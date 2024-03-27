@@ -1,4 +1,4 @@
-module curlrevshell
+module github.com/magisterquis/curlrevshell
 
 go 1.22.1
 
