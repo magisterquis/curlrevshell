@@ -5,14 +5,15 @@ package hsrv
  * io.Writer which sends pink messages to opshell.Shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240325
+ * Last Modified 20240327
  */
 
 import (
-	"curlrevshell/lib/opshell"
 	"fmt"
 	"net"
 	"net/http"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 // Colors for log things

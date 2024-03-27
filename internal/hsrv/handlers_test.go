@@ -5,18 +5,19 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240325
+ * Last Modified 20240327
  */
 
 import (
 	"bytes"
-	"curlrevshell/lib/opshell"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 func TestServerFileHandler(t *testing.T) {

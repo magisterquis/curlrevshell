@@ -6,20 +6,21 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240325
+ * Last Modified 20240327
  */
 
 import (
 	"context"
-	"curlrevshell/internal/hsrv"
-	"curlrevshell/lib/ctxerrgroup"
-	"curlrevshell/lib/opshell"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/magisterquis/curlrevshell/internal/hsrv"
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 const (

@@ -12,8 +12,6 @@ package hsrv
 import (
 	"cmp"
 	"context"
-	"curlrevshell/lib/opshell"
-	"curlrevshell/lib/sstls"
 	"fmt"
 	"log"
 	"net"
@@ -25,6 +23,9 @@ import (
 	"sync/atomic"
 	"text/template"
 	"time"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
 const (

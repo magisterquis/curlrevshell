@@ -5,17 +5,18 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240325
+ * Last Modified 20240327
  */
 
 import (
 	"bytes"
-	"curlrevshell/lib/opshell"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 func TestServerScriptHandler(t *testing.T) {

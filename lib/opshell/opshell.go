@@ -6,13 +6,12 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240325
+ * Last Modified 20240327
  */
 
 import (
 	"bytes"
 	"context"
-	"curlrevshell/lib/ctxerrgroup"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"golang.org/x/term"
 )
 

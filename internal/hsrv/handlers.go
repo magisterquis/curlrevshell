@@ -5,15 +5,16 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240324
+ * Last Modified 20240327
  */
 
 import (
-	"curlrevshell/lib/opshell"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 const (

@@ -5,13 +5,14 @@ package hsrv
  * Tests for logger.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240325
+ * Last Modified 20240327
  */
 
 import (
-	"curlrevshell/lib/opshell"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 func TestServerLogf(t *testing.T) {

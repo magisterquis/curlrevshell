@@ -10,9 +10,10 @@ package hsrv
 
 import (
 	"context"
-	"curlrevshell/lib/opshell"
 	"fmt"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 func newTestServer(t *testing.T) (
