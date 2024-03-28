@@ -5,7 +5,7 @@ package hsrv
  * io.Writer which sends pink messages to opshell.Shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -23,6 +23,17 @@ const (
 	ScriptColor    = opshell.ColorCyan
 	ConnectedColor = opshell.ColorGreen
 )
+
+// Printf sends a colored message to the shell.  The shell will ensure it ends
+// in a newline.  No timestamp will be printed before the line.
+func (s *Server) Printf(color opshell.Color, format string, v ...any) {
+	/* Send the message to be logged. */
+	s.och <- opshell.CLine{
+		Color:       color,
+		Line:        fmt.Sprintf(format, v...),
+		NoTimestamp: true,
+	}
+}
 
 // Logf sends a colered message to the shell.
 func (s *Server) Logf(color opshell.Color, format string, v ...any) {

@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -42,9 +42,10 @@ var ErrOutputClosed = errors.New("output channel closed")
 // CLine is a line and a color to print.  If Prompt is not empty, it is set as
 // the prompt before printing the line.
 type CLine struct {
-	Color  Color
-	Line   string
-	Prompt string
+	Color       Color
+	Line        string
+	Prompt      string
+	NoTimestamp bool /* Don't print a timestamp. */
 }
 
 // Shell is the shell used by an operator.  It's a wrapper around
@@ -182,6 +183,7 @@ func (s *Shell) Do(ctx context.Context) error {
 				/* Print the line. */
 				if _, err := s.Logf(
 					cl.Color,
+					cl.NoTimestamp,
 					"%s",
 					cl.Line,
 				); nil != err {
@@ -237,10 +239,15 @@ func (s *Shell) handleWINCH(ctx context.Context) error {
 // Logf logs a line to the shell.  It is similar to log.Printf but includes
 // a color and only logs the time, not the date.  Logf may be called from
 // multiple goroutines simultaneously.
-func (s *Shell) Logf(color Color, format string, v ...any) (int, error) {
+func (s *Shell) Logf(
+	color Color,
+	noTS bool, /* No timestamp. */
+	format string,
+	v ...any,
+) (int, error) {
 	s.wL.Lock()
 	defer s.wL.Unlock()
-	return logf(s.t, s.t.Escape, color, format, v...)
+	return logf(s.t, s.t.Escape, color, noTS, format, v...)
 }
 
 // logf does what Shell.Logf says it does, but without assuming a shell.
@@ -248,6 +255,7 @@ func logf(
 	w io.Writer,
 	escape *term.EscapeCodes,
 	color Color,
+	noTS bool, /* No timestamp. */
 	format string,
 	v ...any,
 ) (int, error) {
@@ -267,7 +275,9 @@ func logf(
 	if ColorNone != color {
 		b.Write(ColorEC(escape, color))
 	}
-	b.WriteString(time.Now().Format(timeFormat))
+	if !noTS {
+		b.WriteString(time.Now().Format(timeFormat))
+	}
 	b.WriteString(m)
 	if ColorNone != color {
 		b.Write(ColorEC(escape, ColorReset))

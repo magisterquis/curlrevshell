@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -114,6 +114,7 @@ Options:
 	if nil != err {
 		shell.Logf(
 			opshell.ColorRed,
+			false,
 			"Error setting up HTTPS service: %s",
 			err,
 		)
@@ -128,7 +129,7 @@ Options:
 
 	/* Wait for something to go wrong. */
 	if err := eg.Wait(); nil != err {
-		shell.Logf(opshell.ColorRed, "Fatal error: %s", err)
+		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
 		return 1
 	}
 

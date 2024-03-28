@@ -51,8 +51,9 @@ func newTestServer(t *testing.T) (
 		},
 	}, {
 		want: opshell.CLine{
-			Color: ScriptColor,
-			Line:  "\n",
+			Color:       ScriptColor,
+			Line:        "\n",
+			NoTimestamp: true,
 		},
 	}, {
 		want: opshell.CLine{
@@ -62,11 +63,13 @@ func newTestServer(t *testing.T) (
 				s.l.Fingerprint,
 				s.l.Addr().String(),
 			),
+			NoTimestamp: true,
 		},
 	}, {
 		want: opshell.CLine{
-			Color: ScriptColor,
-			Line:  "\n",
+			Color:       ScriptColor,
+			Line:        "\n",
+			NoTimestamp: true,
 		},
 	}, {
 		want: opshell.CLine{
@@ -75,8 +78,9 @@ func newTestServer(t *testing.T) (
 		},
 	}, {
 		want: opshell.CLine{
-			Color: ScriptColor,
-			Line:  "\n",
+			Color:       ScriptColor,
+			Line:        "\n",
+			NoTimestamp: true,
 		},
 	}, {
 		want: opshell.CLine{
@@ -86,11 +90,13 @@ func newTestServer(t *testing.T) (
 				s.l.Fingerprint,
 				s.l.Addr().String(),
 			),
+			NoTimestamp: true,
 		},
 	}, {
 		want: opshell.CLine{
-			Color: ScriptColor,
-			Line:  "\n",
+			Color:       ScriptColor,
+			Line:        "\n",
+			NoTimestamp: true,
 		},
 	}}
 	for i, want := range wantLogs {

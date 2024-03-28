@@ -5,7 +5,7 @@ package opshell
  * Tests for opshell.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240324
+ * Last Modified 20240328
  */
 
 import (
@@ -36,6 +36,7 @@ var testEscapeCodes = &term.EscapeCodes{
 func TestLogf(t *testing.T) {
 	for _, c := range []struct {
 		color  Color
+		noTS   bool
 		format string
 		args   []any
 		want   string
@@ -64,6 +65,18 @@ func TestLogf(t *testing.T) {
 		format: "%s\n",
 		args:   []any{"kittens"},
 		want:   "kittens\n",
+	}, {
+		color:  ColorRed,
+		format: "kittens %d %t",
+		args:   []any{123, true},
+		want:   "\x1b[31mkittens 123 true\n\x1b[0m",
+		noTS:   true,
+	}, {
+		color:  ColorNone,
+		format: "%s",
+		args:   []any{"kittens"},
+		want:   "kittens\n",
+		noTS:   true,
 	}} {
 		t.Run("", func(t *testing.T) {
 			b := new(bytes.Buffer)
@@ -71,22 +84,39 @@ func TestLogf(t *testing.T) {
 				b,
 				testEscapeCodes,
 				c.color,
+				c.noTS,
 				c.format,
 				c.args...,
 			); nil != err {
 				t.Fatalf("Error: %s", err)
 			}
-			if got := removeTimestamp(b.String()); got != c.want {
+			got := b.String()
+			/* Only remove the timestamp if we expect one, to make
+			sure no timestamp messages don't have one. */
+			if !c.noTS {
+				gotNoTS := removeTimestamp(got)
+				/* Make sure we did actually get one. */
+				if gotNoTS == got {
+					t.Errorf(
+						"Did not get timestamp in %q",
+						got,
+					)
+				}
+				got = gotNoTS
+			}
+			if got != c.want {
 				t.Errorf(
 					"Incorrect formatted line:\n"+
 						"format: %q\n"+
 						"  args: %#v\n"+
 						" color: %s\n"+
+						"  noTS: %t\n"+
 						"   got: %q\n"+
 						"  want: %q",
 					c.format,
 					c.args,
 					c.color,
+					c.noTS,
 					got,
 					c.want,
 				)

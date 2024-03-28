@@ -143,31 +143,31 @@ func (s *Server) Do(ctx context.Context) error {
 	/* Tell user where to get static files. */
 	if "" != s.fdir && 0 != len(as) {
 		s.Logf(ScriptColor, "To get files from %s:", s.fdir)
-		s.Logf(ScriptColor, "\n")
+		s.Printf(ScriptColor, "\n")
 		for _, a := range as {
-			s.Logf(
+			s.Printf(
 				ScriptColor,
 				CurlFormat+FileSuffix,
 				s.l.Fingerprint,
 				a,
 			)
 		}
-		s.Logf(ScriptColor, "\n")
+		s.Printf(ScriptColor, "\n")
 	}
 
 	/* Tell the user how to get a callback. */
 	if 0 != len(as) {
 		s.Logf(ScriptColor, "To get a shell:")
-		s.Logf(ScriptColor, "\n")
+		s.Printf(ScriptColor, "\n")
 		for _, a := range as {
-			s.Logf(
+			s.Printf(
 				ScriptColor,
 				CurlFormat+ShellSuffix,
 				s.l.Fingerprint,
 				a,
 			)
 		}
-		s.Logf(ScriptColor, "\n")
+		s.Printf(ScriptColor, "\n")
 	}
 
 	/* Serve until we fail or the context is cancelled. */
@@ -206,6 +206,11 @@ func (s *Server) listenAddresses(l net.Listener) ([]string, error) {
 	}
 	as := make([]string, 0, len(nifs))
 	for _, nif := range nifs {
+		/* Dont print loopback addresses. */
+		if 0 != net.FlagLoopback&nif.Flags {
+			continue
+		}
+		/* Get this interface's addresses. */
 		ifas, err := nif.Addrs()
 		if nil != err {
 			s.ErrorLogf(

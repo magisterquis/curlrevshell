@@ -5,7 +5,7 @@ package hsrv
  * Tests for logger.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -14,6 +14,24 @@ import (
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
+
+func TestServerPrintf(t *testing.T) {
+	_, och, s := newTestServer(t)
+	haveColor := opshell.ColorBlue
+	s.Printf(haveColor, "Hello, %s!", "Kittens")
+	want := opshell.CLine{
+		Color:       haveColor,
+		Line:        "Hello, Kittens!",
+		NoTimestamp: true,
+	}
+	if got := <-och; got != want {
+		t.Errorf(
+			"Incorrect message:\n got: %#v\nwant: %#v",
+			got,
+			want,
+		)
+	}
+}
 
 func TestServerLogf(t *testing.T) {
 	_, och, s := newTestServer(t)
