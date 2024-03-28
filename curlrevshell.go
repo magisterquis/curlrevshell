@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -152,7 +153,9 @@ Options:
 	eg.GoContext(ectx, svr.Do)
 
 	/* Wait for something to go wrong. */
-	if err := eg.Wait(); nil != err {
+	if err := eg.Wait(); errors.Is(err, io.EOF) {
+		shell.Logf(opshell.ColorGreen, false, "Goodbye.")
+	} else if nil != err {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
 		return 1
 	}
