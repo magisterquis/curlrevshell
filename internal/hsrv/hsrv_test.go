@@ -11,6 +11,8 @@ package hsrv
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
@@ -26,7 +28,8 @@ func newTestServer(t *testing.T) (
 		och = make(chan opshell.CLine, 10)
 		td  = t.TempDir()
 	)
-	s, cleanup, err := New("127.0.0.1:0", td, "", ich, och, "")
+	cbAddrs := []string{"kittens.com:8888", "moose.com"}
+	s, cleanup, err := New("127.0.0.1:0", td, "", ich, och, "", cbAddrs)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
 	}
@@ -35,6 +38,17 @@ func newTestServer(t *testing.T) (
 	ctx, cancel := context.WithCancel(context.Background())
 	go s.Do(ctx)
 	t.Cleanup(cancel)
+
+	/* Work out our listen port. */
+	_, listenPort, err := net.SplitHostPort(s.l.Addr().String())
+	if nil != err {
+		t.Fatalf(
+			"Error splitting listen address %s into "+
+				"host and port: %s",
+			s.l.Addr().String(),
+			err,
+		)
+	}
 
 	/* Make sure we get a listening on message. */
 	wantLogs := []struct {
@@ -53,6 +67,26 @@ func newTestServer(t *testing.T) (
 		want: opshell.CLine{
 			Color:       ScriptColor,
 			Line:        "\n",
+			NoTimestamp: true,
+		},
+	}, {
+		want: opshell.CLine{
+			Color: ScriptColor,
+			Line: fmt.Sprintf(
+				CurlFormat+FileSuffix,
+				s.l.Fingerprint,
+				cbAddrs[0],
+			),
+			NoTimestamp: true,
+		},
+	}, {
+		want: opshell.CLine{
+			Color: ScriptColor,
+			Line: fmt.Sprintf(
+				CurlFormat+FileSuffix,
+				s.l.Fingerprint,
+				net.JoinHostPort(cbAddrs[1], listenPort),
+			),
 			NoTimestamp: true,
 		},
 	}, {
@@ -80,6 +114,26 @@ func newTestServer(t *testing.T) (
 		want: opshell.CLine{
 			Color:       ScriptColor,
 			Line:        "\n",
+			NoTimestamp: true,
+		},
+	}, {
+		want: opshell.CLine{
+			Color: ScriptColor,
+			Line: fmt.Sprintf(
+				CurlFormat+ShellSuffix,
+				s.l.Fingerprint,
+				cbAddrs[0],
+			),
+			NoTimestamp: true,
+		},
+	}, {
+		want: opshell.CLine{
+			Color: ScriptColor,
+			Line: fmt.Sprintf(
+				CurlFormat+ShellSuffix,
+				s.l.Fingerprint,
+				net.JoinHostPort(cbAddrs[1], listenPort),
+			),
 			NoTimestamp: true,
 		},
 	}, {
@@ -127,4 +181,70 @@ func newTestServer(t *testing.T) (
 
 func TestServer_Smoketest(t *testing.T) {
 	newTestServer(t)
+}
+
+func TestSortAddresses(t *testing.T) {
+	have := []string{
+		"foo.com:123",
+		"0.0.0.0:123",
+		"[10::10]:123",
+		"10.1.2.3:123",
+		"9.9.9.9:125",
+		"[a:a::a]:123",
+		"9.9.9.9:1023",
+		"9.9.9.9:123",
+		"[10::10]:123",
+		"9.9.9.9:124",
+		"[a:9::a]:123",
+		"[a:1::a]:123",
+		"9.9.9.9:121",
+		"[::1]:123",
+		"[10::10]:123",
+		"[a::a]:123",
+		"[10::10]:123",
+		"[9::9]:123",
+		"[a:1::a]:123",
+		"bar.com:123",
+		"[10::10]:123",
+	}
+	want := []string{
+		"bar.com:123",
+		"foo.com:123",
+		"0.0.0.0:123",
+		"9.9.9.9:121",
+		"9.9.9.9:123",
+		"9.9.9.9:124",
+		"9.9.9.9:125",
+		"9.9.9.9:1023",
+		"10.1.2.3:123",
+		"[::1]:123",
+		"[9::9]:123",
+		"[a::a]:123",
+		"[a:1::a]:123",
+		"[a:9::a]:123",
+		"[a:a::a]:123",
+		"[10::10]:123",
+	}
+	got := sortAddresses(have)
+	if len(got) != len(want) {
+		t.Errorf(
+			"Different length of got (%d) and want (%d) slices",
+			len(got),
+			len(want),
+		)
+	}
+	for i := range min(len(got), len(want)) {
+		if got[i] != want[i] {
+			t.Errorf(
+				"Sorted list incorrect at position %d\n"+
+					"got:\n\n%s\n\n"+
+					"want:\n\n%s",
+				i,
+				strings.Join(got, "\n"),
+				strings.Join(want, "\n"),
+			)
+			break
+		}
+
+	}
 }

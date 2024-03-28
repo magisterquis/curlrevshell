@@ -36,6 +36,7 @@ const (
 func main() { os.Exit(rmain()) }
 func rmain() int {
 	/* Command-line flags. */
+	var cbAddrs []string
 	var (
 		addr = flag.String(
 			"listen-address",
@@ -69,6 +70,15 @@ func rmain() int {
 			false,
 			"Don't print timestamps",
 		)
+	)
+	flag.Func(
+		"callback-address",
+		"Additional callback `address` or domain, for "+
+			"one-liner printing (may be repeated)",
+		func(s string) error {
+			cbAddrs = append(cbAddrs, s)
+			return nil
+		},
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(
@@ -116,7 +126,15 @@ Options:
 	defer cleanup()
 
 	/* HTTPS Server */
-	svr, cleanup, err := hsrv.New(*addr, *fdir, *tmplf, ich, och, *certFile)
+	svr, cleanup, err := hsrv.New(
+		*addr,
+		*fdir,
+		*tmplf,
+		ich,
+		och,
+		*certFile,
+		cbAddrs,
+	)
 	if nil != err {
 		shell.Logf(
 			opshell.ColorRed,
