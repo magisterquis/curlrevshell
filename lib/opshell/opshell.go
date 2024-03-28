@@ -51,23 +51,31 @@ type CLine struct {
 // Shell is the shell used by an operator.  It's a wrapper around
 // golang.org/x/term.Terminal.
 type Shell struct {
-	t    *term.Terminal
-	ich  chan<- string
-	och  <-chan CLine
-	ttyF *os.File
-	wL   sync.Mutex /* Write lock. */
+	t            *term.Terminal
+	ich          chan<- string
+	och          <-chan CLine
+	ttyF         *os.File
+	noTimestamps bool
+	wL           sync.Mutex /* Write lock. */
 }
 
 // New puts the controlly TTY in raw mode and returns a new Shell wrapping
 // stdio.  Call Shell.Do to start processing lines and handle resizing and
 // call the returned function to restore the TTY's state and clean up other
-// resources.  ich will be closed before Shell.Do returns.
-func New(ich chan<- string, och <-chan CLine, prompt string) (*Shell, func(), error) {
+// resources.  ich will be closed before Shell.Do returns.  IF noTimestamps is
+// true, no timestamps will be printed.
+func New(
+	ich chan<- string,
+	och <-chan CLine,
+	prompt string,
+	noTimestamps bool,
+) (*Shell, func(), error) {
 	/* Shell to return. */
 	s := Shell{
-		t:   term.NewTerminal(stdioRW{}, prompt),
-		ich: ich,
-		och: och,
+		t:            term.NewTerminal(stdioRW{}, prompt),
+		ich:          ich,
+		och:          och,
+		noTimestamps: noTimestamps,
 	}
 	var err error
 	if s.ttyF, err = os.Open(ttyPath); nil != err {
@@ -247,7 +255,14 @@ func (s *Shell) Logf(
 ) (int, error) {
 	s.wL.Lock()
 	defer s.wL.Unlock()
-	return logf(s.t, s.t.Escape, color, noTS, format, v...)
+	return logf(
+		s.t,
+		s.t.Escape,
+		color,
+		noTS || s.noTimestamps,
+		format,
+		v...,
+	)
 }
 
 // logf does what Shell.Logf says it does, but without assuming a shell.

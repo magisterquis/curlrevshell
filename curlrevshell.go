@@ -64,6 +64,11 @@ func rmain() int {
 			"Optional `file` in which to cache generated "+
 				"TLS certificate",
 		)
+		noTimestamps = flag.Bool(
+			"no-timestamps",
+			false,
+			"Don't print timestamps",
+		)
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(
@@ -102,6 +107,7 @@ Options:
 		ich,
 		och,
 		Prompt,
+		*noTimestamps,
 	)
 	och <- opshell.CLine{Prompt: shell.WrapInColor(Prompt, opshell.ColorCyan)}
 	if nil != err {
