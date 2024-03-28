@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240328
  */
 
 import (
@@ -58,7 +58,7 @@ func newTestServer(t *testing.T) (
 		want: opshell.CLine{
 			Color: ScriptColor,
 			Line: fmt.Sprintf(
-				CurlFormat,
+				CurlFormat+FileSuffix,
 				s.l.Fingerprint,
 				s.l.Addr().String(),
 			),
