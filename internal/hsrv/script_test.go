@@ -5,11 +5,12 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20240329
  */
 
 import (
 	"bytes"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -78,6 +79,18 @@ done >/dev/null 2>&1
 }
 
 func TestC2URL(t *testing.T) {
+	_, _, s := newTestServer(t)
+	/* Work out our listen port, for testing. */
+	_, serverPort, err := net.SplitHostPort(s.l.Addr().String())
+	if nil != err {
+		t.Fatalf("Error getting server's listen port: %s", err)
+	}
+	if HTTPSPort == serverPort {
+		t.Fatalf(
+			"Test server listening on port %s, this breaks tests",
+			HTTPSPort,
+		)
+	}
 	for _, c := range []struct {
 		have *http.Request
 		want string
@@ -121,7 +134,7 @@ func TestC2URL(t *testing.T) {
 			req.Host = ""
 			return req
 		}(),
-		want: "kittens.com",
+		want: net.JoinHostPort("kittens.com", serverPort),
 	}, {
 		have: func() *http.Request {
 			req := httptest.NewRequest(
@@ -138,7 +151,7 @@ func TestC2URL(t *testing.T) {
 		want: "moose.com",
 	}} {
 		t.Run(c.have.URL.String(), func(t *testing.T) {
-			got, err := c2URL(c.have)
+			got, err := s.c2URL(c.have)
 			if nil != err {
 				t.Fatalf("Error: %s", err)
 			}
