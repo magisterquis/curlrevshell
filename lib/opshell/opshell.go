@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20240329
  */
 
 import (
@@ -302,3 +302,8 @@ func logf(
 	n, err := b.WriteTo(w)
 	return int(n), err
 }
+
+// SetPrompt sets the shell's prompt.  This can also be done by sending it a
+// CLine with CLine.Prompt set.  Don't forget a trailing space.
+// Use s.WrapIncolor to color the prompt.
+func (s *Shell) SetPrompt(prompt string) { s.t.SetPrompt(prompt) }
