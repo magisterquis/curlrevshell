@@ -68,12 +68,16 @@ Options:
     	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
     	Optional callback template file
+  -ipv6-one-liners
+    	Also print callback one-liners with IPv6 addresses
   -listen-address address
     	Listen address (default "0.0.0.0:4444")
   -no-timestamps
     	Don't print timestamps
   -print-default-template
     	Write the default template to stdout and exit
+  -prompt string
+    	Terminal prompt; don't forget a trailing space (default "> ")
   -serve-files-from directory
     	Optional directory from which to serve static files
   -tls-certificate-cache file
