@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20240329
  */
 
 import (
@@ -53,14 +53,15 @@ var (
 
 // Server serves implants over HTTPS.
 type Server struct {
-	fdir    string /* Static files directory. */
-	ich     <-chan string
-	och     chan<- opshell.CLine
-	l       sstls.Listener
-	ps      pinkSender
-	tmpl    *template.Template
-	curID   atomic.Pointer[string] /* Current implant ID. */
-	cbAddrs []string
+	fdir      string /* Static files directory. */
+	ich       <-chan string
+	och       chan<- opshell.CLine
+	l         sstls.Listener
+	ps        pinkSender
+	tmpl      *template.Template
+	curID     atomic.Pointer[string] /* Current implant ID. */
+	cbAddrs   []string
+	printIPv6 bool
 }
 
 // New returns a new Server, listening on addr.  Call its Do method to start it
@@ -76,6 +77,7 @@ func New(
 	och chan<- opshell.CLine,
 	certFile string,
 	cbAddrs []string, /* Callback addresses, for one-liners. */
+	printIPv6 bool,
 ) (*Server, func(), error) {
 	var l sstls.Listener
 
@@ -121,13 +123,14 @@ func New(
 	}
 
 	return &Server{
-		fdir:    fdir,
-		ich:     ich,
-		och:     och,
-		l:       l,
-		ps:      pinkSender{och},
-		tmpl:    tmpl,
-		cbAddrs: cbAddrs,
+		fdir:      fdir,
+		ich:       ich,
+		och:       och,
+		l:         l,
+		ps:        pinkSender{och},
+		tmpl:      tmpl,
+		cbAddrs:   cbAddrs,
+		printIPv6: printIPv6,
 	}, cleanup, nil
 }
 
@@ -144,7 +147,7 @@ func (s *Server) Do(ctx context.Context) error {
 	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 
 	/* Work out our listen addresses, for user help. */
-	as, err := s.listenAddresses(s.l)
+	as, err := s.listenAddresses()
 	if nil != err {
 		s.ErrorLogf("Error determining callback address: %s", err)
 	}
@@ -195,12 +198,12 @@ func (s *Server) Do(ctx context.Context) error {
 }
 
 // listenAddresseses gets all of the addresses we have for the box.
-func (s *Server) listenAddresses(l net.Listener) ([]string, error) {
+func (s *Server) listenAddresses() ([]string, error) {
 	var addrs []string
 
 	/* Parse the listen address and port, which we'll need for
 	manually-added callback addresses. */
-	ls := l.Addr().String()
+	ls := s.l.Addr().String()
 	ap, err := netip.ParseAddrPort(ls)
 	if nil != err {
 		return nil, fmt.Errorf(
@@ -248,13 +251,27 @@ func (s *Server) listenAddresses(l net.Listener) ([]string, error) {
 		}
 		/* Keep hold of each address on this interface. */
 		for _, ifa := range ifas {
-			s := ifa.String()
+			ps := ifa.String()
 			/* If we have a netmask, remove it. */
-			if a, err := netip.ParsePrefix(s); nil == err {
-				s = a.Addr().String()
+			p, err := netip.ParsePrefix(ps)
+			if nil != err {
+				s.ErrorLogf(
+					"Error parsing "+
+						"callback address %s: %s",
+					ps,
+					err,
+				)
+				continue
+			}
+			/* If it's IPv6, make sure we want it. */
+			if p.Addr().Is6() && !s.printIPv6 {
+				continue
 			}
 			/* Save the address with the listen port. */
-			addrs = append(addrs, net.JoinHostPort(s, port))
+			addrs = append(addrs, net.JoinHostPort(
+				p.Addr().String(),
+				port,
+			))
 		}
 	}
 	addrs = sortAddresses(addrs)

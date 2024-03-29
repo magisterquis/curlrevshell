@@ -71,6 +71,11 @@ func rmain() int {
 			false,
 			"Don't print timestamps",
 		)
+		printIPv6 = flag.Bool(
+			"ipv6-one-liners",
+			false,
+			"Also print callback one-liners with IPv6 addresses",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -141,6 +146,7 @@ Options:
 		och,
 		*certFile,
 		cbAddrs,
+		*printIPv6,
 	)
 	if nil != err {
 		shell.Logf(

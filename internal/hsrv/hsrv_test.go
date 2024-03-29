@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20240329
  */
 
 import (
@@ -29,7 +29,16 @@ func newTestServer(t *testing.T) (
 		td  = t.TempDir()
 	)
 	cbAddrs := []string{"kittens.com:8888", "moose.com"}
-	s, cleanup, err := New("127.0.0.1:0", td, "", ich, och, "", cbAddrs)
+	s, cleanup, err := New(
+		"127.0.0.1:0",
+		td,
+		"",
+		ich,
+		och,
+		"",
+		cbAddrs,
+		true,
+	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
 	}
