@@ -103,6 +103,12 @@ func New(
 		}
 	}
 
+	/* Make sure the listen address has a port, and if not ask the OS to
+	choose one for us. */
+	if _, p, err := net.SplitHostPort(addr); "" == p || nil != err {
+		addr = net.JoinHostPort(addr, "0")
+	}
+
 	/* Start our listener. */
 	if l, err = sstls.Listen(
 		"tcp",
