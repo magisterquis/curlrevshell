@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20240329
  */
 
 import (
@@ -25,13 +25,16 @@ import (
 )
 
 const (
-	// Prompt is the shell prompt, settable at compile-time.  It will be
-	// colored Cyan.
-	Prompt = "> "
 	// CertFileDir is the base name of the cert cache file.
 	CertCacheDir = "curlrevshell"
 	// CertCacheFile is the file we stick in CertCacheDir.
 	CertCacheFile = "cert.txtar"
+)
+
+var (
+	// Prompt is the shell prompt, settable at compile-time.  It will be
+	// colored Cyan.
+	Prompt = "> "
 )
 
 func main() { os.Exit(rmain()) }
@@ -71,6 +74,12 @@ func rmain() int {
 			false,
 			"Don't print timestamps",
 		)
+	)
+	flag.StringVar(
+		&Prompt,
+		"prompt",
+		Prompt,
+		"Terminal prompt; don't forget a trailing space",
 	)
 	flag.Func(
 		"callback-address",
