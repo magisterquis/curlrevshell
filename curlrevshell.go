@@ -24,14 +24,11 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
-const (
+var (
 	// CertFileDir is the base name of the cert cache file.
 	CertCacheDir = "curlrevshell"
 	// CertCacheFile is the file we stick in CertCacheDir.
 	CertCacheFile = "cert.txtar"
-)
-
-var (
 	// Prompt is the shell prompt, settable at compile-time.  It will be
 	// colored Cyan.
 	Prompt = "> "
