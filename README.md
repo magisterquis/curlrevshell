@@ -30,7 +30,7 @@ Example
 It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@latest
-go: downloading github.com/magisterquis/curlrevshell v0.0.1-beta.2
+go: downloading github.com/magisterquis/curlrevshell v0.0.1-beta.3
 go: downloading golang.org/x/net v0.22.0
 go: downloading golang.org/x/sync v0.6.0
 go: downloading golang.org/x/term v0.18.0
