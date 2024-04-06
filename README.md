@@ -3,11 +3,8 @@ cURL-Powered Reverse Shell
 Somewhat kooky replacement for the typical `bash >/dev/tcp...` reverse shell,
 but with the following "features":
 
-- Underlying comms via HTTPS via cURL
+- Underlying comms via HTTPS via double cURL
 - Self-signed TLS certificate, plus certificate pinning
-- One cURL execution per output line
-- Lots and lots of fork and exec
-- Like, lots
 - Optionally serves static files
 - Accepts multiple shells in series, like `nc -lk` but in color
 - IPv6-ready

@@ -21,7 +21,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"text/template"
 	"time"
 
@@ -69,7 +69,9 @@ type Server struct {
 	l         sstls.Listener
 	ps        pinkSender
 	tmpl      *template.Template
-	curID     atomic.Pointer[string] /* Current implant ID. */
+	curIDL    sync.Mutex
+	curIDIn   string /* Current Implant ID, for shell input. */
+	curIDOut  string /* Current Implant ID, for shell output. */
 	cbAddrs   []string
 	printIPv6 bool
 }

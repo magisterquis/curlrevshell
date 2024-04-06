@@ -201,7 +201,7 @@ func TestServerInputHandler(t *testing.T) {
 			s.inputHandler(rr, req)
 		}()
 
-		/* Should get two input lines. */
+		/* Should get a server message plus two input lines. */
 		wantLogs := []string{
 			`{"time":"","level":"INFO","msg":"New connection",` +
 				`"http_request":{` +
@@ -210,7 +210,7 @@ func TestServerInputHandler(t *testing.T) {
 				`"request_uri":"/i/` + id + `",` +
 				`"protocol":"HTTP/1.1","host":"example.com",` +
 				`"sni":"","user_agent":"",` +
-				`"id":"` + id + `"}}`,
+				`"id":"` + id + `"},"direction":"input"}`,
 		}
 		for _, l := range haveLines {
 			msg := `{"time":"","level":"INFO",` +
@@ -247,10 +247,13 @@ func TestServerInputHandler(t *testing.T) {
 		/* Make sure shell output is good. */
 		wantCLines := []opshell.CLine{{
 			Color: ConnectedColor,
-			Line:  "[192.0.2.1] Got a shell: ID:" + id,
+			Line:  "[192.0.2.1] Input connected: ID:" + id,
 		}, {
 			Color: ErrorColor,
-			Line:  "[192.0.2.1] Disconnected.",
+			Line:  "[192.0.2.1] Input connection closed",
+		}, {
+			Color: ErrorColor,
+			Line:  "[192.0.2.1] " + ShellDisconnectedMessage,
 		}}
 		wantN := len(wantCLines)
 		gotN := len(och)
@@ -281,7 +284,7 @@ func TestServerInputHandler(t *testing.T) {
 			`"remote_addr":"192.0.2.1:1234","method":"GET",`+
 			`"request_uri":"/i/`+id+`","protocol":"HTTP/1.1",`+
 			`"host":"example.com","sni":"","user_agent":"",`+
-			`"id":"`+id+`"}}`,
+			`"id":"`+id+`"},"direction":"input"}`,
 		)
 	}
 
@@ -315,7 +318,7 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	}()
 	wantCLine := opshell.CLine{
 		Color: ConnectedColor,
-		Line:  "[192.0.2.1] Got a shell: ID:kittens",
+		Line:  "[192.0.2.1] Input connected: ID:kittens",
 	}
 	if gotCLine := <-och; gotCLine != wantCLine {
 		t.Fatalf(
@@ -332,7 +335,7 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
 			`"method":"GET","request_uri":"/i/`+id+`",`+
 			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"`+id+`"}}`,
+			`"user_agent":"","id":"`+id+`"},"direction":"input"}`,
 	)
 
 	/* Second (rejected) connection. */
@@ -344,7 +347,7 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	s.inputHandler(rr, req)
 
 	/* Did it work? */
-	if want := http.StatusServiceUnavailable; want != rr.Code {
+	if want := http.StatusFailedDependency; want != rr.Code {
 		t.Errorf(
 			"Incorrect status code\n"+
 				" got: %d\n"+
@@ -367,7 +370,8 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	/* Make sure logs are good. */
 	wantLogs := []opshell.CLine{{
 		Color: ErrorColor,
-		Line:  "[192.0.2.1] Rejected connection from ID moose, current ID is kittens",
+		Line: "[192.0.2.1] Rejected unexpected input " +
+			"connection with ID " + id,
 	}}
 	wantN := len(wantLogs)
 	gotN := len(och)
@@ -392,62 +396,25 @@ func TestServerOutputHandler(t *testing.T) {
 	output := "moose"
 	id := "kittens"
 
-	/* Try with nothing connected. */
-	t.Run("nothing_connected", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		req := httptest.NewRequest(
-			http.MethodGet,
-			"/o/"+id,
-			strings.NewReader(output),
-		)
-		req.SetPathValue(idParam, id)
-		s.outputHandler(rr, req)
-		/* Did it work? */
-		if want := http.StatusFailedDependency; want != rr.Code {
-			t.Fatalf(
-				"Incorrect status code\n"+
-					" got: %d\n"+
-					"want: %d",
-				rr.Code,
-				want,
-			)
-		}
-		wantBody := UnexpectedOutputMessage + "\n"
-		if got := rr.Body.String(); got != wantBody {
-			t.Errorf(
-				"Incorrect body:\n"+
-					"got:\n%s\n"+
-					"want:\n%s\n",
-				got,
-				wantBody,
-			)
-		}
-		wantLog := opshell.CLine{
-			Color: ErrorColor,
-			Line: "[192.0.2.1] No connection but got " +
-				"output from ID kittens",
-		}
-		if gotLog := <-och; gotLog != wantLog {
-			t.Fatalf(
-				"Incorrect log from input connection:\n"+
-					" got: %#v\n"+
-					"want: %#v",
-				gotLog,
-				wantLog,
-			)
-		}
-		cl.ExpectEmpty(t)
-	})
-
 	/* Connect a connection. */
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/i/"+id,
+		nil,
+	).WithContext(ctx)
 	req.SetPathValue(idParam, id)
-	go s.inputHandler(rr, req)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.inputHandler(rr, req)
+	}()
 	wantLog := opshell.CLine{
 		Color: ConnectedColor,
-		Line:  "[192.0.2.1] Got a shell: ID:kittens",
+		Line:  "[192.0.2.1] Input connected: ID:kittens",
 	}
 	if gotLog := <-och; gotLog != wantLog {
 		t.Fatalf(
@@ -478,12 +445,26 @@ func TestServerOutputHandler(t *testing.T) {
 			t.Errorf("Response body non-empty, has %d bytes", got)
 		}
 		wantLogs := []opshell.CLine{{
-			Line: output,
+			Color: ConnectedColor,
+			Line:  "[192.0.2.1] Output connected: ID:kittens",
+		}, {
+			Color: ConnectedColor,
+			Line:  "[192.0.2.1] " + ShellReadyMessage,
+		}, {
+			Line:  output,
+			Plain: true,
+		}, {
+			Color: ErrorColor,
+			Line:  "[192.0.2.1] Output connection closed",
 		}}
 		wantN := len(wantLogs)
 		gotN := len(och)
 		if gotN != wantN {
-			t.Errorf("Expected %d logs, got %d", wantN, gotN)
+			t.Errorf(
+				"Expected %d shell messages, got %d",
+				wantN,
+				gotN,
+			)
 		}
 		for i := 0; i < min(gotN, wantN); i++ {
 			if got := <-och; got != wantLogs[i] {
@@ -496,6 +477,9 @@ func TestServerOutputHandler(t *testing.T) {
 				)
 			}
 		}
+		for 0 != len(och) {
+			t.Errorf("Extra shell message: %#v", <-och)
+		}
 		cl.ExpectEmpty(
 			t,
 			`{"time":"","level":"INFO","msg":"New connection",`+
@@ -503,14 +487,29 @@ func TestServerOutputHandler(t *testing.T) {
 				`"remote_addr":"192.0.2.1:1234",`+
 				`"method":"GET","request_uri":"/i/`+id+`",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"`+id+`"}}`,
+				`"sni":"","user_agent":"","id":"`+id+`"},`+
+				`"direction":"input"}`,
+			`{"time":"","level":"INFO","msg":"New connection",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/o/`+id+`",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":"`+id+`"},`+
+				`"direction":"output"}`,
 			`{"time":"","level":"INFO","msg":"Shell output",`+
 				`"http_request":{`+
 				`"remote_addr":"192.0.2.1:1234",`+
 				`"method":"GET","request_uri":"/o/`+id+`",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"",`+
-				`"id":"`+id+`"},"line":"`+output+`"}`,
+				`"id":"`+id+`"},"output":"`+output+`"}`,
+			`{"time":"","level":"INFO","msg":"Disconnected",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/o/`+id+`",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":"`+id+`"},`+
+				`"direction":"output"}`,
 		)
 	})
 
@@ -536,7 +535,7 @@ func TestServerOutputHandler(t *testing.T) {
 				want,
 			)
 		}
-		wantBody := UnexpectedOutputMessage + "\n"
+		wantBody := MultiConnectionMessage + "\n"
 		if got := rr.Body.String(); got != wantBody {
 			t.Errorf(
 				"Incorrect body:\n"+
@@ -548,8 +547,8 @@ func TestServerOutputHandler(t *testing.T) {
 		}
 		wantLogs := []opshell.CLine{{
 			Color: ErrorColor,
-			Line: "[192.0.2.1] Got output from ID moose " +
-				"while ID kittens is connected",
+			Line: "[192.0.2.1] Rejected output connection with " +
+				"ID moose, expcted kittens",
 		}}
 		wantN := len(wantLogs)
 		gotN := len(och)
@@ -569,4 +568,16 @@ func TestServerOutputHandler(t *testing.T) {
 		}
 		cl.ExpectEmpty(t)
 	})
+
+	/* Make sure the handler closes so we don't close a channel to which
+	something may write. */
+	cancel()
+	wg.Wait()
+
+	/* Server logs? */
+	cl.ExpectEmpty(t, `{"time":"","level":"INFO","msg":"Disconnected",`+
+		`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+		`"method":"GET","request_uri":"/i/`+id+`",`+
+		`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+		`"user_agent":"","id":"`+id+`"},"direction":"input"}`)
 }

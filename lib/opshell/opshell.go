@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240329
+ * Last Modified 20240406
  */
 
 import (
@@ -46,6 +46,7 @@ type CLine struct {
 	Line        string
 	Prompt      string
 	NoTimestamp bool /* Don't print a timestamp. */
+	Plain       bool /* No newline, color, timestamp, or anything else. */
 }
 
 // Shell is the shell used by an operator.  It's a wrapper around
@@ -175,34 +176,7 @@ func (s *Shell) Do(ctx context.Context) error {
 	})
 
 	/* Send lines sent to us to the shell. */
-	eg.GoContext(ectx, func(ctx context.Context) error {
-		for {
-			select {
-			case <-ctx.Done():
-				return context.Cause(ctx)
-			case cl, ok := <-s.och:
-				if !ok {
-					return ErrOutputClosed
-				}
-				/* Set the prompt if we have one. */
-				if p := cl.Prompt; "" != p {
-					s.t.SetPrompt(p)
-				}
-				/* Print the line. */
-				if _, err := s.Logf(
-					cl.Color,
-					cl.NoTimestamp,
-					"%s",
-					cl.Line,
-				); nil != err {
-					return fmt.Errorf(
-						"writing to shell: %w",
-						err,
-					)
-				}
-			}
-		}
-	})
+	eg.GoContext(ectx, s.handleOutput)
 
 	return eg.Wait()
 }
@@ -240,6 +214,41 @@ func (s *Shell) handleWINCH(ctx context.Context) error {
 			}
 		case <-ctx.Done():
 			return context.Cause(ctx)
+		}
+	}
+}
+
+/* handleOutput handles reading from s.och and writing to s.t */
+func (s *Shell) handleOutput(ctx context.Context) error {
+	var (
+		cl CLine
+		ok bool
+	)
+	for {
+		/* Try to grab some output. */
+		select {
+		case <-ctx.Done():
+			return context.Cause(ctx)
+		case cl, ok = <-s.och:
+			if !ok {
+				return ErrOutputClosed
+			}
+		}
+		/* Set the prompt if we have one. */
+		if p := cl.Prompt; "" != p {
+			s.t.SetPrompt(p)
+		}
+		/* Send the line where it goes. */
+		var err error
+		if cl.Plain {
+			/* Straight to the terminal. */
+			_, err = io.WriteString(s.t, cl.Line)
+		} else {
+			/* Print the line nicely. */
+			_, err = s.Logf(cl.Color, cl.NoTimestamp, "%s", cl.Line)
+		}
+		if nil != err {
+			return fmt.Errorf("writing to terminal: %w", err)
 		}
 	}
 }
