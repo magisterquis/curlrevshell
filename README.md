@@ -11,6 +11,7 @@ but with the following "features":
 - Optionally serves static files
 - Accepts multiple shells in series, like `nc -lk` but in color
 - IPv6-ready
+- Non-zero [documentation](./doc/README.md)
 
 For legal use only
 
