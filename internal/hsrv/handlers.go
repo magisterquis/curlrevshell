@@ -5,12 +5,13 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240406
  */
 
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -29,6 +30,18 @@ const (
 	// UnexpectedOutputMessage is returned when an implant sends an output
 	// line but hasn't connected to /i/{id}.
 	UnexpectedOutputMessage = "Wat?"
+)
+
+// Log messages and keys.
+const (
+	LMFileRequested  = "File requested"
+	LMShellInput     = "Sent shell input"
+	LMNewConnection  = "New connection"
+	LMDisconnected   = "Disconnected"
+	LMShellOutput    = "Shell output"
+	LKStaticFilesDir = "static_files_dir"
+	LKFilename       = "filename"
+	LKLine           = "line"
 )
 
 // newMux returns a new ServeMux, ready to serve.
@@ -50,6 +63,8 @@ func (s *Server) newMux() *http.ServeMux {
 
 // fileHandler logs and serves files.
 func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
+	sl := s.requestLogger(r).With(LKStaticFilesDir, s.fdir)
+
 	/* Work out what to send back. */
 	s.RLogf(FileColor, r, "File requested: %s", r.URL)
 	f, err := os.Open(s.fdir)
@@ -66,6 +81,8 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sl.Info(LMFileRequested)
+
 	/* If we've just been given one file, send it for all requests. */
 	if fi.Mode().IsRegular() {
 		http.ServeContent(w, r, s.fdir, fi.ModTime(), f)
@@ -78,9 +95,12 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 // inputHandler accepts a connection from a shell and sends it input.
 func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
+	sl := s.requestLogger(r)
+
 	/* Get the Implant ID. */
 	id := s.getID(r)
 	if "" == id {
+		s.RErrorLogf(r, "No ID in URL")
 		return
 	}
 
@@ -113,6 +133,8 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	s.RLogf(ConnectedColor, r, "Got a shell: ID:%s", id)
 	defer s.curID.Store(nil)
+	sl.Info(LMNewConnection)
+	defer sl.Info(LMDisconnected)
 
 	/* Proxy lines from stdin. */
 	rc := http.NewResponseController(w)
@@ -130,6 +152,7 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 				s.RErrorLogf(r, "Error flushing line: %s", err)
 				return
 			}
+			sl.Info(LMShellInput, LKLine, l)
 		case <-r.Context().Done():
 			s.RErrorLogf(r, "Disconnected.")
 			return
@@ -140,9 +163,12 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 // outputHandler receives a line of output from the shell and prints it, if the
 // id matches the currently-connected shell.
 func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
+	sl := s.requestLogger(r)
+
 	/* Get the Implant ID. */
 	id := s.getID(r)
 	if "" == id {
+		s.RErrorLogf(r, "No ID in URL")
 		return
 	}
 	/* Make sure it's the right shell. */
@@ -173,6 +199,7 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 	/* Send the output back. */
 	b, err := io.ReadAll(r.Body)
 	if 0 != len(b) {
+		sl.Info(LMShellOutput, LKLine, string(b))
 		s.Logf(opshell.ColorNone, "%s", string(b))
 	}
 	if nil != err {
@@ -184,8 +211,26 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 // logs and error and returns the empty string.
 func (s *Server) getID(r *http.Request) string {
 	id := r.PathValue(idParam)
-	if "" == id {
-		s.RErrorLogf(r, "No ID in URL")
-	}
 	return id
+}
+
+// requestLogger returns a log.Logger which has information about r.
+func (s *Server) requestLogger(r *http.Request) *slog.Logger {
+	/* Work out the SNI, which may or may not exyist. */
+	var sni string
+	if nil != r.TLS {
+		sni = r.TLS.ServerName
+	}
+	/* Logger with ALL the info. */
+	return s.sl.With(slog.Group(
+		"http_request",
+		"remote_addr", r.RemoteAddr,
+		"method", r.Method,
+		"request_uri", r.RequestURI,
+		"protocol", r.Proto,
+		"host", r.Host,
+		"sni", sni,
+		"user_agent", r.UserAgent(),
+		"id", s.getID(r),
+	))
 }

@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240402
+ * Last Modified 20240406
  */
 
 import (
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -33,6 +34,14 @@ var (
 	// Prompt is the shell prompt, settable at compile-time.  It will be
 	// colored Cyan.
 	Prompt = "> "
+	// LogEnvVar is the environment variable we use for the default
+	// logfile, which will be "" if unset.
+	LogEnvVar = "CURLREVSHELL_LOG"
+)
+
+// Log messages and keys.
+const (
+	LKTerminating = "Program terminating"
 )
 
 func main() { os.Exit(rmain()) }
@@ -82,6 +91,11 @@ func rmain() int {
 			false,
 			"Query icanhazip.com for a callback address",
 		)
+		logFile = flag.String(
+			"log",
+			os.Getenv(LogEnvVar),
+			"Optional `file` to which to write JSON logs",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -125,6 +139,26 @@ Options:
 		return 0
 	}
 
+	/* Set up logging.  If we're not writing to a logfile, we'll just kinda
+	discard log messages.  Beats checking for nil, anyways. */
+	var lw = io.Discard
+	if "" != *logFile {
+		f, err := os.OpenFile(
+			*logFile,
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+			0600,
+		)
+		if nil != err {
+			log.Fatalf("Error opening logfile %s: %s",
+				*logFile,
+				err,
+			)
+		}
+		defer f.Close()
+		lw = f
+	}
+	sl := slog.New(slog.NewJSONHandler(lw, nil))
+
 	/* Channels for comms between subsystems. */
 	var (
 		ich = make(chan string, 1024)
@@ -162,6 +196,7 @@ Options:
 
 	/* HTTPS Server */
 	svr, cleanup, err := hsrv.New(
+		sl,
 		*addr,
 		*fdir,
 		*tmplf,
@@ -191,8 +226,10 @@ Options:
 	if err := eg.Wait(); errors.Is(err, io.EOF) {
 		shell.SetPrompt("")
 		shell.Logf(opshell.ColorGreen, false, "Goodbye.")
+		sl.Info(LKTerminating)
 	} else if nil != err {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
+		sl.Info(LKTerminating, hsrv.LKError, err)
 		return 1
 	}
 

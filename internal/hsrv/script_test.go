@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240329
+ * Last Modified 20240406
  */
 
 import (
@@ -21,7 +21,7 @@ import (
 )
 
 func TestServerScriptHandler(t *testing.T) {
-	_, och, s := newTestServer(t)
+	cl, _, och, s := newTestServer(t)
 	rr := httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
 	s.scriptHandler(rr, httptest.NewRequest(http.MethodGet, "/c", nil))
@@ -76,10 +76,11 @@ done >/dev/null 2>&1
 			wantBody,
 		)
 	}
+	cl.ExpectEmpty(t)
 }
 
 func TestC2URL(t *testing.T) {
-	_, _, s := newTestServer(t)
+	cl, _, _, s := newTestServer(t)
 	/* Work out our listen port, for testing. */
 	_, serverPort, err := net.SplitHostPort(s.l.Addr().String())
 	if nil != err {
@@ -166,4 +167,5 @@ func TestC2URL(t *testing.T) {
 			}
 		})
 	}
+	cl.ExpectEmpty(t)
 }

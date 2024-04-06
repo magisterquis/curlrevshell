@@ -5,12 +5,13 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240329
+ * Last Modified 20240406
  */
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"strings"
 	"testing"
@@ -19,17 +20,21 @@ import (
 )
 
 func newTestServer(t *testing.T) (
-	chan<- string,
+	chanLog, /* Server logs. */
+	chan<- string, /* From shell */
 	<-chan opshell.CLine,
 	*Server,
 ) {
 	var (
+		cl  = chanLog(make(chan string, 1024))
 		ich = make(chan string, 10)
 		och = make(chan opshell.CLine, 10)
+		ech = make(chan error, 1)
 		td  = t.TempDir()
 	)
 	cbAddrs := []string{"kittens.com:8888", "moose.com"}
 	s, cleanup, err := New(
+		slog.New(slog.NewJSONHandler(chanLog(cl), nil)),
 		"127.0.0.1:0",
 		td,
 		"",
@@ -43,9 +48,10 @@ func newTestServer(t *testing.T) (
 		t.Fatalf("Creating server: %s", err)
 	}
 	t.Cleanup(cleanup)
+	t.Cleanup(func() { <-ech; close(cl) })
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go s.Do(ctx)
+	go func() { ech <- s.Do(ctx); close(ech) }()
 	t.Cleanup(cancel)
 
 	/* Work out our listen port. */
@@ -60,7 +66,7 @@ func newTestServer(t *testing.T) (
 	}
 
 	/* Make sure we get a listening on message. */
-	wantLogs := []struct {
+	wantCLines := []struct {
 		prep func(s string) string
 		want opshell.CLine
 	}{{
@@ -162,14 +168,14 @@ func newTestServer(t *testing.T) (
 			NoTimestamp: true,
 		},
 	}}
-	for i, want := range wantLogs {
+	for i, want := range wantCLines {
 		got := <-och
 		if nil != want.prep {
 			got.Line = want.prep(got.Line)
 		}
 		if got != want.want {
 			t.Errorf(
-				"Incorrect log message:\n"+
+				"Incorrect shell message:\n"+
 					"   i: %d\n"+
 					" got: %#v\n"+
 					"want: %#v",
@@ -180,12 +186,18 @@ func newTestServer(t *testing.T) (
 		}
 	}
 
+	/* Make sure we get exactly the logs we expect. */
+	cl.ExpectEmpty(t,
+		`{"time":"","level":"INFO","msg":"Listener started",`+
+			`"address":"`+s.l.Addr().String()+`"}`,
+	)
+
 	/* Don't keep going if we have an error. */
 	if t.Failed() {
 		t.FailNow()
 	}
 
-	return ich, och, s
+	return cl, ich, och, s
 }
 
 func TestServer_Smoketest(t *testing.T) {
@@ -256,4 +268,88 @@ func TestSortAddresses(t *testing.T) {
 		}
 
 	}
+}
+
+// chanLog wraps a chan string as a blockingish logfile.  Writes are sent as
+// strings less timestamps and surrounding whitespace to the wrapped chan.
+// Don't send it anything which isn't a log line.
+type chanLog chan string
+
+// Write converts b to a string and sends it to cl.  It always returns
+// len(b), nil.
+func (cl chanLog) Write(b []byte) (int, error) {
+	line := string(b)
+
+	/* Set the timestamp to the empty string. */
+	parts := strings.Split(line, `"`)
+	parts[3] = ""
+	line = strings.Join(parts, `"`)
+
+	/* Remove excess spaces. */
+	line = strings.TrimSpace(line)
+
+	/* Send it out. */
+	cl <- string(line)
+	return len(b), nil
+}
+
+// Expect expects the log entries on cl.  It calls t.Errorf for mismatches and
+// blocks until as many log entries as supplied lines are read.
+func (cl chanLog) Expect(t *testing.T, lines ...string) {
+	t.Helper()
+	for _, want := range lines { /* Make sure we get each line. */
+		got, ok := <-cl
+		if !ok { /* Channel closed early. */
+			t.Errorf(
+				"Log channel closed while waiting for %q",
+				got,
+			)
+			return
+		} else if got != want { /* Wrong line. */
+			t.Errorf(
+				"Unexpected log line:\n got: %s\nwant: %s",
+				got,
+				want,
+			)
+		}
+	}
+}
+
+// ExpectEmpty is like cl.Expect, except it checks that the log is empty and
+// calls t.Errorf which each line if not.  This is inherently racy and should
+// be called concurrently to calls to cl.Write.
+func (cl chanLog) ExpectEmpty(t *testing.T, lines ...string) {
+	t.Helper()
+	/* Check for lines we want. */
+	cl.Expect(t, lines...)
+	/* Anything left is an error. */
+	for 0 != len(cl) {
+		select { /* Check to see if we have anything.  */
+		case l, ok := <-cl: /* We do, nuts. */
+			if !ok { /* Closed.  This works. */
+				return
+			}
+			/* Tell someone about the unexpected line. */
+			t.Errorf("Unexpected log line: %s", l)
+		default: /* Empty, good. */
+			return
+		}
+	}
+}
+
+func TestChanLog(t *testing.T) {
+	cl := chanLog(make(chan string, 10))
+	sl := slog.New(slog.NewJSONHandler(chanLog(cl), nil))
+	have := "kittens"
+	want := `{"time":"","level":"INFO","msg":"kittens"}`
+
+	t.Run("Expect", func(t *testing.T) {
+		sl.Info(have)
+		cl.Expect(t, want)
+	})
+
+	t.Run("ExpectEmpty", func(t *testing.T) {
+		sl.Info(have)
+		cl.ExpectEmpty(t, want)
+	})
 }

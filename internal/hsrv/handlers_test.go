@@ -5,23 +5,25 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240327
+ * Last Modified 20240406
  */
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 func TestServerFileHandler(t *testing.T) {
-	_, och, s := newTestServer(t)
+	cl, _, och, s := newTestServer(t)
 	data := "kittens"
 	fn := "fname"
 	ffn := filepath.Join(s.fdir, fn)
@@ -42,7 +44,7 @@ func TestServerFileHandler(t *testing.T) {
 			t.Errorf("Non-OK Code %d", rr.Code)
 		}
 		want := `<pre>
-<a href="fname">fname</a>
+<a href="` + fn + `">` + fn + `</a>
 </pre>
 `
 		if got := rr.Body.String(); got != want {
@@ -65,6 +67,16 @@ func TestServerFileHandler(t *testing.T) {
 				wantLog,
 			)
 		}
+		cl.ExpectEmpty(
+			t,
+			`{"time":"","level":"INFO","msg":"File requested",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"static_files_dir":"`+s.fdir+`"}`,
+		)
 	})
 	/* Make sure directory listing works. */
 	t.Run("file_in_directory", func(t *testing.T) {
@@ -90,7 +102,7 @@ func TestServerFileHandler(t *testing.T) {
 		}
 		wantLog := opshell.CLine{
 			Color: FileColor,
-			Line:  "[192.0.2.1] File requested: /fname",
+			Line:  "[192.0.2.1] File requested: /" + fn,
 		}
 		if got := <-och; got != wantLog {
 			t.Errorf(
@@ -99,16 +111,27 @@ func TestServerFileHandler(t *testing.T) {
 				wantLog,
 			)
 		}
+		cl.ExpectEmpty(
+			t,
+			`{"time":"","level":"INFO","msg":"File requested",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/`+fn+`",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"static_files_dir":"`+s.fdir+`"}`,
+		)
 	})
 
 	t.Run("file", func(t *testing.T) {
-		_, och, s := newTestServer(t)
+		cl, _, och, s := newTestServer(t)
 		s.fdir = ffn
 		rr := httptest.NewRecorder()
 		rr.Body = new(bytes.Buffer)
+		dfn := "dummy"
 		s.fileHandler(rr, httptest.NewRequest(
 			http.MethodGet,
-			"/dummy",
+			"/"+dfn,
 			nil,
 		))
 		if http.StatusOK != rr.Code {
@@ -126,7 +149,7 @@ func TestServerFileHandler(t *testing.T) {
 		}
 		wantLog := opshell.CLine{
 			Color: FileColor,
-			Line:  "[192.0.2.1] File requested: /dummy",
+			Line:  "[192.0.2.1] File requested: /" + dfn,
 		}
 		if got := <-och; got != wantLog {
 			t.Errorf(
@@ -135,128 +158,182 @@ func TestServerFileHandler(t *testing.T) {
 				wantLog,
 			)
 		}
+		cl.ExpectEmpty(
+			t,
+			`{"time":"","level":"INFO","msg":"File requested",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/`+dfn+`",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"static_files_dir":"`+s.fdir+`"}`,
+		)
 	})
+	cl.ExpectEmpty(t)
 }
 
 func TestServerInputHandler(t *testing.T) {
-	ich, och, s := newTestServer(t)
-	/* Input lines. */
-	haveLines := []string{"kittens", "moose"}
-	for _, l := range haveLines {
-		ich <- l
-	}
-	close(ich)
+	cl, ich, och, s := newTestServer(t)
 
-	/* Make request as an implant. */
-	id := "kittens"
-	rr := httptest.NewRecorder()
-	rr.Body = new(bytes.Buffer)
-	req := httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
-	req.SetPathValue(idParam, id)
-	s.inputHandler(rr, req)
+	try := func(t *testing.T) {
+		/* Input lines. */
+		haveLines := []string{t.Name() + "line1", t.Name() + "line2"}
+		for _, l := range haveLines {
+			ich <- l
+		}
 
-	/* Did it work? */
-	if http.StatusOK != rr.Code {
-		t.Errorf("Non-OK Code %d", rr.Code)
-	}
-	wantBody := strings.Join(haveLines, "\n") + "\n"
-	if got := rr.Body.String(); got != wantBody {
-		t.Errorf(
-			"Incorrect body:\n"+
-				"got:\n%s\n"+
-				"want:\n%s\n",
-			got,
-			wantBody,
-		)
-	}
+		/* Make request as an implant. */
+		id := t.Name()
+		rr := httptest.NewRecorder()
+		rr.Body = new(bytes.Buffer)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/i/"+id,
+			nil,
+		).WithContext(ctx)
+		req.SetPathValue(idParam, id)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.inputHandler(rr, req)
+		}()
 
-	/* Make sure logs are good. */
-	wantLogs := []opshell.CLine{{
-		Color: ConnectedColor,
-		Line:  "[192.0.2.1] Got a shell: ID:kittens",
-	}}
-	wantN := len(wantLogs)
-	gotN := len(och)
-	if gotN != wantN {
-		t.Errorf("Expected %d logs, got %d", wantN, gotN)
-	}
-	for i := 0; i < min(gotN, wantN); i++ {
-		if got := <-och; got != wantLogs[i] {
+		/* Should get two input lines. */
+		wantLogs := []string{
+			`{"time":"","level":"INFO","msg":"New connection",` +
+				`"http_request":{` +
+				`"remote_addr":"192.0.2.1:1234",` +
+				`"method":"GET",` +
+				`"request_uri":"/i/` + id + `",` +
+				`"protocol":"HTTP/1.1","host":"example.com",` +
+				`"sni":"","user_agent":"",` +
+				`"id":"` + id + `"}}`,
+		}
+		for _, l := range haveLines {
+			msg := `{"time":"","level":"INFO",` +
+				`"msg":"Sent shell input","http_request":{` +
+				`"remote_addr":"192.0.2.1:1234",` +
+				`"method":"GET",` +
+				`"request_uri":"/i/` + id + `",` +
+				`"protocol":"HTTP/1.1","host":"example.com",` +
+				`"sni":"","user_agent":"","id":"` + id + `"},` +
+				`"line":"` + l + `"}`
+			wantLogs = append(wantLogs, msg)
+		}
+		cl.ExpectEmpty(t, wantLogs...)
+
+		/* Wait for the request to finish. */
+		cancel()
+		wg.Wait()
+
+		/* Did it work? */
+		if http.StatusOK != rr.Code {
+			t.Errorf("Non-OK Code %d", rr.Code)
+		}
+		wantBody := strings.Join(haveLines, "\n") + "\n"
+		if got := rr.Body.String(); got != wantBody {
 			t.Errorf(
-				"Incorrect log message:\n got: %#v\nwant: %#v",
+				"Incorrect body:\n"+
+					"got:\n%s\n"+
+					"want:\n%s\n",
 				got,
-				wantLogs[i],
+				wantBody,
 			)
 		}
-	}
 
-	/* Make sure another implant can connect. */
-	rr = httptest.NewRecorder()
-	rr.Body = new(bytes.Buffer)
-	req = httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
-	id = "moose"
-	req.SetPathValue(idParam, id)
-	s.inputHandler(rr, req)
-
-	/* Did it work? */
-	if http.StatusOK != rr.Code {
-		t.Errorf("Non-OK Code on reconnect: %d", rr.Code)
-	}
-	if got := rr.Body.Len(); got != 0 {
-		t.Errorf(
-			"Second request respnose body non-empty, has %d bytes",
-			got,
-		)
-	}
-
-	/* Log correct? */
-	wantLogs = []opshell.CLine{{
-		Color: ConnectedColor,
-		Line:  "[192.0.2.1] Got a shell: ID:moose",
-	}}
-	wantN = len(wantLogs)
-	gotN = len(och)
-	if gotN != wantN {
-		t.Errorf(
-			"Expected %d logs after second request, got %d",
-			wantN,
-			gotN,
-		)
-	}
-	for i := 0; i < min(gotN, wantN); i++ {
-		if got := <-och; got != wantLogs[i] {
+		/* Make sure shell output is good. */
+		wantCLines := []opshell.CLine{{
+			Color: ConnectedColor,
+			Line:  "[192.0.2.1] Got a shell: ID:" + id,
+		}, {
+			Color: ErrorColor,
+			Line:  "[192.0.2.1] Disconnected.",
+		}}
+		wantN := len(wantCLines)
+		gotN := len(och)
+		if gotN != wantN {
 			t.Errorf(
-				"Incorrect log message:\n got: %#v\nwant: %#v",
-				got,
-				wantLogs[i],
+				"Expected %d shell messages, got %d",
+				wantN,
+				gotN,
 			)
 		}
+		for i := 0; i < min(gotN, wantN); i++ {
+			if got := <-och; got != wantCLines[i] {
+				t.Errorf(
+					"Incorrect shell message:\n"+
+						"got: %#v\n"+
+						"want: %#v",
+					got,
+					wantCLines[i],
+				)
+			}
+		}
+		for 0 != len(och) {
+			t.Errorf("Extra shell message: %#v", <-och)
+		}
+		/* Make sure we log the disconnect. */
+		cl.ExpectEmpty(t, `{"time":"","level":"INFO",`+
+			`"msg":"Disconnected","http_request":{`+
+			`"remote_addr":"192.0.2.1:1234","method":"GET",`+
+			`"request_uri":"/i/`+id+`","protocol":"HTTP/1.1",`+
+			`"host":"example.com","sni":"","user_agent":"",`+
+			`"id":"`+id+`"}}`,
+		)
 	}
+
+	/* Try a couple of times, to make sure multiple implants work. */
+	t.Run("kittens", try)
+	t.Run("moose", try)
+
 }
 
 func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
-	ich, och, s := newTestServer(t)
+	cl, ich, och, s := newTestServer(t)
 	defer close(ich) /* Don't keep server hanging. */
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	/* First (connected) connection. */
 	id := "kittens"
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/i/"+id,
+		nil,
+	).WithContext(ctx)
 	req.SetPathValue(idParam, id)
-	go s.inputHandler(rr, req)
-	wantLog := opshell.CLine{
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.inputHandler(rr, req)
+	}()
+	wantCLine := opshell.CLine{
 		Color: ConnectedColor,
 		Line:  "[192.0.2.1] Got a shell: ID:kittens",
 	}
-	if gotLog := <-och; gotLog != wantLog {
+	if gotCLine := <-och; gotCLine != wantCLine {
 		t.Fatalf(
-			"Incorrect log from first connection:\n"+
+			"Incorrect terminal message from first connection:\n"+
 				" got: %#v\n"+
 				"want: %#v",
-			gotLog,
-			wantLog,
+			gotCLine,
+			wantCLine,
 		)
 	}
+	cl.ExpectEmpty(
+		t,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/i/`+id+`",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"`+id+`"}}`,
+	)
 
 	/* Second (rejected) connection. */
 	id = "moose"
@@ -306,10 +383,11 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 			)
 		}
 	}
+	cl.ExpectEmpty(t)
 }
 
 func TestServerOutputHandler(t *testing.T) {
-	ich, och, s := newTestServer(t)
+	cl, ich, och, s := newTestServer(t)
 	defer close(ich) /* Don't keep server hanging. */
 	output := "moose"
 	id := "kittens"
@@ -359,6 +437,7 @@ func TestServerOutputHandler(t *testing.T) {
 				wantLog,
 			)
 		}
+		cl.ExpectEmpty(t)
 	})
 
 	/* Connect a connection. */
@@ -417,6 +496,22 @@ func TestServerOutputHandler(t *testing.T) {
 				)
 			}
 		}
+		cl.ExpectEmpty(
+			t,
+			`{"time":"","level":"INFO","msg":"New connection",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/i/`+id+`",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":"`+id+`"}}`,
+			`{"time":"","level":"INFO","msg":"Shell output",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/o/`+id+`",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"",`+
+				`"id":"`+id+`"},"line":"`+output+`"}`,
+		)
 	})
 
 	/* Output for wrong ID. */
@@ -472,5 +567,6 @@ func TestServerOutputHandler(t *testing.T) {
 				)
 			}
 		}
+		cl.ExpectEmpty(t)
 	})
 }

