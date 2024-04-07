@@ -10,6 +10,10 @@ in the next tagged version.  Get them with
 go install github.com/magisterquis/curlrevshell@master
 ```
 
+Nothing yet...
+
+`v0.0.1-beta.4`
+===============
 - `-icanhazip`: Guess callback address using [icanhazip.com](https://icanhazip.com).
 - `-log`: JSON logging.  Do _you_ remember what you did a month ago?
 - [`flags.md`](./flags.md): Do _I_ remember what all these flags do?
