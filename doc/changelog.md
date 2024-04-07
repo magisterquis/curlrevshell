@@ -11,6 +11,7 @@ go install github.com/magisterquis/curlrevshell@master
 ```
 - Actually try to put the generated TLS certificate in `$HOME` if we can't find
   a cache directory.
+- Change date on LICENSE, only four months late.
 
 
 `v0.0.1-beta.4`
@@ -19,4 +20,4 @@ go install github.com/magisterquis/curlrevshell@master
 - `-log`: JSON logging.  Do _you_ remember what you did a month ago?
 - [`flags.md`](./flags.md): Do _I_ remember what all these flags do?
 - Output uses one long-lived cURL process.  Way faster.  No left-justification.
-- Updated dependencies
+- Updated dependencies.
