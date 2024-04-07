@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240407
  */
 
 import (
@@ -253,7 +253,7 @@ func defaultCertFile() string {
 	if dir, err := os.UserHomeDir(); nil != err {
 		log.Printf("Unable to determine home directory: %s", err)
 	} else {
-		filepath.Join(dir, p, CertCacheFile)
+		return filepath.Join(dir, p, CertCacheFile)
 	}
 
 	/* Give up and use the local directory. */

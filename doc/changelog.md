@@ -9,8 +9,9 @@ in the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@master
 ```
+- Actually put the generated TLS certificate in `$HOME` if we can't find a
+  cache directory.
 
-Nothing yet...
 
 `v0.0.1-beta.4`
 ===============
