@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240407
+ * Last Modified 20240408
  */
 
 import (
@@ -237,7 +237,8 @@ Options:
 }
 
 // defaultCertfile returns a path for the default cert file.  It tries the
-// system-specific user-specific cache, and failing that $HOME/ and ..
+// system-specific user-specific cache, and failing that $HOME/ and the current
+// directory.
 func defaultCertFile() string {
 	/* Come up with a directory, somewhere. */
 	if dir, err := os.UserCacheDir(); nil != err {
