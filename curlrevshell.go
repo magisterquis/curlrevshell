@@ -18,19 +18,15 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
 var (
-	// CertFileDir is the base name of the cert cache file.
-	CertCacheDir = "curlrevshell"
-	// CertCacheFile is the file we stick in CertCacheDir.
-	CertCacheFile = "cert.txtar"
 	// Prompt is the shell prompt, settable at compile-time.  It will be
 	// colored Cyan.
 	Prompt = "> "
@@ -72,7 +68,7 @@ func rmain() int {
 		)
 		certFile = flag.String(
 			"tls-certificate-cache",
-			defaultCertFile(),
+			sstls.DefaultCertFile(),
 			"Optional `file` in which to cache generated "+
 				"TLS certificate",
 		)
@@ -234,29 +230,4 @@ Options:
 	}
 
 	return 0
-}
-
-// defaultCertfile returns a path for the default cert file.  It tries the
-// system-specific user-specific cache, and failing that $HOME/ and the current
-// directory.
-func defaultCertFile() string {
-	/* Come up with a directory, somewhere. */
-	if dir, err := os.UserCacheDir(); nil != err {
-		log.Printf("Unable to determine cache directory: %s", err)
-	} else {
-		return filepath.Join(dir, CertCacheDir, CertCacheFile)
-	}
-
-	/* In not the cache directory, we'll want a . directory. */
-	p := "." + CertCacheDir
-
-	/* Try HOME. */
-	if dir, err := os.UserHomeDir(); nil != err {
-		log.Printf("Unable to determine home directory: %s", err)
-	} else {
-		return filepath.Join(dir, p, CertCacheFile)
-	}
-
-	/* Give up and use the local directory. */
-	return filepath.Join(p, CertCacheFile)
 }

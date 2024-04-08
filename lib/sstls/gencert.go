@@ -5,7 +5,7 @@ package sstls
  * Generate a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20240327
+ * Last Modified 20240408
  */
 
 import (
@@ -21,6 +21,8 @@ import (
 	"io/fs"
 	"math/big"
 	"net"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -31,6 +33,10 @@ var (
 	// SelfSignedSubject is the subject name we use for self-signed
 	// certificates.
 	SelfSignedSubject = "sstls"
+	// CertFileDir is the base name of the cert cache file.
+	CertCacheDir = "sstls"
+	// CertCacheFile is the file we stick in CertCacheDir.
+	CertCacheFile = "cert.txtar"
 )
 
 // Names of files in a txtar archive for the PEM-encoded cert and key.
@@ -208,4 +214,25 @@ func generateSelfSignedCert(
 	cert.Leaf = leaf
 
 	return certPEM, keyPEM, cert, nil
+}
+
+// DefaultCertFile returns a path for the default cert file.  It tries the
+// system-specific user-specific cache, and failing that $HOME/ and then
+// current directory.
+func DefaultCertFile() string {
+	/* Come up with a directory, somewhere. */
+	if dir, err := os.UserCacheDir(); nil == err {
+		return filepath.Join(dir, CertCacheDir, CertCacheFile)
+	}
+
+	/* In not the cache directory, we'll want a . directory. */
+	p := "." + CertCacheDir
+
+	/* Try HOME. */
+	if dir, err := os.UserHomeDir(); nil == err {
+		return filepath.Join(dir, p, CertCacheFile)
+	}
+
+	/* Give up and use the local directory. */
+	return filepath.Join(p, CertCacheFile)
 }
