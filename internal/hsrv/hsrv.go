@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240408
+ * Last Modified 20240425
  */
 
 import (
@@ -58,7 +58,8 @@ type Server struct {
 	och       chan<- opshell.CLine
 	l         sstls.Listener
 	ps        pinkSender
-	tmpl      *template.Template
+	tmplf     string             /* Template file. */
+	defTmpl   *template.Template /* Default template, for testing. */
 	curIDL    sync.Mutex
 	curIDIn   string /* Current Implant ID, for shell input. */
 	curIDOut  string /* Current Implant ID, for shell output. */
@@ -84,23 +85,6 @@ func New(
 ) (*Server, func(), error) {
 	var l sstls.Listener
 
-	/* Work out our template. */
-	var (
-		tmpl *template.Template
-		err  error
-	)
-	if "" != tmplf {
-		if tmpl, err = template.ParseFiles(tmplf); nil != err {
-			return nil, nil, fmt.Errorf(
-				"parsing callback template from %s: %w",
-				tmplf,
-				err,
-			)
-		}
-	} else {
-		tmpl = template.Must(template.New("").Parse(DefaultTemplate))
-	}
-
 	/* cleanup closes the listener. */
 	cleanup := func() {
 		if nil != l.Listener {
@@ -115,6 +99,7 @@ func New(
 	}
 
 	/* Start our listener. */
+	var err error
 	if l, err = sstls.Listen("tcp", addr, "", 0, certFile); nil != err {
 		return nil, nil, fmt.Errorf("listening on %s: %w", addr, err)
 	}
@@ -127,7 +112,8 @@ func New(
 		och:       och,
 		l:         l,
 		ps:        pinkSender{och},
-		tmpl:      tmpl,
+		tmplf:     tmplf,
+		defTmpl:   parsedDefaultTemplate,
 		cbAddrs:   cbAddrs,
 		printIPv6: printIPv6,
 	}, cleanup, nil

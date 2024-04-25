@@ -65,7 +65,7 @@ Options:
   -callback-address address
     	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
-    	Optional callback template file
+    	Optional callback template file, used if it exists
   -icanhazip
     	Query icanhazip.com for a callback address
   -ipv6-one-liners
@@ -83,7 +83,7 @@ Options:
   -serve-files-from directory
     	Optional directory from which to serve static files
   -tls-certificate-cache file
-    	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/curlrevshell/cert.txtar")
+    	Optional file in which to cache generated TLS certificate (default "/home/you/.cache/sstls/cert.txtar")
 ```
 
 Details
@@ -108,8 +108,9 @@ $ vim ./custom.tmpl                                 # Mod ALL the things!
 $ curlrevshell -callback-template ./custom.tmpl     # Run with your fancy new template
 ```
 The struct passed to the template is `TemplateParams` in
-[script.go](internal/hsrv/script.go).  The default script is
-[script.tmpl](internal/hsrv/script.tmpl).
+[script.go](internal/hsrv/script.go).  The default template is
+[script.tmpl](internal/hsrv/script.tmpl).  It's re-read every time it's needed,
+so feel free to change it as often as you'd like.
 
 Callback Address
 ----------------

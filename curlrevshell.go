@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240408
+ * Last Modified 20240425
  */
 
 import (
@@ -59,7 +59,7 @@ func rmain() int {
 		tmplf = flag.String(
 			"callback-template",
 			"",
-			"Optional callback `template` file",
+			"Optional callback `template` file, used if it exists",
 		)
 		printDefaultTemplate = flag.Bool(
 			"print-default-template",

