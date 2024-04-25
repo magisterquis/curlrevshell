@@ -5,7 +5,7 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240425
  */
 
 import (
@@ -342,9 +342,9 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	id = "moose"
 	rr = httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
-	req = httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
-	req.SetPathValue(idParam, id)
-	s.inputHandler(rr, req)
+	req2 := httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
+	req2.SetPathValue(idParam, id)
+	s.inputHandler(rr, req2)
 
 	/* Did it work? */
 	if want := http.StatusFailedDependency; want != rr.Code {
@@ -367,27 +367,47 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 		)
 	}
 
+	/* Wait for the first connection to die. */
+	cancel()
+	wg.Wait()
+
 	/* Make sure logs are good. */
-	wantLogs := []opshell.CLine{{
+	wantCLines := []opshell.CLine{{
 		Color: ErrorColor,
 		Line: "[192.0.2.1] Rejected unexpected input " +
 			"connection with ID " + id,
+	}, {
+		Color: ErrorColor,
+		Line:  "[192.0.2.1] Input connection closed",
+	}, {
+		Color: ErrorColor,
+		Line:  "[192.0.2.1] Shell is gone :(",
 	}}
-	wantN := len(wantLogs)
+	wantN := len(wantCLines)
 	gotN := len(och)
 	if gotN != wantN {
-		t.Errorf("Expected %d logs, got %d", wantN, gotN)
+		t.Errorf("Expected %d shell messages, got %d", wantN, gotN)
 	}
 	for i := 0; i < min(gotN, wantN); i++ {
-		if got := <-och; got != wantLogs[i] {
+		if got := <-och; got != wantCLines[i] {
 			t.Errorf(
-				"Incorrect log message:\n got: %#v\nwant: %#v",
+				"Incorrect shell message:\n got: %#v\nwant: %#v",
 				got,
-				wantLogs[i],
+				wantCLines[i],
 			)
 		}
 	}
-	cl.ExpectEmpty(t)
+	for 0 != len(och) {
+		t.Errorf("Unexpected shell message: %#v", <-och)
+	}
+	cl.ExpectEmpty(
+		t,
+		`{"time":"","level":"INFO","msg":"Disconnected",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/i/kittens",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"kittens"},"direction":"input"}`,
+	)
 }
 
 func TestServerOutputHandler(t *testing.T) {
