@@ -23,7 +23,7 @@ go install github.com/magisterquis/curlrevshell@master
   Ctrl+D after hitting enter a couple of times.
 - Don't serve up `Eek!`s anymore, just in case someone piped one to a shell
   after Ctrl+D after hitting enter a coule of times.
-- Tests are a little ess crashy.
+- Tests are a little less crashy.
 
 
 `v0.0.1-beta.4`
