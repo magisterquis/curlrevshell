@@ -6,12 +6,13 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240425
+ * Last Modified 20240426
  */
 
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -52,18 +53,27 @@ const (
 
 // Server serves implants over HTTPS.
 type Server struct {
-	sl        *slog.Logger
-	fdir      string /* Static files directory. */
-	ich       <-chan string
-	och       chan<- opshell.CLine
-	l         sstls.Listener
-	ps        pinkSender
-	tmplf     string             /* Template file. */
-	defTmpl   *template.Template /* Default template, for testing. */
-	curIDL    sync.Mutex
-	curIDIn   string /* Current Implant ID, for shell input. */
-	curIDOut  string /* Current Implant ID, for shell output. */
+	sl   *slog.Logger
+	fdir string /* Static files directory. */
+	ich  <-chan string
+	och  chan<- opshell.CLine
+	l    sstls.Listener
+	ps   pinkSender
+
+	/* Template generation. */
+	tmplf   string             /* Template file. */
+	defTmpl *template.Template /* Default template, for testing. */
+
+	/* Used for making sure we don't get mismatched input and output. */
+	curIDL   sync.Mutex
+	curIDIn  string      /* Current Implant ID, for shell input. */
+	curIDOut string      /* Current Implant ID, for shell output. */
+	stopIn   func(error) /* Stops the Input handler. */
+
+	/* Things for printing help. */
 	cbAddrs   []string
+	lAddrs    []string /* Listen addresses, for help. */
+	cbHelp    string   /* Callback help text. */
 	printIPv6 bool
 }
 
@@ -105,7 +115,8 @@ func New(
 	}
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())
 
-	return &Server{
+	/* Server to return. */
+	s := &Server{
 		sl:        sl,
 		fdir:      fdir,
 		ich:       ich,
@@ -116,7 +127,36 @@ func New(
 		defTmpl:   parsedDefaultTemplate,
 		cbAddrs:   cbAddrs,
 		printIPv6: printIPv6,
-	}, cleanup, nil
+	}
+
+	/* Work out our listen addresses, for user help. */
+	if s.lAddrs, err = s.listenAddresses(); nil != err {
+		cleanup()
+		return nil, nil, fmt.Errorf(
+			"determining listen addresses: %w",
+			err,
+		)
+	}
+	if 0 == len(s.lAddrs) {
+		cleanup()
+		return nil, nil, errors.New("no listen addresses")
+	}
+
+	/* Help text for user getting a callback. */
+	sb := new(strings.Builder)
+	sb.WriteRune('\n')
+	for _, la := range s.lAddrs {
+		fmt.Fprintf(
+			sb,
+			CurlFormat+ShellSuffix+"\n",
+			s.l.Fingerprint,
+			la,
+		)
+	}
+	sb.WriteRune('\n')
+	s.cbHelp = sb.String()
+
+	return s, cleanup, nil
 }
 
 // Do actually serves HTTPS clients.
@@ -131,17 +171,11 @@ func (s *Server) Do(ctx context.Context) error {
 	}
 	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 
-	/* Work out our listen addresses, for user help. */
-	as, err := s.listenAddresses()
-	if nil != err {
-		s.ErrorLogf("Error determining callback address: %s", err)
-	}
-
 	/* Tell user where to get static files. */
-	if "" != s.fdir && 0 != len(as) {
+	if "" != s.fdir && 0 != len(s.lAddrs) {
 		s.Logf(ScriptColor, "To get files from %s:", s.fdir)
 		s.Printf(ScriptColor, "\n")
-		for _, a := range as {
+		for _, a := range s.lAddrs {
 			s.Printf(
 				ScriptColor,
 				CurlFormat+FileSuffix,
@@ -152,24 +186,13 @@ func (s *Server) Do(ctx context.Context) error {
 		s.Printf(ScriptColor, "\n")
 	}
 
-	/* Tell the user how to get a callback. */
-	if 0 != len(as) {
-		s.Logf(ScriptColor, "To get a shell:")
-		s.Printf(ScriptColor, "\n")
-		for _, a := range as {
-			s.Printf(
-				ScriptColor,
-				CurlFormat+ShellSuffix,
-				s.l.Fingerprint,
-				a,
-			)
-		}
-		s.Printf(ScriptColor, "\n")
-	}
+	/* Tell user how to get a callback. */
+	s.printCallbackHelp()
 
 	/* Serve until we fail or the context is cancelled. */
 	var ech = make(chan error, 1)
 	go func() { ech <- hsvr.Serve(s.l) }()
+	var err error
 	select {
 	case err = <-ech:
 	case <-ctx.Done():
@@ -267,6 +290,14 @@ func (s *Server) listenAddresses() ([]string, error) {
 	}
 
 	return addrs, nil
+}
+
+// printCallbackHelp prints a friendly message to the user instructing him how to
+// get a callback.
+func (s *Server) printCallbackHelp() {
+	/* Tell the user how to get a callback. */
+	s.Logf(ScriptColor, "To get a shell:")
+	s.Printf(ScriptColor, "%s", s.cbHelp)
 }
 
 // sortAddresses sorts a slice of addresses as string.  Non-IP:Port pairs come

@@ -5,12 +5,13 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240425
+ * Last Modified 20240426
  */
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -172,6 +173,52 @@ func TestServerFileHandler(t *testing.T) {
 	cl.ExpectEmpty(t)
 }
 
+/* Make sure closing stdin stops the handler. */
+func TestServerInputHandler_CloseStdin(t *testing.T) {
+	cl, ich, _, s := newTestServer(t)
+
+	/* Roll a request */
+	id := t.Name()
+	rr := httptest.NewRecorder()
+	rr.Body = new(bytes.Buffer)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/i/"+id,
+		nil,
+	)
+	req.SetPathValue(idParam, id)
+
+	/* Start the handler handling. */
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.inputHandler(rr, req)
+	}()
+
+	/* Close the input and wait for the handler to return. */
+	close(ich)
+	wg.Wait()
+
+	/* Make sure we log the disconnect. */
+	cl.ExpectEmpty(t,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"http_request":{`+
+			`"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET",`+
+			`"request_uri":"/i/`+id+`",`+
+			`"protocol":"HTTP/1.1","host":"example.com",`+
+			`"sni":"","user_agent":"",`+
+			`"id":"`+id+`"},"direction":"input"}`,
+		`{"time":"","level":"INFO",`+
+			`"msg":"Disconnected","http_request":{`+
+			`"remote_addr":"192.0.2.1:1234","method":"GET",`+
+			`"request_uri":"/i/`+id+`","protocol":"HTTP/1.1",`+
+			`"host":"example.com","sni":"","user_agent":"",`+
+			`"id":"`+id+`"},"direction":"input"}`,
+	)
+}
+
 func TestServerInputHandler(t *testing.T) {
 	cl, ich, och, s := newTestServer(t)
 
@@ -186,8 +233,8 @@ func TestServerInputHandler(t *testing.T) {
 		id := t.Name()
 		rr := httptest.NewRecorder()
 		rr.Body = new(bytes.Buffer)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx, cancel := context.WithCancelCause(context.Background())
+		defer cancel(errors.New("test finished"))
 		req := httptest.NewRequest(
 			http.MethodGet,
 			"/i/"+id,
@@ -202,6 +249,7 @@ func TestServerInputHandler(t *testing.T) {
 		}()
 
 		/* Should get a server message plus two input lines. */
+		wantErr := "test disconnect"
 		wantLogs := []string{
 			`{"time":"","level":"INFO","msg":"New connection",` +
 				`"http_request":{` +
@@ -226,7 +274,7 @@ func TestServerInputHandler(t *testing.T) {
 		cl.ExpectEmpty(t, wantLogs...)
 
 		/* Wait for the request to finish. */
-		cancel()
+		cancel(errors.New(wantErr))
 		wg.Wait()
 
 		/* Did it work? */
@@ -250,10 +298,18 @@ func TestServerInputHandler(t *testing.T) {
 			Line:  "[192.0.2.1] Input connected: ID:" + id,
 		}, {
 			Color: ErrorColor,
-			Line:  "[192.0.2.1] Input connection closed",
+			Line: "[192.0.2.1] Input connection closed: " +
+				wantErr,
 		}, {
 			Color: ErrorColor,
 			Line:  "[192.0.2.1] " + ShellDisconnectedMessage,
+		}, {
+			Color: ScriptColor,
+			Line:  "To get a shell:",
+		}, {
+			Color:       ScriptColor,
+			Line:        s.cbHelp,
+			NoTimestamp: true,
 		}}
 		wantN := len(wantCLines)
 		gotN := len(och)
@@ -268,7 +324,7 @@ func TestServerInputHandler(t *testing.T) {
 			if got := <-och; got != wantCLines[i] {
 				t.Errorf(
 					"Incorrect shell message:\n"+
-						"got: %#v\n"+
+						" got: %#v\n"+
 						"want: %#v",
 					got,
 					wantCLines[i],
@@ -279,12 +335,13 @@ func TestServerInputHandler(t *testing.T) {
 			t.Errorf("Extra shell message: %#v", <-och)
 		}
 		/* Make sure we log the disconnect. */
-		cl.ExpectEmpty(t, `{"time":"","level":"INFO",`+
+		cl.ExpectEmpty(t, `{"time":"","level":"ERROR",`+
 			`"msg":"Disconnected","http_request":{`+
 			`"remote_addr":"192.0.2.1:1234","method":"GET",`+
 			`"request_uri":"/i/`+id+`","protocol":"HTTP/1.1",`+
 			`"host":"example.com","sni":"","user_agent":"",`+
-			`"id":"`+id+`"},"direction":"input"}`,
+			`"id":"`+id+`"},"direction":"input",`+
+			`"error":"`+wantErr+`"}`,
 		)
 	}
 
@@ -299,8 +356,8 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	defer close(ich) /* Don't keep server hanging. */
 
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(errors.New("test finished"))
 
 	/* First (connected) connection. */
 	id := "kittens"
@@ -347,7 +404,7 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	s.inputHandler(rr, req2)
 
 	/* Did it work? */
-	if want := http.StatusFailedDependency; want != rr.Code {
+	if want := http.StatusOK; want != rr.Code {
 		t.Errorf(
 			"Incorrect status code\n"+
 				" got: %d\n"+
@@ -356,19 +413,13 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 			want,
 		)
 	}
-	wantBody := MultiConnectionMessage + "\n"
-	if got := rr.Body.String(); got != wantBody {
-		t.Errorf(
-			"Incorrect body:\n"+
-				" got:\n%s\n"+
-				"want:\n%s\n",
-			got,
-			wantBody,
-		)
+	if got := len(rr.Body.String()); 0 != got {
+		t.Errorf("Response body non-empty, has %d bytes", got)
 	}
 
 	/* Wait for the first connection to die. */
-	cancel()
+	wantErr := "test disconnect"
+	cancel(errors.New(wantErr))
 	wg.Wait()
 
 	/* Make sure logs are good. */
@@ -378,10 +429,17 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 			"connection with ID " + id,
 	}, {
 		Color: ErrorColor,
-		Line:  "[192.0.2.1] Input connection closed",
+		Line:  "[192.0.2.1] Input connection closed: " + wantErr,
 	}, {
 		Color: ErrorColor,
 		Line:  "[192.0.2.1] Shell is gone :(",
+	}, {
+		Color: ScriptColor,
+		Line:  "To get a shell:",
+	}, {
+		Color:       ScriptColor,
+		Line:        s.cbHelp,
+		NoTimestamp: true,
 	}}
 	wantN := len(wantCLines)
 	gotN := len(och)
@@ -402,11 +460,12 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	}
 	cl.ExpectEmpty(
 		t,
-		`{"time":"","level":"INFO","msg":"Disconnected",`+
+		`{"time":"","level":"ERROR","msg":"Disconnected",`+
 			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
 			`"method":"GET","request_uri":"/i/kittens",`+
 			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"direction":"input"}`,
+			`"user_agent":"","id":"kittens"},"direction":"input",`+
+			`"error":"`+wantErr+`"}`,
 	)
 }
 
@@ -415,36 +474,6 @@ func TestServerOutputHandler(t *testing.T) {
 	defer close(ich) /* Don't keep server hanging. */
 	output := "moose"
 	id := "kittens"
-
-	/* Connect a connection. */
-	rr := httptest.NewRecorder()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/i/"+id,
-		nil,
-	).WithContext(ctx)
-	req.SetPathValue(idParam, id)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.inputHandler(rr, req)
-	}()
-	wantLog := opshell.CLine{
-		Color: ConnectedColor,
-		Line:  "[192.0.2.1] Input connected: ID:kittens",
-	}
-	if gotLog := <-och; gotLog != wantLog {
-		t.Fatalf(
-			"Incorrect log from input connection:\n"+
-				" got: %#v\n"+
-				"want: %#v",
-			gotLog,
-			wantLog,
-		)
-	}
 
 	/* Normal output. */
 	t.Run("normal_output", func(t *testing.T) {
@@ -457,6 +486,7 @@ func TestServerOutputHandler(t *testing.T) {
 		)
 		req.SetPathValue(idParam, id)
 		s.outputHandler(rr, req)
+
 		/* Did it work? */
 		if http.StatusOK != rr.Code {
 			t.Errorf("Non-OK Code %d", rr.Code)
@@ -468,14 +498,21 @@ func TestServerOutputHandler(t *testing.T) {
 			Color: ConnectedColor,
 			Line:  "[192.0.2.1] Output connected: ID:kittens",
 		}, {
-			Color: ConnectedColor,
-			Line:  "[192.0.2.1] " + ShellReadyMessage,
-		}, {
 			Line:  output,
 			Plain: true,
 		}, {
 			Color: ErrorColor,
 			Line:  "[192.0.2.1] Output connection closed",
+		}, {
+			Color: ErrorColor,
+			Line:  "[192.0.2.1] " + ShellDisconnectedMessage,
+		}, {
+			Color: ScriptColor,
+			Line:  "To get a shell:",
+		}, {
+			Color:       ScriptColor,
+			Line:        s.cbHelp,
+			NoTimestamp: true,
 		}}
 		wantN := len(wantLogs)
 		gotN := len(och)
@@ -505,13 +542,6 @@ func TestServerOutputHandler(t *testing.T) {
 			`{"time":"","level":"INFO","msg":"New connection",`+
 				`"http_request":{`+
 				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/i/`+id+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"`+id+`"},`+
-				`"direction":"input"}`,
-			`{"time":"","level":"INFO","msg":"New connection",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
 				`"method":"GET","request_uri":"/o/`+id+`",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"","id":"`+id+`"},`+
@@ -535,7 +565,40 @@ func TestServerOutputHandler(t *testing.T) {
 
 	/* Output for wrong ID. */
 	t.Run("wrong_id", func(t *testing.T) {
-		id := "moose"
+		/* Make input request as an implant. */
+		irr := httptest.NewRecorder()
+		irr.Body = new(bytes.Buffer)
+		ctx, cancel := context.WithCancelCause(context.Background())
+		defer cancel(errors.New("test finished"))
+		ireq := httptest.NewRequest(
+			http.MethodGet,
+			"/i/"+id,
+			nil,
+		).WithContext(ctx)
+		ireq.SetPathValue(idParam, id)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.inputHandler(irr, ireq)
+		}()
+
+		/* Wait for the input to connect. */
+		wantCLine := opshell.CLine{
+			Color: ConnectedColor,
+			Line:  "[192.0.2.1] Input connected: ID:kittens",
+		}
+		if got := <-och; wantCLine != got {
+			t.Fatalf(
+				"Incorrect input connected message:\n"+
+					" got: %#v\n"+
+					"want: %#v",
+				got,
+				wantCLine,
+			)
+		}
+
+		newid := "zoomies!"
 		rr := httptest.NewRecorder()
 		rr.Body = new(bytes.Buffer)
 		req := httptest.NewRequest(
@@ -543,10 +606,16 @@ func TestServerOutputHandler(t *testing.T) {
 			"/o/"+id,
 			strings.NewReader(output),
 		)
-		req.SetPathValue(idParam, id)
+		req.SetPathValue(idParam, newid)
 		s.outputHandler(rr, req)
+
+		/* Wait for input handler to finish. */
+		wantErr := "test disconnect"
+		cancel(errors.New(wantErr))
+		wg.Wait()
+
 		/* Did it work? */
-		if want := http.StatusFailedDependency; want != rr.Code {
+		if want := http.StatusOK; want != rr.Code {
 			t.Fatalf(
 				"Incorrect status code\n"+
 					" got: %d\n"+
@@ -555,30 +624,41 @@ func TestServerOutputHandler(t *testing.T) {
 				want,
 			)
 		}
-		wantBody := MultiConnectionMessage + "\n"
-		if got := rr.Body.String(); got != wantBody {
-			t.Errorf(
-				"Incorrect body:\n"+
-					" got:\n%s\n"+
-					"want:\n%s\n",
-				got,
-				wantBody,
-			)
+		if got := len(rr.Body.String()); 0 != got {
+			t.Errorf("Response body non-empty, has %d bytes", got)
 		}
 		wantLogs := []opshell.CLine{{
 			Color: ErrorColor,
-			Line: "[192.0.2.1] Rejected output connection with " +
-				"ID moose, expcted kittens",
+			Line: "[192.0.2.1] Rejected output " +
+				"connection with ID " + newid +
+				", expected " + id,
+		}, {
+			Color: ErrorColor,
+			Line:  "[192.0.2.1] Input connection closed: " + wantErr,
+		}, {
+			Color: ErrorColor,
+			Line:  "[192.0.2.1] " + ShellDisconnectedMessage,
+		}, {
+			Color: ScriptColor,
+			Line:  "To get a shell:",
+		}, {
+			Color:       ScriptColor,
+			Line:        s.cbHelp,
+			NoTimestamp: true,
 		}}
 		wantN := len(wantLogs)
 		gotN := len(och)
 		if gotN != wantN {
-			t.Errorf("Expected %d logs, got %d", wantN, gotN)
+			t.Errorf(
+				"Expected %d shell messages, got %d",
+				wantN,
+				gotN,
+			)
 		}
 		for i := 0; i < min(gotN, wantN); i++ {
 			if got := <-och; got != wantLogs[i] {
 				t.Errorf(
-					"Incorrect log message:\n"+
+					"Incorrect shell message:\n"+
 						" got: %#v\n"+
 						"want: %#v",
 					got,
@@ -586,18 +666,172 @@ func TestServerOutputHandler(t *testing.T) {
 				)
 			}
 		}
-		cl.ExpectEmpty(t)
+		for 0 != len(och) {
+			t.Errorf("Unexpected shell message: %#v", <-och)
+		}
+		cl.ExpectEmpty(
+			t,
+			`{"time":"","level":"INFO","msg":"New connection",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/i/kittens",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":"kittens"},`+
+				`"direction":"input"}`,
+			`{"time":"","level":"ERROR","msg":"Disconnected",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"GET","request_uri":"/i/kittens",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":"kittens"},`+
+				`"direction":"input",`+
+				`"error":"test disconnect"}`,
+		)
 	})
 
-	/* Make sure the handler closes so we don't close a channel to which
-	something may write. */
-	cancel()
+	/* Server logs? */
+	cl.ExpectEmpty(t)
+}
+
+func TestServerOutputHandler_DisconnectInput(t *testing.T) {
+	cl, ich, och, s := newTestServer(t)
+	defer close(ich) /* Don't keep server hanging. */
+	id := "kittens"
+	output := "moose"
+
+	/* Make input request as an implant. */
+	irr := httptest.NewRecorder()
+	irr.Body = new(bytes.Buffer)
+	ireq := httptest.NewRequest(
+		http.MethodGet,
+		"/i/"+id,
+		nil,
+	)
+	ireq.SetPathValue(idParam, id)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.inputHandler(irr, ireq)
+	}()
+
+	/* Wait for the input to connect. */
+	wantCLine := opshell.CLine{
+		Color: ConnectedColor,
+		Line:  "[192.0.2.1] Input connected: ID:kittens",
+	}
+	if got := <-och; wantCLine != got {
+		t.Fatalf(
+			"Incorrect input connected message:\n"+
+				" got: %#v\n"+
+				"want: %#v",
+			got,
+			wantCLine,
+		)
+	}
+
+	/* Send output, which starts and ends a shell. */
+	orr := httptest.NewRecorder()
+	orr.Body = new(bytes.Buffer)
+	oreq := httptest.NewRequest(
+		http.MethodGet,
+		"/o/"+id,
+		strings.NewReader(output),
+	)
+	oreq.SetPathValue(idParam, id)
+	s.outputHandler(orr, oreq)
+
+	/* Wait for input handler to finish as well. */
 	wg.Wait()
 
-	/* Server logs? */
-	cl.ExpectEmpty(t, `{"time":"","level":"INFO","msg":"Disconnected",`+
-		`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-		`"method":"GET","request_uri":"/i/`+id+`",`+
-		`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-		`"user_agent":"","id":"`+id+`"},"direction":"input"}`)
+	/* Did it work? */
+	if http.StatusOK != irr.Code {
+		t.Errorf("Non-OK Input Code %d", irr.Code)
+	}
+	if http.StatusOK != orr.Code {
+		t.Errorf("Non-OK Output Code %d", orr.Code)
+	}
+	if got := irr.Body.Len(); got != 0 {
+		t.Errorf("Input response body non-empty, has %d bytes", got)
+	}
+	if got := orr.Body.Len(); got != 0 {
+		t.Errorf("Output response body non-empty, has %d bytes", got)
+	}
+	wantLogs := []opshell.CLine{{
+		Color: ConnectedColor,
+		Line:  "[192.0.2.1] Output connected: ID:kittens",
+	}, {
+		Color: ConnectedColor,
+		Line:  "[192.0.2.1] " + ShellReadyMessage,
+	}, {
+		Line:  output,
+		Plain: true,
+	}, {
+		Color: ErrorColor,
+		Line:  "[192.0.2.1] Output connection closed",
+	}, {
+		Color: ErrorColor,
+		Line:  "[192.0.2.1] Input connection closed",
+	}, {
+		Color: ErrorColor,
+		Line:  "[192.0.2.1] " + ShellDisconnectedMessage,
+	}, {
+		Color: ScriptColor,
+		Line:  "To get a shell:",
+	}, {
+		Color:       ScriptColor,
+		Line:        s.cbHelp,
+		NoTimestamp: true,
+	}}
+	wantN := len(wantLogs)
+	gotN := len(och)
+	if gotN != wantN {
+		t.Errorf(
+			"Expected %d shell messages, got %d",
+			wantN,
+			gotN,
+		)
+	}
+	for i := 0; i < min(gotN, wantN); i++ {
+		if got := <-och; got != wantLogs[i] {
+			t.Errorf(
+				"Incorrect log message:\n"+
+					" got: %#v\n"+
+					"want: %#v",
+				got,
+				wantLogs[i],
+			)
+		}
+	}
+	for 0 != len(och) {
+		t.Errorf("Extra shell message: %#v", <-och)
+	}
+	cl.ExpectEmpty(
+		t,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/i/kittens",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"kittens"},"direction":"input"}`,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/o/kittens",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"kittens"},"direction":"output"}`,
+		`{"time":"","level":"INFO","msg":"Shell output",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/o/kittens",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"kittens"},"output":"moose"}`,
+		`{"time":"","level":"INFO","msg":"Disconnected",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/o/kittens",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"kittens"},"direction":"output"}`,
+		`{"time":"","level":"INFO","msg":"Disconnected",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"GET","request_uri":"/i/kittens",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":"kittens"},"direction":"input"}`,
+	)
 }

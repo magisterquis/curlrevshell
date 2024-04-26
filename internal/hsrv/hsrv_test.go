@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240426
  */
 
 import (
@@ -127,44 +127,27 @@ func newTestServer(t *testing.T) (
 		},
 	}, {
 		want: opshell.CLine{
-			Color:       ScriptColor,
-			Line:        "\n",
-			NoTimestamp: true,
-		},
-	}, {
-		want: opshell.CLine{
 			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+ShellSuffix,
-				s.l.Fingerprint,
-				cbAddrs[0],
-			),
-			NoTimestamp: true,
-		},
-	}, {
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+ShellSuffix,
-				s.l.Fingerprint,
-				net.JoinHostPort(cbAddrs[1], listenPort),
-			),
-			NoTimestamp: true,
-		},
-	}, {
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+ShellSuffix,
-				s.l.Fingerprint,
-				s.l.Addr().String(),
-			),
-			NoTimestamp: true,
-		},
-	}, {
-		want: opshell.CLine{
-			Color:       ScriptColor,
-			Line:        "\n",
+			Line: "\n" + strings.Join([]string{
+				fmt.Sprintf(
+					CurlFormat+ShellSuffix,
+					s.l.Fingerprint,
+					cbAddrs[0],
+				),
+				fmt.Sprintf(
+					CurlFormat+ShellSuffix,
+					s.l.Fingerprint,
+					net.JoinHostPort(
+						cbAddrs[1],
+						listenPort,
+					),
+				),
+				fmt.Sprintf(
+					CurlFormat+ShellSuffix,
+					s.l.Fingerprint,
+					s.l.Addr().String(),
+				),
+			}, "\n") + "\n\n",
 			NoTimestamp: true,
 		},
 	}}

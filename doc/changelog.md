@@ -14,9 +14,16 @@ go install github.com/magisterquis/curlrevshell@master
 - Change date on LICENSE, only four months late.
 - Put the certificate in a directory called `sstls` and set the CN to `sstls`,
   to make it that much easier to reuse `lib/sstls` in other code and have the
-  same copy/pastable fingerprint.
+  same copy/pastable fingerprint.  This will probably change again.
 - The `-callback-template` callback template is now re-read every time it's
   needed, for on-the-fly ~debugging~ good ideas.
+- Make sure input and output disconnect together, which means no hitting enter
+  a couple of times before the next callback.
+- Print the curl one-liners every time the shell dies, which means no more
+  Ctrl+D after hitting enter a couple of times.
+- Don't serve up `Eek!`s anymore, just in case someone piped one to a shell
+  after Ctrl+D after hitting enter a coule of times.
+- Tests are a little ess crashy.
 
 
 `v0.0.1-beta.4`

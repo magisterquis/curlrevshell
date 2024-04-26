@@ -5,10 +5,11 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240426
  */
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,10 +27,6 @@ const (
 )
 
 const (
-	// MultiConnectionMessage is returned when an implant tries to connect
-	// when one is already connected.
-	MultiConnectionMessage = "Eek!"
-
 	// ShellReadyMessage is what we print when both sides of the shell are
 	// connected.
 	ShellReadyMessage = "Shell is ready to go!"
@@ -53,6 +50,10 @@ const (
 	LKOutput         = "output"
 	LKStaticFilesDir = "static_files_dir"
 )
+
+// ErrConnectionClosed indicates we're closing the input connection because one
+// side or the other closed.
+var ErrConnectionClosed = errors.New("connection closed")
 
 // newMux returns a new ServeMux, ready to serve.
 func (s *Server) newMux() *http.ServeMux {
@@ -105,17 +106,23 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 // inputHandler accepts a connection from a shell and sends it input.
 func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancelCause(r.Context())
+	defer cancel(errors.New("handler returned"))
+
 	/* Make sure we're ok with this connection and set up logging. */
 	which := "Input"
-	sl := s.startConnection(w, r, &s.curIDIn, &s.curIDOut, which)
+	sl := s.startConnection(w, r, &s.curIDIn, &s.curIDOut, which, cancel)
 	if nil == sl {
 		return
 	}
-	defer s.endConnection(sl, r, &s.curIDIn, &s.curIDOut, which)
+	var cerr error
+	defer func() {
+		s.endConnection(sl, r, &s.curIDIn, &s.curIDOut, which, cerr)
+	}()
 
 	/* Proxy lines from stdin. */
 	rc := http.NewResponseController(w)
-	for {
+	for nil == cerr {
 		select {
 		case l, ok := <-s.ich:
 			if !ok { /* Input channel closed. */
@@ -130,8 +137,8 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			sl.Info(LMShellInput, LKLine, l)
-		case <-r.Context().Done():
-			return
+		case <-ctx.Done():
+			cerr = context.Cause(ctx)
 		}
 	}
 }
@@ -141,27 +148,29 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 	/* Make sure we're ok with this connection and set up logging. */
 	which := "Output"
-	sl := s.startConnection(w, r, &s.curIDOut, &s.curIDIn, which)
+	sl := s.startConnection(w, r, &s.curIDOut, &s.curIDIn, which, nil)
 	if nil == sl {
 		return
 	}
-	defer s.endConnection(sl, r, &s.curIDOut, &s.curIDIn, which)
+	var err error
+	defer func() {
+		s.endConnection(sl, r, &s.curIDOut, &s.curIDIn, which, err)
+	}()
 
 	/* Read output and send it to the shell. */
 	b := make([]byte, 2048)
-	for {
-		n, err := r.Body.Read(b)
+	var n int
+	for nil == err {
+		n, err = r.Body.Read(b)
 		if 0 != n {
 			o := string(b[:n])
 			s.och <- opshell.CLine{Line: o, Plain: true}
 			sl.Info(LMShellOutput, LKOutput, o)
 		}
+		/* End of stream isn't really an error. */
 		if errors.Is(err, io.EOF) ||
 			errors.Is(err, io.ErrUnexpectedEOF) {
-			break
-		}
-		if nil != err {
-			s.RErrorLogf(r, "Error reading output: %s", err)
+			err = nil
 			break
 		}
 	}
@@ -185,6 +194,7 @@ func (s *Server) startConnection(
 	us *string,
 	other *string,
 	which string,
+	stopIn func(error), /* May be nil. */
 ) *slog.Logger {
 	s.curIDL.Lock()
 	defer s.curIDL.Unlock()
@@ -195,15 +205,6 @@ func (s *Server) startConnection(
 		return nil
 	}
 
-	/* eek sends a 503 and a sad message to w. */
-	eek := func() {
-		http.Error(
-			w,
-			MultiConnectionMessage,
-			http.StatusFailedDependency,
-		)
-	}
-
 	/* We'll need this a few times. */
 	lwhich := strings.ToLower(which)
 
@@ -211,12 +212,11 @@ func (s *Server) startConnection(
 	if "" != *other && id != *other {
 		s.RErrorLogf(
 			r,
-			"Rejected %s connection with ID %s, expcted %s",
+			"Rejected %s connection with ID %s, expected %s",
 			lwhich,
 			id,
 			*other,
 		)
-		eek()
 		return nil
 	}
 
@@ -228,7 +228,6 @@ func (s *Server) startConnection(
 			lwhich,
 			id,
 		)
-		eek()
 		return nil
 	} else if "" != *us {
 		s.RErrorLogf(
@@ -237,7 +236,6 @@ func (s *Server) startConnection(
 			lwhich,
 			id,
 		)
-		eek()
 		return nil
 	}
 
@@ -246,6 +244,11 @@ func (s *Server) startConnection(
 	s.RLogf(ConnectedColor, r, "%s connected: ID:%s", which, id)
 	sl.Info(LMNewConnection, LKDirection, lwhich)
 	*us = id
+
+	/* Register the input-stopper, if we have one. */
+	if nil != stopIn {
+		s.stopIn = stopIn
+	}
 
 	/* If we have both sides, we have a shell. */
 	if *other == id {
@@ -263,17 +266,39 @@ func (s *Server) endConnection(
 	us *string,
 	other *string,
 	which string,
+	err error,
 ) {
 	s.curIDL.Lock()
 	defer s.curIDL.Unlock()
 
+	/* A connection closing isn't a real error. */
+	if errors.Is(err, ErrConnectionClosed) {
+		err = nil
+	}
+
 	/* Note we've lost this half of the connection. */
 	*us = ""
-	s.RErrorLogf(r, "%s connection closed", which)
+	sl = sl.With(LKDirection, strings.ToLower(which))
+	switch err {
+	case nil:
+		s.RErrorLogf(r, "%s connection closed", which)
+		sl.Info(LMDisconnected)
+	default:
+		s.RErrorLogf(r, "%s connection closed: %s", which, err)
+		sl.Error(LMDisconnected, LKError, err)
+	}
+
+	/* Note the shell's dead, if it's dead. */
 	if "" == *other {
 		s.RErrorLogf(r, "%s", ShellDisconnectedMessage)
+		s.printCallbackHelp()
 	}
-	sl.Info(LMDisconnected, LKDirection, strings.ToLower(which))
+
+	/* Stop the input side as well. */
+	if nil != s.stopIn {
+		s.stopIn(ErrConnectionClosed)
+		s.stopIn = nil
+	}
 }
 
 // requestLogger returns a log.Logger which has information about r.
