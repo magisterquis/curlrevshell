@@ -2,8 +2,8 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`master`
-========
+`v0.0.1-beta.5`
+===============
 The following changes are available on the master branch and will (probably) be
 in the next tagged version.  Get them with
 ```sh
