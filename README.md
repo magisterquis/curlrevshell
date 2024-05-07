@@ -17,7 +17,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@latest
+   go install github.com/magisterquis/curlrevshell@dev
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -28,7 +28,7 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@latest
+$ go install github.com/magisterquis/curlrevshell@dev
 go: downloading github.com/magisterquis/curlrevshell v0.0.1-beta.5
 go: downloading golang.org/x/sync v0.7.0
 go: downloading golang.org/x/net v0.24.0
