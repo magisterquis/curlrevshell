@@ -2,13 +2,18 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`v0.0.1-beta.5`
-===============
-The following changes are available on the master branch and will (probably) be
+`dev`
+=====
+The following changes are available on the dev branch and will (probably) be
 in the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@master
+go install github.com/magisterquis/curlrevshell@dev
 ```
+- No more blank lines or repeated comamnds when up-arrowing.
+
+
+`v0.0.1-beta.5`
+===============
 - Actually try to put the generated TLS certificate in `$HOME` if we can't find
   a cache directory.
 - Change date on LICENSE, only four months late.

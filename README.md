@@ -30,11 +30,11 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@latest
 go: downloading github.com/magisterquis/curlrevshell v0.0.1-beta.5
-go: downloading golang.org/x/net v0.24.0
 go: downloading golang.org/x/sync v0.7.0
-go: downloading golang.org/x/term v0.19.0
+go: downloading golang.org/x/net v0.24.0
 go: downloading golang.org/x/tools v0.20.0
-go: downloading golang.org/x/sys v0.19.0
+go: downloading github.com/magisterquis/goxterm v0.0.0-20240507195027-fe9c44acc418
+go: downloading golang.org/x/sys v0.20.0
 go: downloading golang.org/x/text v0.14.0
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444

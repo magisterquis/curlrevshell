@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240507
  */
 
 import (
@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
-	"golang.org/x/term"
+	"github.com/magisterquis/goxterm"
 )
 
 const (
@@ -50,9 +50,9 @@ type CLine struct {
 }
 
 // Shell is the shell used by an operator.  It's a wrapper around
-// golang.org/x/term.Terminal.
+// github.com/magisterquis/goxterm.Terminal
 type Shell struct {
-	t            *term.Terminal
+	t            *goxterm.Terminal
 	ich          chan<- string
 	och          <-chan CLine
 	ttyF         *os.File
@@ -73,7 +73,7 @@ func New(
 ) (*Shell, func(), error) {
 	/* Shell to return. */
 	s := Shell{
-		t:            term.NewTerminal(stdioRW{}, prompt),
+		t:            goxterm.NewTerminal(stdioRW{}, prompt),
 		ich:          ich,
 		och:          och,
 		noTimestamps: noTimestamps,
@@ -84,11 +84,11 @@ func New(
 	}
 
 	/* Cleanup things. */
-	var oldState *term.State
+	var oldState *goxterm.State
 	cleanup := sync.OnceFunc(func() {
 		/* Restore the terminal state. */
 		if nil != oldState {
-			term.Restore(int(s.ttyF.Fd()), oldState)
+			goxterm.Restore(int(s.ttyF.Fd()), oldState)
 		}
 
 		/* Close the underlying TTY. */
@@ -102,7 +102,7 @@ func New(
 	}
 
 	/* Put the TTY in raw mode. */
-	if oldState, err = term.MakeRaw(int(s.ttyF.Fd())); nil != err {
+	if oldState, err = goxterm.MakeRaw(int(s.ttyF.Fd())); nil != err {
 		cleanup()
 		return nil, nil, fmt.Errorf(
 			"putting terminal in raw mode: %w",
@@ -125,7 +125,7 @@ func (s *Shell) Do(ctx context.Context) error {
 	eg.GoContext(ectx, s.handleWINCH)
 
 	/* Read lines from stdin, send them out.  It'd be nice to do this in
-	the errgroup, but term.Terminal.ReadLine doesn't let us stop it. */
+	the errgroup, but goxterm.Terminal.ReadLine doesn't let us stop it. */
 	var (
 		ech  = make(chan error, 1)
 		ich  = s.ich
@@ -184,7 +184,7 @@ func (s *Shell) Do(ctx context.Context) error {
 // resize resizes t to the size of its underlying TTY.
 func (s *Shell) resize() error {
 	/* Get the current size. */
-	w, h, err := term.GetSize(int(s.ttyF.Fd()))
+	w, h, err := goxterm.GetSize(int(s.ttyF.Fd()))
 	if nil != err {
 		return fmt.Errorf("getting tty size: %w", err)
 	}
@@ -277,7 +277,7 @@ func (s *Shell) Logf(
 // logf does what Shell.Logf says it does, but without assuming a shell.
 func logf(
 	w io.Writer,
-	escape *term.EscapeCodes,
+	escape *goxterm.EscapeCodes,
 	color Color,
 	noTS bool, /* No timestamp. */
 	format string,
