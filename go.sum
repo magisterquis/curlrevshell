@@ -1,5 +1,5 @@
-github.com/magisterquis/goxterm v0.0.0-20240508191657-d7ede5b8a37e h1:qp2HjiNuvuKKBKrDAKqOvDbdnfVVN3qX8cmdtd2nABU=
-github.com/magisterquis/goxterm v0.0.0-20240508191657-d7ede5b8a37e/go.mod h1:9aX6RmnmhbGK/Tph4ai7Z9Kc/ZrAi+Zjdp2CFQXPHwQ=
+github.com/magisterquis/goxterm v0.0.0-20240516195102-f93a9a8a646d h1:o50NWhwhlxIANyLAdblrFIhfwMzEkBJgckZuMQUs3d0=
+github.com/magisterquis/goxterm v0.0.0-20240516195102-f93a9a8a646d/go.mod h1:9aX6RmnmhbGK/Tph4ai7Z9Kc/ZrAi+Zjdp2CFQXPHwQ=
 golang.org/x/net v0.25.0 h1:d/OCCoBEUq33pjydKrGQhw7IlUPI2Oylr+8qLx49kac=
 golang.org/x/net v0.25.0/go.mod h1:JkAGAh7GEvH74S6FOH42FLoXpXbE/aqXSrIQjXgsiwM=
 golang.org/x/sync v0.7.0 h1:YsImfSBoP9QPYL0xyKJPq0gcaJdG3rInoqxTWbfQu9M=

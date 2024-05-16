@@ -10,6 +10,7 @@ in the next tagged version.  Get them with
 go install github.com/magisterquis/curlrevshell@dev
 ```
 - No more blank lines or repeated comamnds when up-arrowing.
+- Option+Left/Right works, at least in iTerm2/Terminal.app on a Mac.
 
 
 `v0.0.1-beta.5`
