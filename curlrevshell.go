@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240425
+ * Last Modified 20240517
  */
 
 import (
@@ -113,7 +113,10 @@ func rmain() int {
 			os.Stderr,
 			`Usage: %s [options]
 
-Even worse reverse shell, powered by cURL
+Even worse reverse shell, powered by cURL.
+
+Keyboard Shortcuts:
+Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
 
 Options:
 `,

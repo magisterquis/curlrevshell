@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240507
+ * Last Modified 20240517
  */
 
 import (
@@ -35,6 +35,15 @@ const (
 	timeFormat = "15:04:05.000 "
 )
 
+const (
+	// PlainWritePause is the amount of time a terminal must have no
+	// plain writes (i.e. [CLine]'s with Plain set to true) after a user
+	// sends Ctrl+O before plain writes are written again.
+	// This is meant to give a user a fighting chance after he accidentally
+	// cats a large file.
+	PlainWritePause = 2 * time.Second
+)
+
 // ErrOutputClosed is returned by Shell.Do when it returns because someone
 // closed the output channel.
 var ErrOutputClosed = errors.New("output channel closed")
@@ -58,6 +67,10 @@ type Shell struct {
 	ttyF         *os.File
 	noTimestamps bool
 	wL           sync.Mutex /* Write lock. */
+
+	silenced       bool        /* Don't write plain messages for a bit. */
+	silenceTimer   *time.Timer /* Unsilences after output's quiet. */
+	lastPlainWrite time.Time   /* Last attempted write. */
 }
 
 // New puts the controlly TTY in raw mode and returns a new Shell wrapping
@@ -78,6 +91,49 @@ func New(
 		och:          och,
 		noTimestamps: noTimestamps,
 	}
+	/* Set up a timer to unsilence the shell after there's been a lull. */
+	s.silenceTimer = time.AfterFunc(0, func() {
+		s.wL.Lock()
+		defer s.wL.Unlock()
+
+		/* If we're called during init, don't actually do anything. */
+		if s.lastPlainWrite.IsZero() {
+			return
+		}
+
+		/* If we're not actually ready, try again later. */
+		if PlainWritePause > time.Since(s.lastPlainWrite) {
+			s.resetSilenceTimer(false)
+			return
+		}
+
+		/* Note we're no longer silenced. */
+		s.silenced = false
+		go s.Logf(ColorGreen, false, "Unmuting")
+	})
+	/* Handle control characters. */
+	s.t.ControlCharacterCallback = func(key rune) {
+		switch key {
+		case 0x0F: /* ^O, silence output for a bit. */
+			s.wL.Lock()
+			defer s.wL.Unlock()
+			/* Don't double-pause. */
+			if s.silenced {
+				go s.Logf(ColorRed, false, "Already muted")
+				return
+			}
+			/* Pause output for a bit. */
+			s.silenced = true
+			s.resetSilenceTimer(true)
+			go s.Logf(
+				ColorRed,
+				false,
+				"Muting until we get %s of calm",
+				PlainWritePause,
+			)
+		}
+	}
+	/* Open the controlling TTY, for raw mode and output. */
 	var err error
 	if s.ttyF, err = os.Open(ttyPath); nil != err {
 		return nil, nil, fmt.Errorf("opening controlling TTY: %w", err)
@@ -242,7 +298,7 @@ func (s *Shell) handleOutput(ctx context.Context) error {
 		var err error
 		if cl.Plain {
 			/* Straight to the terminal. */
-			_, err = io.WriteString(s.t, cl.Line)
+			err = s.writePlain(cl.Line)
 		} else {
 			/* Print the line nicely. */
 			_, err = s.Logf(cl.Color, cl.NoTimestamp, "%s", cl.Line)
@@ -251,6 +307,24 @@ func (s *Shell) handleOutput(ctx context.Context) error {
 			return fmt.Errorf("writing to terminal: %w", err)
 		}
 	}
+}
+
+// writePlain writes a plain message to the terminal, assuming the terminal's
+// not being silenced.
+func (s *Shell) writePlain(line string) error {
+	s.wL.Lock()
+	defer s.wL.Unlock()
+
+	/* If we've been told to be quiet, make sure we're not
+	doing this too fast. */
+	if s.silenced {
+		s.resetSilenceTimer(true)
+		return nil
+	}
+
+	/* Actually do the write. */
+	_, err := io.WriteString(s.t, line)
+	return err
 }
 
 // Logf logs a line to the shell.  It is similar to log.Printf but includes
@@ -316,3 +390,15 @@ func logf(
 // CLine with CLine.Prompt set.  Don't forget a trailing space.
 // Use s.WrapIncolor to color the prompt.
 func (s *Shell) SetPrompt(prompt string) { s.t.SetPrompt(prompt) }
+
+// resetSilenceTimer resets the silenceTimer to fire PlainWritePause after
+// s.lastPlainWrite.
+// resetSilenceTimer's caller must hold s.wL.
+// If updateLast is true, s.lastPlainWrite will be set to the current time
+// before resetting the timer.
+func (s *Shell) resetSilenceTimer(updateLast bool) {
+	if updateLast {
+		s.lastPlainWrite = time.Now()
+	}
+	s.silenceTimer.Reset(time.Until(s.lastPlainWrite.Add(PlainWritePause)))
+}
