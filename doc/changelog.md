@@ -11,6 +11,8 @@ go install github.com/magisterquis/curlrevshell@dev
 ```
 - No more blank lines or repeated comamnds when up-arrowing.
 - Option+Left/Right works, at least in iTerm2/Terminal.app on a Mac.
+- Ctrl+O mutes output until it calms down, as requested by someone who found
+  every logfile on target being printed to his screen.
 
 
 `v0.0.1-beta.5`

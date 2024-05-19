@@ -59,7 +59,10 @@ Usage
 ```
 Usage: curlrevshell [options]
 
-Even worse reverse shell, powered by cURL
+Even worse reverse shell, powered by cURL.
+
+Keyboard Shortcuts:
+Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
 
 Options:
   -callback-address address
