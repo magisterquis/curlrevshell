@@ -15,6 +15,7 @@ go install github.com/magisterquis/curlrevshell@dev
   every logfile on target being printed to his screen.
 - `-one-shell`: Stop listening after a shell connects.  Like netcat without
   `-k` but nicer.
+- No more pesky quotes around the cyan callback/file URL lines.
 
 
 `v0.0.1-beta.5`
