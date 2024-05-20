@@ -13,6 +13,8 @@ go install github.com/magisterquis/curlrevshell@dev
 - Option+Left/Right works, at least in iTerm2/Terminal.app on a Mac.
 - Ctrl+O mutes output until it calms down, as requested by someone who found
   every logfile on target being printed to his screen.
+- `-one-shell`: Stop listening after a shell connects.  Like netcat without
+  `-k` but nicer.
 
 
 `v0.0.1-beta.5`

@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240426
+ * Last Modified 20240520
  */
 
 import (
@@ -51,14 +51,19 @@ const (
 	LKListenAddr = "address"
 )
 
+// ErrOneShellClosed indicates that the listener was closed as expected after
+// receiving a single shell.
+var ErrOneShellClosed = errors.New("closed after shell received")
+
 // Server serves implants over HTTPS.
 type Server struct {
-	sl   *slog.Logger
-	fdir string /* Static files directory. */
-	ich  <-chan string
-	och  chan<- opshell.CLine
-	l    sstls.Listener
-	ps   pinkSender
+	sl       *slog.Logger
+	fdir     string /* Static files directory. */
+	ich      <-chan string
+	och      chan<- opshell.CLine
+	l        sstls.Listener
+	ps       pinkSender
+	oneShell bool /* Close listener after getting a shell. */
 
 	/* Template generation. */
 	tmplf   string             /* Template file. */
@@ -92,6 +97,7 @@ func New(
 	certFile string,
 	cbAddrs []string, /* Callback addresses, for one-liners. */
 	printIPv6 bool,
+	oneShell bool, /* Shut down listener after first shell. */
 ) (*Server, func(), error) {
 	var l sstls.Listener
 
@@ -127,6 +133,7 @@ func New(
 		defTmpl:   parsedDefaultTemplate,
 		cbAddrs:   cbAddrs,
 		printIPv6: printIPv6,
+		oneShell:  oneShell,
 	}
 
 	/* Work out our listen addresses, for user help. */
@@ -191,7 +198,15 @@ func (s *Server) Do(ctx context.Context) error {
 
 	/* Serve until we fail or the context is cancelled. */
 	var ech = make(chan error, 1)
-	go func() { ech <- hsvr.Serve(s.l) }()
+	go func() {
+		err := hsvr.Serve(s.l)
+		/* If we're only running a single shell, a closed listener is
+		to be expected. */
+		if errors.Is(err, net.ErrClosed) && s.oneShell {
+			err = ErrOneShellClosed
+		}
+		ech <- err
+	}()
 	var err error
 	select {
 	case err = <-ech:

@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240426
+ * Last Modified 20240520
  */
 
 import (
@@ -34,15 +34,24 @@ const (
 	// ShellDisconnectedMessage is what we print when both sides of the
 	// shell are gone.
 	ShellDisconnectedMessage = "Shell is gone :("
+
+	// ClosingListenerMessage is what we print to tell the user we're
+	// closing the listener after getting a shell when we've also got
+	// -one-shell.
+	ClosingListenerMessage = "Closing listener, because -" + OneShellFlag
+
+	// OneShellFlag is the flag we use to indicate we only want one shell.
+	OneShellFlag = "one-shell"
 )
 
 // Log messages and keys.
 const (
-	LMDisconnected  = "Disconnected"
-	LMFileRequested = "File requested"
-	LMNewConnection = "New connection"
-	LMShellInput    = "Sent shell input"
-	LMShellOutput   = "Shell output"
+	LMOneShellClosingListener = "Got one shell, closing listener"
+	LMDisconnected            = "Disconnected"
+	LMFileRequested           = "File requested"
+	LMNewConnection           = "New connection"
+	LMShellInput              = "Sent shell input"
+	LMShellOutput             = "Shell output"
 
 	LKDirection      = "direction"
 	LKFilename       = "filename"
@@ -252,6 +261,12 @@ func (s *Server) startConnection(
 
 	/* If we have both sides, we have a shell. */
 	if *other == id {
+		/* If we're only having one shell, close the listener. */
+		if s.oneShell {
+			s.RLogf(ConnectedColor, r, "%s", ClosingListenerMessage)
+			sl.Debug(LMOneShellClosingListener)
+			s.l.Close()
+		}
 		s.RLogf(ConnectedColor, r, "%s", ShellReadyMessage)
 	}
 
@@ -291,7 +306,9 @@ func (s *Server) endConnection(
 	/* Note the shell's dead, if it's dead. */
 	if "" == *other {
 		s.RErrorLogf(r, "%s", ShellDisconnectedMessage)
-		s.printCallbackHelp()
+		if !s.oneShell {
+			s.printCallbackHelp()
+		}
 	}
 
 	/* Stop the input side as well. */

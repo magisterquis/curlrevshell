@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240517
+ * Last Modified 20240520
  */
 
 import (
@@ -91,6 +91,11 @@ func rmain() int {
 			"log",
 			os.Getenv(LogEnvVar),
 			"Optional `file` to which to write JSON logs",
+		)
+		oneShell = flag.Bool(
+			hsrv.OneShellFlag,
+			false,
+			"Close listening socket when first shell connects",
 		)
 	)
 	flag.StringVar(
@@ -204,6 +209,7 @@ Options:
 		*certFile,
 		cbAddrs,
 		*printIPv6,
+		*oneShell,
 	)
 	if nil != err {
 		shell.Logf(
@@ -222,15 +228,17 @@ Options:
 	eg.GoContext(ectx, svr.Do)
 
 	/* Wait for something to go wrong. */
-	if err := eg.Wait(); errors.Is(err, io.EOF) {
-		shell.SetPrompt("")
-		shell.Logf(opshell.ColorGreen, false, "Goodbye.")
-		sl.Info(LKTerminating)
-	} else if nil != err {
+	err = eg.Wait()
+	shell.SetPrompt("")
+	if nil != err &&
+		!errors.Is(err, io.EOF) &&
+		!errors.Is(err, hsrv.ErrOneShellClosed) {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
 		sl.Info(LKTerminating, hsrv.LKError, err)
 		return 1
 	}
+	shell.Logf(opshell.ColorGreen, false, "Goodbye.")
+	sl.Info(LKTerminating)
 
 	return 0
 }
