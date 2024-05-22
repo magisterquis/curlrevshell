@@ -2,19 +2,20 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
-The following changes are available on the dev branch and will (probably) be
-in the next tagged version.  Get them with
-```sh
-go install github.com/magisterquis/curlrevshell@dev
-```
+Bleeding-edge code can be found in the
+[`dev` branch](https://github.com/magisterquis/curlrevshell/tree/dev):
+ ```sh
+ go install github.com/magisterquis/curlrevshell@dev
+ ```
+
+`v0.0.1-beta.6` (2024-05-22)
+============================
 - No more blank lines or repeated comamnds when up-arrowing.
 - Option+Left/Right works, at least in iTerm2/Terminal.app on a Mac.
 - Ctrl+O mutes output until it calms down, as requested by someone who found
   every logfile on target being printed to his screen.
-- `-one-shell`: Stop listening after a shell connects.  Like netcat without
-  `-k` but nicer.
+- `-one-shell`: Stop listening after a shell connects, like a nicer `-k`-less
+  netcat.
 - No more pesky quotes around the cyan callback/file URL lines.
 
 
