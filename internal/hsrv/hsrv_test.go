@@ -5,14 +5,20 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240426
+ * Last Modified 20240520
  */
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"maps"
 	"net"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -34,7 +40,10 @@ func newTestServer(t *testing.T) (
 	)
 	cbAddrs := []string{"kittens.com:8888", "moose.com"}
 	s, cleanup, err := New(
-		slog.New(slog.NewJSONHandler(chanLog(cl), nil)),
+		slog.New(slog.NewJSONHandler(
+			chanLog(cl),
+			&slog.HandlerOptions{Level: slog.LevelDebug},
+		)),
 		"127.0.0.1:0",
 		td,
 		"",
@@ -43,12 +52,21 @@ func newTestServer(t *testing.T) (
 		"",
 		cbAddrs,
 		true,
+		false,
 	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
 	}
 	t.Cleanup(cleanup)
-	t.Cleanup(func() { <-ech; close(cl) })
+	t.Cleanup(func() {
+		if err := <-ech; nil != err && !errors.Is(
+			err,
+			ErrOneShellClosed,
+		) {
+			t.Fatalf("Server error: %s", err)
+		}
+		close(cl)
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { ech <- s.Do(ctx); close(ech) }()
@@ -335,4 +353,110 @@ func TestChanLog(t *testing.T) {
 		sl.Info(have)
 		cl.ExpectEmpty(t, want)
 	})
+}
+
+// Make sure the server returns after a single shell, if oneShell is set.
+func TestServer_OneShell(t *testing.T) {
+	cl, _, _, s := newTestServer(t)
+	s.oneShell = true /* Only handle one shell. */
+
+	/* HTTP Client which does not certificate validation. */
+	httpc := http.Client{
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		}},
+	}
+
+	/* Connect a shell. */
+	id := "kittens"
+	ech := make(chan error, 2)
+	doneCh := make(chan struct{})
+	go func() {
+		res, err := httpc.Get(
+			"https://" + s.l.Addr().String() + "/i/" + id,
+		)
+		if nil != err {
+			ech <- fmt.Errorf("request for /i: %w", err)
+			return
+		}
+		defer res.Body.Close()
+		if http.StatusOK != res.StatusCode {
+			ech <- fmt.Errorf(
+				"request for /i: status %s",
+				res.Status,
+			)
+		}
+		ech <- nil
+	}()
+	go func() {
+		pr, pw := io.Pipe()
+		defer pr.Close()
+		defer pw.Close()
+		go func() {
+			<-doneCh
+			pw.Close()
+		}()
+		res, err := httpc.Post(
+			"https://"+s.l.Addr().String()+"/o/"+id,
+			"",
+			pr,
+		)
+		if nil != err {
+			ech <- fmt.Errorf("request for /o: %w", err)
+			return
+		}
+		defer res.Body.Close()
+		if http.StatusOK != res.StatusCode {
+			ech <- fmt.Errorf(
+				"request for /o: status %s",
+				res.Status,
+			)
+		}
+		<-doneCh
+		ech <- nil
+	}()
+
+	/* Wait for connections to happen and the listener to close. */
+	type lmsg struct {
+		Msg       string
+		Direction string
+	}
+	var (
+		got  = make(map[lmsg]int)
+		want = map[lmsg]int{
+			{Msg: LMOneShellClosingListener}:            1,
+			{Msg: LMNewConnection, Direction: "input"}:  1,
+			{Msg: LMNewConnection, Direction: "output"}: 1,
+		}
+	)
+	for i := 0; i < 3; i++ {
+		select {
+		case l := <-cl:
+			var msg lmsg
+			if err := json.Unmarshal([]byte(l), &msg); nil != err {
+				t.Fatalf("Error unmarshaling %s: %s", l, err)
+			}
+			got[msg]++
+		case err := <-ech:
+			t.Fatalf(
+				"Request error before listener closed: %s",
+				err,
+			)
+		}
+	}
+	if !maps.Equal(got, want) {
+		t.Fatalf("Incorrect logs:\ngot: %q\nwant: %q", got, want)
+	}
+
+	close(doneCh)
+	for i := 0; i < len(ech); i++ {
+		if err := <-ech; nil != err {
+			t.Errorf(
+				"Request error after listener closed: %s",
+				err,
+			)
+		}
+	}
+
+	cl.ExpectEmpty(t)
 }

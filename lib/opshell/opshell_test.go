@@ -5,7 +5,7 @@ package opshell
  * Tests for opshell.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20240507
  */
 
 import (
@@ -14,14 +14,14 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/term"
+	"github.com/magisterquis/goxterm"
 )
 
 // timestampRE matches a timestamp a the beginning of a line.
 var timestampRE = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}.\d{3} `)
 
 // testEscapeCodes are ANSI escape codes.
-var testEscapeCodes = &term.EscapeCodes{
+var testEscapeCodes = &goxterm.EscapeCodes{
 	Black:   []byte("\x1b[30m"),
 	Red:     []byte("\x1b[31m"),
 	Green:   []byte("\x1b[32m"),

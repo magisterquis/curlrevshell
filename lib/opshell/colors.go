@@ -5,14 +5,14 @@ package opshell
  * Colors for Shell.Logf
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20240325
+ * Last Modified 20240507
  */
 
 import (
 	"bytes"
 	"fmt"
 
-	"golang.org/x/term"
+	"github.com/magisterquis/goxterm"
 )
 
 // Color represents a specific color.
@@ -37,7 +37,7 @@ const (
 // ColorNone returns an empty slice, as do unknown colors.  The returned slice
 // is a copy of the slice in ec or a newly-allocated slice; it may be modified
 // at will.
-func ColorEC(ec *term.EscapeCodes, color Color) []byte {
+func ColorEC(ec *goxterm.EscapeCodes, color Color) []byte {
 	/* Figure out what color to return. */
 	var b []byte
 	switch color {

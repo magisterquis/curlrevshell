@@ -8,6 +8,17 @@ Bleeding-edge code can be found in the
 go install github.com/magisterquis/curlrevshell@dev
 ```
 
+`v0.0.1-beta.6` (2024-05-22)
+============================
+- No more blank lines or repeated comamnds when up-arrowing.
+- Option+Left/Right works, at least in iTerm2/Terminal.app on a Mac.
+- Ctrl+O mutes output until it calms down, as requested by someone who found
+  every logfile on target being printed to his screen.
+- `-one-shell`: Stop listening after a shell connects, like a nicer `-k`-less
+  netcat.
+- No more pesky quotes around the cyan callback/file URL lines.
+
+
 `v0.0.1-beta.5`
 ===============
 - Actually try to put the generated TLS certificate in `$HOME` if we can't find

