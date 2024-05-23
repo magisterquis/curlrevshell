@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240520
+ * Last Modified 20240523
  */
 
 import (
@@ -97,6 +97,11 @@ func rmain() int {
 			false,
 			"Close listening socket when first shell connects",
 		)
+		insertFile = flag.String(
+			"ctrl-i-file",
+			"",
+			"File to insert with Ctrl+I",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -121,6 +126,7 @@ func rmain() int {
 Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
+Ctrl+I - Insert (send) the file specified with -ctrl-i-file
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
 
 Options:
@@ -175,12 +181,43 @@ Options:
 		och,
 		Prompt,
 		*noTimestamps,
+		*insertFile,
 	)
 	och <- opshell.CLine{Prompt: shell.WrapInColor(Prompt, opshell.ColorCyan)}
 	if nil != err {
 		log.Printf("Error setting up shell: %s", err)
 	}
 	defer cleanup()
+
+	/* Warn the user if the insertion file isn't there or looks empty. */
+	if "" != *insertFile {
+		fi, err := os.Stat(*insertFile)
+		if errors.Is(err, os.ErrNotExist) {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Warning: Ctrl+I file %s does not exist (yet)",
+				*insertFile,
+			)
+		} else if nil != err {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Warning: Could not get info about Ctrl+I "+
+					"file %s: %s",
+				*insertFile,
+				err,
+			)
+		} else if 0 == fi.Size() {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Warning: Ctrl+I file %s looks empty",
+				*insertFile,
+			)
+		}
+
+	}
 
 	/* Ask icanhazip for our IP address. */
 	if *useIcanhazip {
