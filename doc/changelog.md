@@ -11,6 +11,10 @@ go install github.com/magisterquis/curlrevshell@dev
 ```
 - `-ctrl-i-file`: In-memory, over-the-wire, on-demand module loading.  Or just
   sending the contents of a file to the shell.
+- Added a [`tools` directory](../tools) for helper tools.
+- Added [`funcgen`](../tools/src/funcgen) to make it easier to generate files
+  for `-ctrl-i-file` and `-callback-template` which stick functions in the
+  shell.
 
 
 `v0.0.1-beta.6` (2024-05-22)
