@@ -94,6 +94,38 @@ Quickstart
     info, and the functions `psod`, `tget`, `histories`, and `pss` should
     work.
 
+Usage
+-----
+```
+Usage: ./tools/funcgen [-chxv] [-o output_file] [-t callback_template] funcdir [funcdir...]
+
+Rolls a file suitable for use with -ctrl-i-file (by default) or
+-callback-template (with -t) which loads shell functions from files in one or
+more directories (funcdir) into the remote shell.
+
+In each funcdir should be files with names ending in .sh containing shell
+functions (i.e. function foo {...} or foo() {...}) or perl scripts with names
+ending in .pl.  Files ending in .sh may also have code which executes when the
+script is sent.  Files ending in .pl will be turned into shell functions with
+the same name as the file, less the .pl.  Multiple files with the name name but
+different extensions are a bad idea.
+
+A template for use with -callback-template may be specified with -t.  This
+will be passed through m4 -PEE, with the functions, escaped for inclusion in
+single quotes, sent on stdin.  An example template may be printed with -x.  If
+the special value @builtin is passed via -t, a built-in template will be used.
+
+Options:
+  -c    Clean (remove) generated files from the funcdir(s)
+  -h    Print this help
+  -o filename
+        Optional output filename, default is standard output
+  -t callback_template
+        Optional custom -callback-template template
+  -v    Print commands as they're run
+  -x    Print an example tempalte for use with -t
+```
+
 Quickerstart
 ------------
 1.  Be in the top level of this repo.
