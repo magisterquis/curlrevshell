@@ -10,6 +10,8 @@ but with the following "features":
 - IPv6-ready
 - Logged [feature creep](./doc/changelog.md)
 - Non-zero [documentation](./doc/README.md)
+- Makefiles which coldheartedly assume
+  [BSD Make](https://man.openbsd.org/make).
 
 For legal use only
 
@@ -18,7 +20,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@dev
+   go install github.com/magisterquis/curlrevshell@sendscript
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -29,7 +31,7 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@dev
+$ go install github.com/magisterquis/curlrevshell@sendscript
 go: downloading golang.org/x/sync v0.7.0
 go: downloading golang.org/x/net v0.25.0
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
@@ -116,6 +118,12 @@ The struct passed to the template is `TemplateParams` in
 [script.go](internal/hsrv/script.go).  The default template is
 [script.tmpl](internal/hsrv/script.tmpl).  It's re-read every time it's needed,
 so feel free to change it as often as you'd like.
+
+A script to generate a custom callback template with embedded shell functions
+can be made with `make tools/funcgen` and is found in `tools/funcgen`.
+
+On Linux, you'll probably need BSD make(`apt/yum/such install bmake`, or
+thereabouts) and add a `b` before the `make`s.
 
 Callback Address
 ----------------

