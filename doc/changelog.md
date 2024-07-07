@@ -9,13 +9,13 @@ in the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
-- `-ctrl-i-file`: In-memory, over-the-wire, on-demand module loading.  Or just
-  sending the contents of a file to the shell.
-- Added a [`tools` directory](../tools) for helper tools.
-- Added [`funcgen`](../tools/src/funcgen) to make it easier to generate files
-  for `-ctrl-i-file` and `-callback-template` which stick functions in the
-  shell.
-
+- [`-ctrl-i`](./flags#-ctrl-i): In-memory, over-the-wire, on-demand module
+  loading.  Or just sending the contents of a file (or directory or magically
+  shellified Perl script) to the remote shell.
+- [`shellfuncsfile`](../lib/shellfuncsfile): a nifty library to roll a
+  file or directory into a single gob of shell functions; does a lot of
+  `-ctrl-i`'s heavy lifting.
+- Updated dependencies.
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================

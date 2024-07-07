@@ -1,0 +1,7 @@
+function penv {
+        tr '\0' '\n' <"/proc/${1:-"self"}/environ" | sort -u;
+}
+
+echo "b.subr loaded"
+
+# vim: ft=sh

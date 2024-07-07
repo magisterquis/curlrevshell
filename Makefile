@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20240602
+# Last Modified 20240707
 
 BINNAME    != basename $$(pwd)
 BUILDFLAGS  = -trimpath -ldflags "-w -s"
@@ -11,9 +11,9 @@ TESTFLAGS  += -timeout 3s
 TOOLSDIR    = tools
 VETFLAGS    = -printf.funcs 'debugf,errorf,erorrlogf,logf,printf,rerrorlogf,rlogf'
 
-.PHONY: all test install tools clean
+.PHONY: all test install clean
 
-all: test build tools
+all: test build
 
 ${BINNAME}: *.go go.* ${CRSSRCS}
 	go build ${BUILDFLAGS} -o ${BINNAME}
@@ -37,23 +37,5 @@ test:
 install:
 	go install ${BUILDFLAGS}
 
-clean::
+clean:
 	rm -f ${BINNAME}
-
-# List of tools to build when asked
-TOOLSRCDIRS != find $(TOOLSDIR)/src -type d -mindepth 1 -maxdepth 1
-tools: $(TOOLSRCDIRS:S,src/,,)
-
-# Build ALL the tools/
-.for TSD in $(TOOLSRCDIRS)
-
-# Build a tool when its dependencies change
-DEPS != find $(TSD) -type f ! -name '*.swp' -a ! -path $(TSD)/$(TSD:T)
-$(TOOLSDIR)/$(TSD:T): $(DEPS)
-	$(.MAKE) -C "$(TOOLSDIR)/src/$(@:T)" BIN="$(.CURDIR)/$@"
-
-# When we make clean, clean up this tools' files as well.
-clean::
-	$(.MAKE) -C $(TSD) clean
-
-.endfor

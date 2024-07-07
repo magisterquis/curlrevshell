@@ -1,0 +1,1 @@
+remove_whitespace() { SFF_1720354778930267614=7072696e742022576f726b792e5c6e22 perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }

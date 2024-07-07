@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240523
+ * Last Modified 20240707
  */
 
 import (
@@ -23,6 +23,7 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/shellfuncsfile"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
@@ -98,9 +99,9 @@ func rmain() int {
 			"Close listening socket when first shell connects",
 		)
 		insertFile = flag.String(
-			"ctrl-i-file",
+			"ctrl-i",
 			"",
-			"File to insert with Ctrl+I",
+			"Tab/Ctrl+I's insertion `source` file or directory",
 		)
 	)
 	flag.StringVar(
@@ -126,8 +127,9 @@ func rmain() int {
 Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
-Ctrl+I - Insert (send) the file specified with -ctrl-i-file
+Ctrl+I - Insert (send) the file specified with -ctrl-i
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
+Tab    - Same as Ctrl+I
 
 Options:
 `,
@@ -175,15 +177,29 @@ Options:
 		och = make(chan opshell.CLine, 1024)
 	)
 
+	/* Converter for Ctrl+I. */
+	ctrlIConv := shellfuncsfile.NewDefaultConverter()
+
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(
 		ich,
 		och,
 		Prompt,
 		*noTimestamps,
+		func() ([]byte, error) {
+			/* Make sure we have something to insert. */
+			if "" == *insertFile {
+				return nil, errors.New("no source configured")
+			}
+			/* Send it for inserting. */
+			return ctrlIConv.From(*insertFile)
+		},
 		*insertFile,
 	)
-	och <- opshell.CLine{Prompt: shell.WrapInColor(Prompt, opshell.ColorCyan)}
+	och <- opshell.CLine{Prompt: shell.WrapInColor(
+		Prompt,
+		opshell.ColorCyan,
+	)}
 	if nil != err {
 		log.Printf("Error setting up shell: %s", err)
 	}

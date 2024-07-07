@@ -1,0 +1,22 @@
+These are test cases for FromPerl.
+The first line of each test case is what FromPerl should return.
+The rest is fed into FromPerl.
+The environment variable name is always SFF_1720354778930267614
+-- simple.pl --
+simple() { SFF_1720354778930267614=7072696e7420224b697474656e735c6e223b perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+print "Kittens\n";
+-- header.pl --
+header() { SFF_1720354778930267614=7072696e7420224b697474656e735c6e223b0a0a736c65657020313b0a0a64696520225765207472696564223b perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+#!/usr/bin/env perl
+#
+# header.pl
+# A test case
+
+print "Kittens\n";
+
+sleep 1;
+
+die "We tried";
+
+    
+

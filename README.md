@@ -11,7 +11,8 @@ but with the following "features":
 - Logged [feature creep](./doc/changelog.md)
 - Non-zero [documentation](./doc/README.md)
 - Makefiles which coldheartedly assume
-  [BSD Make](https://man.openbsd.org/make).
+  [BSD Make](https://man.openbsd.org/make)
+- Somewhat kinda easyish in-target-memory shell function sender
 
 For legal use only
 
@@ -33,11 +34,12 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@sendscript
 go: downloading golang.org/x/sync v0.7.0
-go: downloading golang.org/x/net v0.25.0
+go: downloading golang.org/x/net v0.27.0
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/tools v0.21.0
-go: downloading golang.org/x/sys v0.20.0
-go: downloading golang.org/x/text v0.15.0
+go: downloading golang.org/x/tools v0.22.0
+go: downloading golang.org/x/sys v0.22.0
+go: downloading golang.org/x/text v0.16.0
+
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
@@ -68,29 +70,31 @@ Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
 
 Options:
   -callback-address address
-        Additional callback address or domain, for one-liner printing (may be repeated)
+    	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
-        Optional callback template file, used if it exists
+    	Optional callback template file, used if it exists
+  -ctrl-i source
+    	Tab/Ctrl+I's insertion source file or directory
   -icanhazip
-        Query icanhazip.com for a callback address
+    	Query icanhazip.com for a callback address
   -ipv6-one-liners
-        Also print callback one-liners with IPv6 addresses
+    	Also print callback one-liners with IPv6 addresses
   -listen-address address
-        Listen address (default "0.0.0.0:4444")
+    	Listen address (default "0.0.0.0:4444")
   -log file
-        Optional file to which to write JSON logs
+    	Optional file to which to write JSON logs
   -no-timestamps
-        Don't print timestamps
+    	Don't print timestamps
   -one-shell
-        Close listening socket when first shell connects
+    	Close listening socket when first shell connects
   -print-default-template
-        Write the default template to stdout and exit
+    	Write the default template to stdout and exit
   -prompt string
-        Terminal prompt; don't forget a trailing space (default "> ")
+    	Terminal prompt; don't forget a trailing space (default "> ")
   -serve-files-from directory
-        Optional directory from which to serve static files
+    	Optional directory from which to serve static files
   -tls-certificate-cache file
-        Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
+    	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
 ```
 
 Details
@@ -169,3 +173,13 @@ TLS is all via a pinned self-signed certificate.  By default, the certificate
 is cached in a file, mostly to keep from having to copy/paste a new fingerprint
 every time a ragey Ctrl+C kills the current shell.  Caching can be disabled
 with `-tls-certificate-cache ""`.
+
+File Insertion
+--------------
+It's kinda nice to bring your own functions, even nicer to not have to
+drop them to disk, and even nice still to not have to copy/paste a few hundred
+lines of shell script by hand.
+
+Works with single files, Perl scripts, and even entire directories.
+
+More info in [the docs](./doc/flags.md#-ctrl-i).

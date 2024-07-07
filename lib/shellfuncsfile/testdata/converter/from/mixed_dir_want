@@ -1,0 +1,6 @@
+echo "The shell script has loaded"
+
+function foo {
+        echo "bar"
+}
+b() { SFF_1720354778930267614=7072696e742022546869732069732061207065726c2066756e6374696f6e22 perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
