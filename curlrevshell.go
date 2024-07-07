@@ -127,7 +127,8 @@ func rmain() int {
 Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
-Ctrl+I - Insert (send) the file specified with -ctrl-i
+Ctrl+I - Insert the file or directory specified with -ctrl-i
+Ctrl+J - Print locally what Ctrl+I would send
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
 Tab    - Same as Ctrl+I
 

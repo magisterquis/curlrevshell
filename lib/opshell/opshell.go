@@ -141,6 +141,8 @@ func New(
 			)
 		case 0x09: /* ^I, paste from file. */
 			go s.insert()
+		case 0x0a: /* ^J, like ^I but just locally. */
+			go s.pretendInsert()
 			/* This is left here but commented out to make it that
 			much easier to add another Ctrl+Key. */
 			//default:

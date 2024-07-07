@@ -11,7 +11,8 @@ go install github.com/magisterquis/curlrevshell@dev
 ```
 - [`-ctrl-i`](./flags#-ctrl-i): In-memory, over-the-wire, on-demand module
   loading.  Or just sending the contents of a file (or directory or magically
-  shellified Perl script) to the remote shell.
+  shellified Perl script) to the remote shell.  Trigger it with `Ctrl+I`, or
+  use `Ctrl+J` to just see what `Ctrl+I` would send.
 - [`shellfuncsfile`](../lib/shellfuncsfile): a nifty library to roll a
   file or directory into a single gob of shell functions; does a lot of
   `-ctrl-i`'s heavy lifting.

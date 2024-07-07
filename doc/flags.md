@@ -63,6 +63,8 @@ the hood.  Stdio and argv and so on (should) work more or less like normal.
 
 Files ending in `.sh`, `.subr`, or with no `.`anything are sent as-is.
 
+For testing, `Ctrl+J` will print out what would be sent with `Ctrl+I`.
+
 Handy for libraries of shell functions and telling people you load modules
 in memory over the network.
 

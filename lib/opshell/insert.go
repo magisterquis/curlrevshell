@@ -55,3 +55,28 @@ func (s *Shell) insert() {
 	s.Logf(ColorGreen, false, "Inserted %d bytes from %s", n, s.insertName)
 	s.Logf(ColorGreen, false, "SHA256: %x", her.Sum(nil))
 }
+
+// pretendInsert is like insert but sends what would have been inserted to
+// the shell instead.
+func (s *Shell) pretendInsert() {
+	/* Get the bytes to insert. */
+	b, err := s.insertGen()
+	if nil != err {
+		s.Logf(
+			ColorRed,
+			false,
+			"Error working out what to insert: %s",
+			err,
+		)
+		return
+	}
+
+	/* Send it back to the user. */
+	s.Logf(
+		ColorCyan,
+		false,
+		"Would have sent the following %d bytes:\n%s",
+		len(b),
+		b,
+	)
+}
