@@ -12,7 +12,7 @@ but with the following "features":
 - Non-zero [documentation](./doc/README.md)
 - Makefiles which coldheartedly assume
   [BSD Make](https://man.openbsd.org/make)
-- Somewhat kinda easyish in-target-memory shell function sender
+- Easyish in-target-memory [shell function sender](./doc/flags.md#-ctrl-i)
 
 For legal use only
 
