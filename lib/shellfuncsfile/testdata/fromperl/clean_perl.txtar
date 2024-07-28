@@ -1,0 +1,62 @@
+These are test cases for FromPerl.
+Each case has three files, *.have, *.leadComments, and *.perl corresponding to
+the raw Perl passed into cleanPerl and the two returned strings.
+-- empty.have --
+-- empty.leadComments --
+-- empty.perl --
+-- justcode.have --
+print "Hello, JustCodeWorld!\n";
+# Exit nicely
+exit 0;
+-- justcode.leadComments --
+-- justcode.perl --
+print "Hello, JustCodeWorld!\n";
+# Exit nicely
+exit 0;
+-- code_and_lead_comments.have --
+#!/usr/bin/perl
+# TABDOC: foo bar tridge
+# TABDOC: baaz quux
+print "Hello, World!\n";
+# Exit nicely
+exit 0;
+-- code_and_lead_comments.leadComments --
+# TABDOC: foo bar tridge
+# TABDOC: baaz quux
+-- code_and_lead_comments.perl --
+
+
+
+print "Hello, World!\n";
+# Exit nicely
+exit 0;
+-- comment_and_blank_in_middle.have --
+print "Hello, Vertical Space!\n";
+
+# Now we exit
+exit 0;
+-- comment_and_blank_in_middle.leadComments --
+-- comment_and_blank_in_middle.perl --
+print "Hello, Vertical Space!\n";
+
+# Now we exit
+exit 0;
+-- shebang.have --
+#!/usr/bin/perl
+#
+# foo
+# bar
+
+printf "shebang\n";
+exit 0;
+-- shebang.leadComments --
+# foo
+# bar
+-- shebang.perl --
+
+
+
+
+
+printf "shebang\n";
+exit 0;

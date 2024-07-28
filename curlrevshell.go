@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240707
+ * Last Modified 20240728
  */
 
 import (
@@ -180,6 +180,7 @@ Options:
 
 	/* Converter for Ctrl+I. */
 	ctrlIConv := shellfuncsfile.NewDefaultConverter()
+	ctrlIConv.AddListFunction = true
 
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(
@@ -193,7 +194,15 @@ Options:
 				return nil, errors.New("no source configured")
 			}
 			/* Send it for inserting. */
-			return ctrlIConv.From(*insertFile)
+			b, err := ctrlIConv.From(*insertFile)
+			if nil != err {
+				return nil, fmt.Errorf(
+					"preparing %s: %w",
+					*insertFile,
+					err,
+				)
+			}
+			return b, nil
 		},
 		*insertFile,
 	)

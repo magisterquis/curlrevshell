@@ -1,0 +1,19 @@
+# A simple perl program
+# TABDOC: a A perl script to do a thing
+a() { SFF_1720354778930267614=0a0a0a0a0a757365207761726e696e67733b0a757365207374726963743b0a0a7072696e74202241207468696e6720686173206265656e20646f6e655c6e223b0a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+# TABDOC: foo  Does a 'nice' foo
+foo() {
+        echo "Does a foo"
+}
+
+# TABDOC: bar A "questionable" bar
+bar() {
+        printf "bar\tbar\n"
+}
+
+tab_list() {
+        echo 'a         - A perl script to do a thing'
+        echo 'bar       - A "questionable" bar'
+        echo 'foo       - Does a '\''nice'\'' foo'
+        echo 'tab_list  - This function list'
+}

