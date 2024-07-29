@@ -34,9 +34,10 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@sendscript
 go: downloading golang.org/x/sync v0.7.0
-go: downloading golang.org/x/net v0.27.0
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/tools v0.22.0
+go: downloading golang.org/x/net v0.27.0
+go: downloading golang.org/x/tools v0.23.0
+go: downloading golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 go: downloading golang.org/x/sys v0.22.0
 go: downloading golang.org/x/text v0.16.0
 

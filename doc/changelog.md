@@ -2,12 +2,12 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
+`sendscript`
+============
 The following changes are available on the dev branch and will (probably) be
 in the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev
+go install github.com/magisterquis/curlrevshell@sendscript
 ```
 - [`-ctrl-i`](./flags#-ctrl-i): In-memory, over-the-wire, on-demand module
   loading.  Or just sending the contents of a file (or directory or magically
