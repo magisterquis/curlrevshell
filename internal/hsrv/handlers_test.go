@@ -5,7 +5,7 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240426
+ * Last Modified 20240729
  */
 
 import (
@@ -262,13 +262,13 @@ func TestServerInputHandler(t *testing.T) {
 		}
 		for _, l := range haveLines {
 			msg := `{"time":"","level":"INFO",` +
-				`"msg":"Sent shell input","http_request":{` +
+				`"msg":"Shell I/O","http_request":{` +
 				`"remote_addr":"192.0.2.1:1234",` +
 				`"method":"GET",` +
 				`"request_uri":"/i/` + id + `",` +
 				`"protocol":"HTTP/1.1","host":"example.com",` +
 				`"sni":"","user_agent":"","id":"` + id + `"},` +
-				`"line":"` + l + `"}`
+				`"direction":"input","data":"` + l + `\n"}`
 			wantLogs = append(wantLogs, msg)
 		}
 		cl.ExpectEmpty(t, wantLogs...)
@@ -546,13 +546,14 @@ func TestServerOutputHandler(t *testing.T) {
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"","id":"`+id+`"},`+
 				`"direction":"output"}`,
-			`{"time":"","level":"INFO","msg":"Shell output",`+
+			`{"time":"","level":"INFO","msg":"Shell I/O",`+
 				`"http_request":{`+
 				`"remote_addr":"192.0.2.1:1234",`+
 				`"method":"GET","request_uri":"/o/`+id+`",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"",`+
-				`"id":"`+id+`"},"output":"`+output+`"}`,
+				`"id":"`+id+`"},"direction":"output",`+
+				`"data":"`+output+`"}`,
 			`{"time":"","level":"INFO","msg":"Disconnected",`+
 				`"http_request":{`+
 				`"remote_addr":"192.0.2.1:1234",`+
@@ -818,11 +819,12 @@ func TestServerOutputHandler_DisconnectInput(t *testing.T) {
 			`"method":"GET","request_uri":"/o/kittens",`+
 			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
 			`"user_agent":"","id":"kittens"},"direction":"output"}`,
-		`{"time":"","level":"INFO","msg":"Shell output",`+
+		`{"time":"","level":"INFO","msg":"Shell I/O",`+
 			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
 			`"method":"GET","request_uri":"/o/kittens",`+
 			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"output":"moose"}`,
+			`"user_agent":"","id":"kittens"},`+
+			`"direction":"output","data":"moose"}`,
 		`{"time":"","level":"INFO","msg":"Disconnected",`+
 			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
 			`"method":"GET","request_uri":"/o/kittens",`+

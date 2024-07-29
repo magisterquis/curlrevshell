@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240520
+ * Last Modified 20240729
  */
 
 import (
@@ -21,8 +21,17 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+)
+
+var (
+	// errTestEnding indicates we're cancelling a context because the test
+	// is over.
+	errTestEnding = errors.New("test ending")
+	// errServerDone indicates Server.Do returned
+	errServerDone = errors.New("server.Do returned")
 )
 
 func newTestServer(t *testing.T) (
@@ -57,20 +66,33 @@ func newTestServer(t *testing.T) (
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
 	}
-	t.Cleanup(cleanup)
+
+	/* Start the server going. */
+	ctx, cancel := context.WithCancelCause(context.Background())
+	go func() { ech <- s.Do(ctx); close(ech); cancel(errServerDone) }()
+
 	t.Cleanup(func() {
-		if err := <-ech; nil != err && !errors.Is(
+		cleanup()   /* Stop the server politely. */
+		go func() { /* And forcefully after a second. */
+			timer := time.NewTimer(time.Second)
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+				cancel(errTestEnding)
+			}
+			if !timer.Stop() {
+				<-timer.C
+			}
+		}()
+		err := <-ech
+		if nil != err && !errors.Is(
 			err,
 			ErrOneShellClosed,
-		) {
-			t.Fatalf("Server error: %s", err)
+		) && !errors.Is(err, net.ErrClosed) {
+			t.Fatalf("Unexpected server error: %s", err)
 		}
 		close(cl)
 	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() { ech <- s.Do(ctx); close(ech) }()
-	t.Cleanup(cancel)
 
 	/* Work out our listen port. */
 	_, listenPort, err := net.SplitHostPort(s.l.Addr().String())
@@ -435,6 +457,11 @@ func TestServer_OneShell(t *testing.T) {
 			var msg lmsg
 			if err := json.Unmarshal([]byte(l), &msg); nil != err {
 				t.Fatalf("Error unmarshaling %s: %s", l, err)
+			}
+			/* Direction doesn't matter when we close the
+			listener. */
+			if LMOneShellClosingListener == msg.Msg {
+				msg.Direction = ""
 			}
 			got[msg]++
 		case err := <-ech:
