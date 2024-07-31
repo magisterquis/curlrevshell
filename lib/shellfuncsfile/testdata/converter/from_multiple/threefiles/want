@@ -1,0 +1,13 @@
+# TABDOC: A The contents of file A.
+File A
+# TABDOC: B A subroutine file
+File B
+# TABDOC: C A Perl script
+have_c() { SFF_1720354778930267614=0a7072696e74202246696c652043223b0a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+
+tab_list() {
+        echo 'A         - The contents of file A.'
+        echo 'B         - A subroutine file'
+        echo 'C         - A Perl script'
+        echo 'tab_list  - This function list'
+}
