@@ -13,8 +13,9 @@ but with the following "features":
 - Makefiles which coldheartedly assume
   [BSD Make](https://man.openbsd.org/make)
 - Easyish in-target-memory [shell function sender](./doc/flags.md#-ctrl-i)
+- Other [tool~s~](./doc/tools.md)
 
-For legal use only
+For legal use only.
 
 Quickstart
 ----------

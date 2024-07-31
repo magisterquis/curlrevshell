@@ -5,7 +5,7 @@ package shellfuncsfile
  * Turn a file or directory into shell functions
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20240728
+ * Last Modified 20240731
  */
 
 import (
@@ -18,15 +18,15 @@ import (
 	"testing"
 )
 
-//go:embed testdata/converter/from
-var converterFromCases embed.FS
+//go:embed testdata
+var testData embed.FS
 
 // converterFromWantListFunc is a string which, if found in a want filename,
 // indicates we want a list function as well.
 const converterFromWantListFunc = "_list_"
 
 func TestConverterFrom(t *testing.T) {
-	tfs, err := fs.Sub(converterFromCases, "testdata/converter/from")
+	tfs, err := fs.Sub(testData, "testdata/converter/from")
 	if nil != err {
 		t.Fatalf("Failed to get cases directory: %s", err)
 	}
@@ -100,4 +100,72 @@ func TestConverterFromReader_SubdirName(t *testing.T) {
 			want,
 		)
 	}
+}
+
+// TestConverterFrom_Multiple tests converting multiple files.  In each
+// subdirectory of testdata/converter/from_multiple, the files named have_* are
+// passed to from, sorted lexicographically, and compared to the file named
+// want.
+func TestConverterFrom_Multiple(t *testing.T) {
+	/* Get the test case directory. */
+	td, err := fs.Sub(testData, "testdata/converter/from_multiple")
+	if nil != err {
+		t.Fatalf("Error getting test cases directory: %s", err)
+	}
+	/* And the test cases. */
+	des, err := fs.ReadDir(td, ".")
+	if nil != err {
+		t.Fatalf("Error getting test cases: %s", err)
+	}
+	/* Test ALL the directories. */
+	for _, de := range des {
+		t.Run(de.Name(), func(t *testing.T) {
+			sd, err := fs.Sub(td, de.Name())
+			if nil != err {
+				t.Fatalf(
+					"Error getting test directory from "+
+						"%s: %s",
+					de.Name(),
+					err,
+				)
+			}
+			/* Get want. */
+			want, err := fs.ReadFile(sd, "want")
+			if nil != err {
+				t.Fatalf("Error reading want: %s", err)
+			}
+			/* Convert the haves. */
+			ns, err := fs.Glob(sd, "have_*")
+			if nil != err {
+				t.Fatalf("Getting list of want files: %s", err)
+			}
+			conv := NewDefaultConverter()
+			conv.FS = sd
+			conv.AddListFunction = true
+			got, err := conv.From(ns...)
+			if nil != err {
+				t.Fatalf("From failed with error: %s", err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatalf(
+					"From failed:\nfiles: %v\n\n"+
+						"got:\n%s\nwant:\n%s",
+					ns,
+					got,
+					want,
+				)
+			}
+
+		})
+	}
+}
+
+// mustReadTestdataFile returns the bytes of the file fn in testdata.  It calls
+// t.Fatalf on failure.
+func mustReadTestdataFile(t *testing.T, fn string) []byte {
+	b, err := fs.ReadFile(testData, fn)
+	if nil != err {
+		t.Fatalf("Failed to extract %s from testData: %s", fn, err)
+	}
+	return b
 }

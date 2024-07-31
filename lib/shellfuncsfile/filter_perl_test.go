@@ -5,30 +5,25 @@ package shellfuncsfile
  * Tests for filter_perl.go
  * By J. Stuart McMurray
  * Created 20240707
- * Last Modified 20240728
+ * Last Modified 20240731
  */
 
 import (
 	"bytes"
-	_ "embed"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/txtar"
 )
 
-// fromPerlCasesTxtar are test cases for fromPerl, in txtar format.
-// Each case has two files *_have and *_want.
-//
-//go:embed testdata/fromperl/from_perl.txtar
-var fromPerlCasesTxtar []byte
-
 func TestFromPerl(t *testing.T) {
 	/* Roll a bunch of test cases.  We'll whine later if filenames aren't
 	correct. */
 	testCases := make(map[string]struct{})
 	files := make(map[string][]byte)
-	a := txtar.Parse(fromPerlCasesTxtar)
+	a := txtar.Parse(
+		mustReadTestdataFile(t, "testdata/fromperl/from_perl.txtar"),
+	)
 	for _, f := range a.Files {
 		/* Get the part before the final _. */
 		name, _, ok := strings.Cut(f.Name, ".")
@@ -74,19 +69,14 @@ func TestFromPerl(t *testing.T) {
 	}
 }
 
-// cleanPerlCasesTxtar are test cases for cleanPerl, in txtar format.  Each
-// case has three files: *_have, *_leadComments, and *_perl, corresponding to
-// the input and two outputs of cleanPerl.
-//
-//go:embed testdata/fromperl/clean_perl.txtar
-var cleanPerlCasesTxtar []byte
-
 func TestCleanPerl(t *testing.T) {
 	/* Roll a bunch of test cases.  We'll whine later if filenames aren't
 	correct. */
 	testCases := make(map[string]struct{})
 	files := make(map[string][]byte)
-	a := txtar.Parse(cleanPerlCasesTxtar)
+	a := txtar.Parse(
+		mustReadTestdataFile(t, "testdata/fromperl/clean_perl.txtar"),
+	)
 	for _, f := range a.Files {
 		/* Get the part before the final _. */
 		name, _, ok := strings.Cut(f.Name, ".")

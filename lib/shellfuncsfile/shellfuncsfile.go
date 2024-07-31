@@ -16,7 +16,7 @@ package shellfuncsfile
  * Turn a file or directory into shell functions
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20240728
+ * Last Modified 20240731
  */
 
 import (
@@ -276,7 +276,40 @@ func (c *Converter) fromReader(
 // names do not start with a period, adding newlines as needed.
 //
 // Filter patterns will be tried in lexicographical order.
-func (c *Converter) From(source string) ([]byte, error) {
+func (c *Converter) From(sources ...string) ([]byte, error) {
+	var buf bytes.Buffer
+	/* Convert ALL the sources. */
+	for _, source := range sources {
+		b, err := c.from(source)
+		if nil != err {
+			return nil, fmt.Errorf(
+				"converting %s: %w",
+				source,
+				err,
+			)
+		}
+		buf.Write(b)
+	}
+
+	/* Add a list if we're meant to. */
+	if c.AddListFunction {
+		lf, err := GenFuncList(buf.String())
+		if nil != err {
+			return nil, fmt.Errorf(
+				"generating function-listing function: %w",
+				err,
+			)
+		}
+		buf.WriteRune('\n')
+		buf.Write(lf)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// from does what From says it does, but for only once source and doesn't
+// add the list function.
+func (c *Converter) from(source string) ([]byte, error) {
 	/* If this is a single file, life's easy. */
 	var (
 		fi  fs.FileInfo
@@ -305,19 +338,6 @@ func (c *Converter) From(source string) ([]byte, error) {
 		}
 	default:
 		return nil, InvalidTypeError{FI: fi}
-	}
-
-	/* Add a list if we're meant to. */
-	if c.AddListFunction {
-		lf, err := GenFuncList(string(b))
-		if nil != err {
-			return nil, fmt.Errorf(
-				"generating function-listing function: %w",
-				err,
-			)
-		}
-		b = append(b, '\n')
-		b = append(b, lf...)
 	}
 
 	return b, nil

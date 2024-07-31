@@ -5,30 +5,25 @@ package shellfuncsfile
  * Tests for funclist.go
  * By J. Stuart McMurray
  * Created 20240728
- * Last Modified 20240728
+ * Last Modified 20240731
  */
 
 import (
 	"bytes"
-	_ "embed"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/txtar"
 )
 
-// genFuncListCasesTxtar are test cases for fromPerl, in txtar format.
-// Each case has two files *_have and *_want.
-//
-//go:embed testdata/funclist/cases.txtar
-var genFuncListCasesTxtar []byte
-
 func TestGenFuncList(t *testing.T) {
 	/* Roll a bunch of test cases.  We'll whine later if filenames aren't
 	correct. */
 	testCases := make(map[string]struct{})
 	files := make(map[string][]byte)
-	a := txtar.Parse(genFuncListCasesTxtar)
+	a := txtar.Parse(
+		mustReadTestdataFile(t, "testdata/funclist/cases.txtar"),
+	)
 	for _, f := range a.Files {
 		/* Get the part before the final _. */
 		name, _, ok := strings.Cut(f.Name, ".")

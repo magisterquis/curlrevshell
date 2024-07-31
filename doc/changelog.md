@@ -17,6 +17,10 @@ go install github.com/magisterquis/curlrevshell@sendscript
   file or directory into a single gob of shell functions; does a lot of
   `-ctrl-i`'s heavy lifting.
 - Updated dependencies.
+- [`shellfuncsfile` the tool](../lib/shellfuncsfile/cmd/shellfuncsfile): A
+  wrapper around [`shellfuncsfile` the library](../lib/shellfuncsfile) to
+  generate shell functions files like [`-ctrl-i`](./flags#-ctrl-i) does, but
+  standalone.
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================
