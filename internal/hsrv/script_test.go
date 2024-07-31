@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240425
+ * Last Modified 20240731
  */
 
 import (
@@ -86,7 +86,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 
 	var want string
 
-	f := func(t *testing.T) {
+	f := func(t *testing.T, expResCode int) {
 		t.Helper()
 		rr := httptest.NewRecorder()
 		rr.Body = new(bytes.Buffer)
@@ -94,8 +94,12 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			rr,
 			httptest.NewRequest(http.MethodGet, "/c", nil),
 		)
-		if http.StatusOK != rr.Code {
-			t.Errorf("Non-OK response code %d", rr.Code)
+		if expResCode != rr.Code {
+			t.Errorf(
+				"Unexpected response code %d (!= %d)",
+				rr.Code,
+				expResCode,
+			)
 		}
 		if got := rr.Body.String(); got != want {
 			t.Errorf(
@@ -117,7 +121,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
 		want = "kittens: example.com"
-		f(t)
+		f(t, http.StatusOK)
 	})
 
 	/* Test a change to the file. */
@@ -130,7 +134,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
 		want = "moose: example.com"
-		f(t)
+		f(t, http.StatusOK)
 	})
 
 	/* Test an empty file. */
@@ -143,8 +147,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			)
 		}
 		want = ""
-		t.Run("empty_file", f)
-		f(t)
+		t.Run("empty_file", func(t *testing.T) { f(t, http.StatusOK) })
+		f(t, http.StatusOK)
 	})
 
 	/* Test removing the file. */
@@ -152,8 +156,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		if err := os.Remove(fn); nil != err {
 			t.Fatalf("Error removing %s: %s", fn, err)
 		}
-		want = defTxt
-		f(t)
+		want = ""
+		f(t, http.StatusInternalServerError)
 	})
 }
 

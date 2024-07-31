@@ -9,6 +9,8 @@ in the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
+- `-callback-template`: Missing templates are probably not what you want.  Red
+  text should help.
 
 
 `v0.0.1-beta.6` (2024-05-22)

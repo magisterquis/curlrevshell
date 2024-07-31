@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240520
+ * Last Modified 20240731
  */
 
 import (
@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -195,6 +196,17 @@ func (s *Server) Do(ctx context.Context) error {
 
 	/* Tell user how to get a callback. */
 	s.printCallbackHelp()
+
+	/* Warn someone if we have a template filename but no template. */
+	if "" != s.tmplf {
+		if _, err := os.ReadFile(s.tmplf); nil != err {
+			s.ErrorLogf(
+				"Warning: Template file %s not readable: %s",
+				s.tmplf,
+				err,
+			)
+		}
+	}
 
 	/* Serve until we fail or the context is cancelled. */
 	var ech = make(chan error, 1)

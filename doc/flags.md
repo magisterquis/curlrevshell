@@ -35,7 +35,6 @@ default is in [`internal/hserv/script.tmpl`](../internal/hsrv/script.tmpl) and
 can be printed with `-print-default-template`.
 The file is re-read every time it's needed,
 so no need to restart curlrevshell if you change it.
-If the file doesn't exist, the built-in default template will still be used.
 
 Handy for giving curl options or using something totally different on target.
 

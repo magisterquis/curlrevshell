@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240425
+ * Last Modified 20240731
  */
 
 import (
@@ -13,7 +13,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"io/fs"
 	"math/rand"
 	"net"
 	"net/http"
@@ -143,9 +142,7 @@ func (s *Server) readTemplate() (*template.Template, error) {
 
 	/* Read the template from the file. */
 	b, err := os.ReadFile(s.tmplf)
-	if errors.Is(err, fs.ErrNotExist) {
-		return s.defTmpl, nil
-	} else if nil != err {
+	if nil != err {
 		return nil, fmt.Errorf("reading %s: %w", s.tmplf, err)
 	}
 
