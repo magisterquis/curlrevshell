@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240520
+ * Last Modified 20240729
  */
 
 import (
@@ -50,13 +50,11 @@ const (
 	LMDisconnected            = "Disconnected"
 	LMFileRequested           = "File requested"
 	LMNewConnection           = "New connection"
-	LMShellInput              = "Sent shell input"
-	LMShellOutput             = "Shell output"
+	LMShellIO                 = "Shell I/O"
 
 	LKDirection      = "direction"
 	LKFilename       = "filename"
-	LKLine           = "line"
-	LKOutput         = "output"
+	LKData           = "data"
 	LKStaticFilesDir = "static_files_dir"
 )
 
@@ -134,10 +132,11 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 	for nil == cerr {
 		select {
 		case l, ok := <-s.ich:
-			if !ok { /* Input channel closed. */
+			l += "\n" /* Always send a newline after lines. */
+			if !ok {  /* Input channel closed. */
 				return
 			}
-			if _, err := fmt.Fprintf(w, "%s\n", l); nil != err {
+			if _, err := fmt.Fprintf(w, "%s", l); nil != err {
 				s.RErrorLogf(r, "Error sending line: %s", err)
 				return
 			}
@@ -145,7 +144,7 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 				s.RErrorLogf(r, "Error flushing line: %s", err)
 				return
 			}
-			sl.Info(LMShellInput, LKLine, l)
+			sl.Info(LMShellIO, LKData, l)
 		case <-ctx.Done():
 			cerr = context.Cause(ctx)
 		}
@@ -174,7 +173,7 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 		if 0 != n {
 			o := string(b[:n])
 			s.och <- opshell.CLine{Line: o, Plain: true}
-			sl.Info(LMShellOutput, LKOutput, o)
+			sl.Info(LMShellIO, LKData, o)
 		}
 		/* End of stream isn't really an error. */
 		if errors.Is(err, io.EOF) ||
@@ -249,9 +248,9 @@ func (s *Server) startConnection(
 	}
 
 	/* All set, note we're the new us ID. */
-	sl := s.requestLogger(r)
+	sl := s.requestLogger(r).With(LKDirection, lwhich)
 	s.RLogf(ConnectedColor, r, "%s connected: ID:%s", which, id)
-	sl.Info(LMNewConnection, LKDirection, lwhich)
+	sl.Info(LMNewConnection)
 	*us = id
 
 	/* Register the input-stopper, if we have one. */
@@ -293,7 +292,6 @@ func (s *Server) endConnection(
 
 	/* Note we've lost this half of the connection. */
 	*us = ""
-	sl = sl.With(LKDirection, strings.ToLower(which))
 	switch err {
 	case nil:
 		s.RErrorLogf(r, "%s connection closed", which)
