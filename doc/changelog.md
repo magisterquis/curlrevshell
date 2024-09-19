@@ -9,7 +9,7 @@ in the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@sendscript
 ```
-- [`-ctrl-i`](./flags#-ctrl-i): In-memory, over-the-wire, on-demand module
+- [`-ctrl-i`](./flags.md#-ctrl-i): In-memory, over-the-wire, on-demand module
   loading.  Or just sending the contents of a file (or directory or magically
   shellified Perl script) to the remote shell.  Trigger it with `Ctrl+I`, or
   use `Ctrl+J` to just see what `Ctrl+I` would send.
@@ -19,7 +19,7 @@ go install github.com/magisterquis/curlrevshell@sendscript
 - Updated dependencies.
 - [`shellfuncsfile` the tool](../lib/shellfuncsfile/cmd/shellfuncsfile): A
   wrapper around [`shellfuncsfile` the library](../lib/shellfuncsfile) to
-  generate shell functions files like [`-ctrl-i`](./flags#-ctrl-i) does, but
+  generate shell functions files like [`-ctrl-i`](./flags.md#-ctrl-i) does, but
   standalone.
 - [`-print-ctrl-i`](./flags.md#-print-ctrl-i): Like [`shellfuncsfile`
   the tool](../lib/shellfuncsfile/cmd/shellfuncsfile), but
