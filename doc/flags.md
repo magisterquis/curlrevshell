@@ -74,6 +74,8 @@ functions and calling `tab_list` when you're ten functions in and don't
 remember which is which.
 
 For testing, `Ctrl+J` will print out what would be sent with `Ctrl+I`.
+Alternatively, running with [`-print-ctrl-i`](#-print-ctrl-i) will print the
+whole thing to stdout.
 
 Handy for libraries of shell functions and telling people you load modules
 in memory over the network.
@@ -241,6 +243,14 @@ Stop listening after a shell has connected.
 
 Handy for having multiple shells at once without having to work out which port
 to use.
+
+`-print-ctrl-i`
+---------------
+Writes to standard output what Tab/Ctrl+I would send, with
+[`-ctrl-i`](#-ctrl-i).
+
+Handy for debugging (try piping it to `cat -n`) as well as rolling a shell
+functions file for other purposes.
 
 `-print-default-template`
 -------------------------

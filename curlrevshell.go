@@ -103,6 +103,11 @@ func rmain() int {
 			"",
 			"Tab/Ctrl+I's insertion `source` file or directory",
 		)
+		printCtrlI = flag.Bool(
+			"print-ctrl-i",
+			false,
+			"Print what would be sent with Tab/Ctrl+I and exit",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -181,6 +186,32 @@ Options:
 	/* Converter for Ctrl+I. */
 	ctrlIConv := shellfuncsfile.NewDefaultConverter()
 	ctrlIConv.AddListFunction = true
+	insertGen := func() ([]byte, error) {
+		/* Make sure we have something to insert. */
+		if "" == *insertFile {
+			return nil, errors.New("no source configured")
+		}
+		/* Send it for inserting. */
+		b, err := ctrlIConv.From(*insertFile)
+		if nil != err {
+			return nil, fmt.Errorf(
+				"preparing %s: %w",
+				*insertFile,
+				err,
+			)
+		}
+		return b, nil
+	}
+
+	/* If we're just printing it, life's easy. */
+	if *printCtrlI {
+		b, err := insertGen()
+		if nil != err {
+			log.Fatalf("Error generating Ctrl+I file: %s", err)
+		}
+		os.Stdout.Write(b)
+		return 0
+	}
 
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(
@@ -188,22 +219,7 @@ Options:
 		och,
 		Prompt,
 		*noTimestamps,
-		func() ([]byte, error) {
-			/* Make sure we have something to insert. */
-			if "" == *insertFile {
-				return nil, errors.New("no source configured")
-			}
-			/* Send it for inserting. */
-			b, err := ctrlIConv.From(*insertFile)
-			if nil != err {
-				return nil, fmt.Errorf(
-					"preparing %s: %w",
-					*insertFile,
-					err,
-				)
-			}
-			return b, nil
-		},
+		insertGen,
 		*insertFile,
 	)
 	och <- opshell.CLine{Prompt: shell.WrapInColor(

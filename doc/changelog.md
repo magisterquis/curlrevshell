@@ -21,6 +21,9 @@ go install github.com/magisterquis/curlrevshell@sendscript
   wrapper around [`shellfuncsfile` the library](../lib/shellfuncsfile) to
   generate shell functions files like [`-ctrl-i`](./flags#-ctrl-i) does, but
   standalone.
+- [`-print-ctrl-i`](./flags.md#-print-ctrl-i): Like [`shellfuncsfile`
+  the tool](../lib/shellfuncsfile/cmd/shellfuncsfile), but
+  without having to remember to build and run something else
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================

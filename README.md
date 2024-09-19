@@ -89,6 +89,8 @@ Options:
     	Don't print timestamps
   -one-shell
     	Close listening socket when first shell connects
+  -print-ctrl-i
+    	Print what would be sent with Tab/Ctrl+I and exit
   -print-default-template
     	Write the default template to stdout and exit
   -prompt string
