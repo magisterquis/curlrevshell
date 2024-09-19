@@ -44,7 +44,9 @@ func TestServerFileHandler(t *testing.T) {
 		if http.StatusOK != rr.Code {
 			t.Errorf("Non-OK Code %d", rr.Code)
 		}
-		want := `<pre>
+		want := `<!doctype html>
+<meta name="viewport" content="width=device-width">
+<pre>
 <a href="` + fn + `">` + fn + `</a>
 </pre>
 `
