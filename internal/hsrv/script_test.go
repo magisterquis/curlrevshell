@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240731
+ * Last Modified 20240925
  */
 
 import (
@@ -24,7 +24,7 @@ import (
 )
 
 func TestServerScriptHandler(t *testing.T) {
-	cl, _, och, s := newTestServer(t)
+	cl, _, och, s, _ := newTestServer(t)
 	rr := httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
 	s.scriptHandler(rr, httptest.NewRequest(http.MethodGet, "/c", nil))
@@ -78,7 +78,7 @@ curl -Nsk --pinnedpubkey "sha256//xxx=" https://example.com/o/IDID -T- >/dev/nul
 
 /* Make sure changing and deleting a template file works. */
 func TestServerScriptHandler_FromFile(t *testing.T) {
-	cl, _, _, s := newTestServer(t)
+	cl, _, _, s, _ := newTestServer(t)
 	fn := filepath.Join(t.TempDir(), "kittens.tmpl")
 	s.tmplf = fn
 	defTxt := "default template"
@@ -162,7 +162,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 }
 
 func TestC2URL(t *testing.T) {
-	cl, _, _, s := newTestServer(t)
+	cl, _, _, s, _ := newTestServer(t)
 	/* Work out our listen port, for testing. */
 	_, serverPort, err := net.SplitHostPort(s.l.Addr().String())
 	if nil != err {

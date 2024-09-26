@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240520
+ * Last Modified 20240924
  */
 
 import (
@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
+	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
@@ -143,6 +144,19 @@ Options:
 		return 0
 	}
 
+	/* Channels for comms between subsystems. */
+	var (
+		ich = make(chan string, 1024)
+		och = make(chan opshell.CLine, 1024)
+	)
+
+	/* And an adapter betwen io.{Read,Writ}er and channels. */
+	iob, err := iobroker.New(ich, och)
+	if nil != err {
+		log.Printf("Error setting up comms between subsystems: %s", err)
+		return 3
+	}
+
 	/* Set up logging.  If we're not writing to a logfile, we'll just kinda
 	discard log messages.  Beats checking for nil, anyways. */
 	var lw = io.Discard
@@ -163,12 +177,6 @@ Options:
 	}
 	sl := slog.New(slog.NewJSONHandler(lw, nil))
 
-	/* Channels for comms between subsystems. */
-	var (
-		ich = make(chan string, 1024)
-		och = make(chan opshell.CLine, 1024)
-	)
-
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(
 		ich,
@@ -178,7 +186,8 @@ Options:
 	)
 	och <- opshell.CLine{Prompt: shell.WrapInColor(Prompt, opshell.ColorCyan)}
 	if nil != err {
-		log.Printf("Error setting up shell: %s", err)
+		/* TODO: Die if this happens. */
+		log.Fatalf("Error setting up shell: %s", err)
 	}
 	defer cleanup()
 
@@ -199,13 +208,14 @@ Options:
 	}
 
 	/* HTTPS Server */
-	svr, cleanup, err := hsrv.New(
+	svr, err := hsrv.New(
 		sl,
 		*addr,
 		*fdir,
 		*tmplf,
 		ich,
 		och,
+		iob,
 		*certFile,
 		cbAddrs,
 		*printIPv6,
@@ -220,12 +230,12 @@ Options:
 		)
 		return 2
 	}
-	defer cleanup()
 
 	/* Start ALL the things. */
 	eg, ectx := ctxerrgroup.WithContext(context.Background())
 	eg.GoContext(ectx, shell.Do)
 	eg.GoContext(ectx, svr.Do)
+	eg.GoContext(ectx, iob.Do)
 
 	/* Wait for something to go wrong. */
 	err = eg.Wait()

@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240731
+ * Last Modified 20240925
  */
 
 import (
@@ -23,9 +23,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 
+	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
@@ -46,7 +47,8 @@ const (
 
 // Log messages and keys.
 const (
-	LMListening = "Listener started"
+	LMListening               = "Listener started"
+	LMOneShellClosingListener = "Got one shell, closing listener"
 
 	LKError      = "error"
 	LKListenAddr = "address"
@@ -62,6 +64,7 @@ type Server struct {
 	fdir     string /* Static files directory. */
 	ich      <-chan string
 	och      chan<- opshell.CLine
+	iob      *iobroker.Broker
 	l        sstls.Listener
 	ps       pinkSender
 	oneShell bool /* Close listener after getting a shell. */
@@ -69,12 +72,6 @@ type Server struct {
 	/* Template generation. */
 	tmplf   string             /* Template file. */
 	defTmpl *template.Template /* Default template, for testing. */
-
-	/* Used for making sure we don't get mismatched input and output. */
-	curIDL   sync.Mutex
-	curIDIn  string      /* Current Implant ID, for shell input. */
-	curIDOut string      /* Current Implant ID, for shell output. */
-	stopIn   func(error) /* Stops the Input handler. */
 
 	/* Things for printing help. */
 	cbAddrs   []string
@@ -84,8 +81,8 @@ type Server struct {
 }
 
 // New returns a new Server, listening on addr.  Call its Do method to start it
-// serving.  Call the returned cleanup function to deallocate resources
-// allocated by New.  Static files will be served from fdir, if non-empty.  If
+// serving.
+// Static files will be served from fdir, if non-empty.  If
 // tmplf is non-empty, it is taken as a file from which to read the callback
 // template.
 func New(
@@ -95,19 +92,13 @@ func New(
 	tmplf string,
 	ich <-chan string,
 	och chan<- opshell.CLine,
+	iob *iobroker.Broker,
 	certFile string,
 	cbAddrs []string, /* Callback addresses, for one-liners. */
 	printIPv6 bool,
 	oneShell bool, /* Shut down listener after first shell. */
-) (*Server, func(), error) {
+) (*Server, error) {
 	var l sstls.Listener
-
-	/* cleanup closes the listener. */
-	cleanup := func() {
-		if nil != l.Listener {
-			l.Close()
-		}
-	}
 
 	/* Make sure the listen address has a port, and if not ask the OS to
 	choose one for us. */
@@ -118,7 +109,7 @@ func New(
 	/* Start our listener. */
 	var err error
 	if l, err = sstls.Listen("tcp", addr, "", 0, certFile); nil != err {
-		return nil, nil, fmt.Errorf("listening on %s: %w", addr, err)
+		return nil, fmt.Errorf("listening on %s: %w", addr, err)
 	}
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())
 
@@ -128,6 +119,7 @@ func New(
 		fdir:      fdir,
 		ich:       ich,
 		och:       och,
+		iob:       iob,
 		l:         l,
 		ps:        pinkSender{och},
 		tmplf:     tmplf,
@@ -139,15 +131,15 @@ func New(
 
 	/* Work out our listen addresses, for user help. */
 	if s.lAddrs, err = s.listenAddresses(); nil != err {
-		cleanup()
-		return nil, nil, fmt.Errorf(
+		l.Close()
+		return nil, fmt.Errorf(
 			"determining listen addresses: %w",
 			err,
 		)
 	}
 	if 0 == len(s.lAddrs) {
-		cleanup()
-		return nil, nil, errors.New("no listen addresses")
+		l.Close()
+		return nil, errors.New("no listen addresses")
 	}
 
 	/* Help text for user getting a callback. */
@@ -164,19 +156,20 @@ func New(
 	sb.WriteRune('\n')
 	s.cbHelp = sb.String()
 
-	return s, cleanup, nil
+	return s, nil
 }
 
 // Do actually serves HTTPS clients.
 func (s *Server) Do(ctx context.Context) error {
-	/* Set up a server. */
-	hsvr := http.Server{
-		Handler:  s.newMux(),
-		ErrorLog: log.New(s.ps, "Server error: ", log.Lmsgprefix),
-		BaseContext: func(_ net.Listener) context.Context {
-			return ctx
-		},
-	}
+	/* Sign up to watch IO Broker events. */
+	evCh := make(chan iobroker.Event, iobroker.EVChanLen)
+	s.iob.AddEventListener(evCh)
+	defer func() {
+		s.iob.RemoveEventListener(evCh)
+		close(evCh)
+	}()
+
+	/* Tell the user we're listening. */
 	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 
 	/* Tell user where to get static files. */
@@ -208,28 +201,14 @@ func (s *Server) Do(ctx context.Context) error {
 		}
 	}
 
-	/* Serve until we fail or the context is cancelled. */
-	var ech = make(chan error, 1)
-	go func() {
-		err := hsvr.Serve(s.l)
-		/* If we're only running a single shell, a closed listener is
-		to be expected. */
-		if errors.Is(err, net.ErrClosed) && s.oneShell {
-			err = ErrOneShellClosed
-		}
-		ech <- err
-	}()
-	var err error
-	select {
-	case err = <-ech:
-	case <-ctx.Done():
-	}
-
-	/* Shutdown the server. */
-	serr := hsvr.Shutdown(ctx)
-
-	/* Return the first non-nil error. */
-	return cmp.Or(err, serr)
+	/* Serve clients and watch events. */
+	eg, ectx := ctxerrgroup.WithContext(ctx)
+	eg.GoContext(ectx, s.serveHTTP) /* Handle HTTP. */
+	eg.Go(func() error {            /* Process IOB events. */
+		s.watchIOBEvents(ectx, evCh)
+		return nil
+	})
+	return eg.Wait()
 }
 
 // listenAddresseses gets all of the addresses we have for the box.
@@ -325,6 +304,85 @@ func (s *Server) printCallbackHelp() {
 	/* Tell the user how to get a callback. */
 	s.Logf(ScriptColor, "To get a shell:")
 	s.Printf(ScriptColor, "%s", s.cbHelp)
+}
+
+// watchIOBEvents watches for events from the IO Broker and takes action.  Its
+// only job is to either send the reconnect message when the shell dies or to
+// kill the listener, if we have -one-shell.
+func (s *Server) watchIOBEvents(
+	ctx context.Context,
+	evCh <-chan iobroker.Event,
+) {
+	/* Watch for events. */
+	var (
+		ev iobroker.Event
+		ok bool
+	)
+	for {
+		/* Grab the next event. */
+		select {
+		case ev, ok = <-evCh: /* Pop an event. */
+			if !ok { /* No more events. */
+				return
+			}
+			/* Handled below. */
+		case <-ctx.Done(): /* Or not. */
+			return
+		}
+		/* Do a thing. */
+		switch ev.Type {
+		case iobroker.EventTypeConnected:
+			if s.oneShell {
+				s.Logf(
+					ConnectedColor,
+					"%s",
+					ClosingListenerMessage,
+				)
+				s.sl.Debug(LMOneShellClosingListener)
+				s.l.Close()
+			}
+		case iobroker.EventTypeDisconnected:
+			/* Print the callback help when the shell dies. */
+			if !s.oneShell {
+				s.printCallbackHelp()
+			}
+		}
+	}
+}
+
+// serveHTTP starts HTTP Service going.
+func (s *Server) serveHTTP(ctx context.Context) error {
+	/* Set up a server. */
+	hsvr := http.Server{
+		Handler:  s.newMux(),
+		ErrorLog: log.New(s.ps, "Server error: ", log.Lmsgprefix),
+		BaseContext: func(_ net.Listener) context.Context {
+			return ctx
+		},
+	}
+
+	/* Serve until we fail or the context is cancelled. */
+	var ech = make(chan error, 1)
+	go func() {
+		err := hsvr.Serve(s.l)
+		/* If we're only running a single shell, a closed listener is
+		to be expected. */
+		if errors.Is(err, net.ErrClosed) && s.oneShell {
+			err = ErrOneShellClosed
+		}
+		ech <- err
+	}()
+	var err error
+	select {
+	case err = <-ech:
+	case <-ctx.Done():
+	}
+
+	/* Shutdown the server. */
+	serr := hsvr.Shutdown(ctx)
+
+	/* Return the first non-nil error. */
+	return cmp.Or(err, serr)
 }
 
 // sortAddresses sorts a slice of addresses as string.  Non-IP:Port pairs come

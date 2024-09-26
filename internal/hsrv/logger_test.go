@@ -5,7 +5,7 @@ package hsrv
  * Tests for logger.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240406
+ * Last Modified 20240924
  */
 
 import (
@@ -16,7 +16,7 @@ import (
 )
 
 func TestServerPrintf(t *testing.T) {
-	cl, _, och, s := newTestServer(t)
+	cl, _, och, s, _ := newTestServer(t)
 	haveColor := opshell.ColorBlue
 	s.Printf(haveColor, "Hello, %s!", "Kittens")
 	want := opshell.CLine{
@@ -35,7 +35,7 @@ func TestServerPrintf(t *testing.T) {
 }
 
 func TestServerLogf(t *testing.T) {
-	cl, _, och, s := newTestServer(t)
+	cl, _, och, s, _ := newTestServer(t)
 	haveColor := opshell.ColorBlue
 	s.Logf(haveColor, "Hello, %s!", "Kittens")
 	want := opshell.CLine{
@@ -53,7 +53,7 @@ func TestServerLogf(t *testing.T) {
 }
 
 func TestServerRLogf(t *testing.T) {
-	cl, _, och, s := newTestServer(t)
+	cl, _, och, s, _ := newTestServer(t)
 	haveColor := opshell.ColorBlue
 	haveR := httptest.NewRequest("GET", "http://127.0.0.1:4444", nil)
 	s.RLogf(haveColor, haveR, "Hello, %s!", "Kittens")
@@ -72,7 +72,7 @@ func TestServerRLogf(t *testing.T) {
 }
 
 func TestServerErrorLogf(t *testing.T) {
-	cl, _, och, s := newTestServer(t)
+	cl, _, och, s, _ := newTestServer(t)
 	s.ErrorLogf("Hello, %s!", "Kittens")
 	want := opshell.CLine{
 		Color: ErrorColor,
@@ -89,7 +89,7 @@ func TestServerErrorLogf(t *testing.T) {
 }
 
 func TestServerRErrorLogf(t *testing.T) {
-	cl, _, och, s := newTestServer(t)
+	cl, _, och, s, _ := newTestServer(t)
 	haveR := httptest.NewRequest("GET", "http://127.0.0.1:4444", nil)
 	s.RErrorLogf(haveR, "Hello, %s!", "Kittens")
 	want := opshell.CLine{
