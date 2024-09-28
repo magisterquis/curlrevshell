@@ -24,6 +24,8 @@ go install github.com/magisterquis/curlrevshell@sendscript
 - [`-print-ctrl-i`](./flags.md#-print-ctrl-i): Like [`shellfuncsfile`
   the tool](../lib/shellfuncsfile/cmd/shellfuncsfile), but
   without having to remember to build and run something else
+- [`uu`](../lib/uu): Little library to do uuencoding/uudecoding, compatibly
+  with perl's `pack("u", ...)`.
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================

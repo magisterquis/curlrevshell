@@ -1,0 +1,19 @@
+-- dec --
+# $OpenBSD: services,v 1.106 2023/12/07 14:53:31 sthen Exp $
+#
+# Network services, Internet style
+# https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt
+#
+
+tcpmux		1/tcp				# TCP port service multiplexer
+echo		7/tcp
+echo		7/udp
+discard		9/tcp		sink null
+-- enc --
+M(R`D3W!E;D)31#H@<V5R=FEC97,L=B`Q+C$P-B`R,#(S+S$R+S`W(#$T.C4S
+M.C,Q('-T:&5N($5X<"`D"B,*(R!.971W;W)K('-E<G9I8V5S+"!);G1E<FYE
+M="!S='EL90HC(&AT='!S.B\O=W=W+FEA;F$N;W)G+V%S<VEG;FUE;G1S+W-E
+M<G9I8V4M;F%M97,M<&]R="UN=6UB97)S+W-E<G9I8V4M;F%M97,M<&]R="UN
+M=6UB97)S+G1X=`HC"@IT8W!M=7@)"3$O=&-P"0D)"2,@5$-0('!O<G0@<V5R
+M=FEC92!M=6QT:7!L97AE<@IE8VAO"0DW+W1C<`IE8VAO"0DW+W5D<`ID:7-C
+687)D"0DY+W1C<`D)<VEN:R!N=6QL"@``
