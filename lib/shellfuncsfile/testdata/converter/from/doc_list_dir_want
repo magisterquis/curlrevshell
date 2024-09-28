@@ -1,6 +1,11 @@
 # A simple perl program
 # TABDOC: a A perl script to do a thing
-a() { SFF_1720354778930267614=0a0a0a0a0a757365207761726e696e67733b0a757365207374726963743b0a0a7072696e74202241207468696e6720686173206265656e20646f6e655c6e223b0a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+a() {(
+(exit $((0 != $#))) || set -- -e "" "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+M"@H*"@IU<V4@=V%R;FEN9W,["G5S92!S=s)I8W0["@IP<FEN="`B02!T:&EN
+49R!H87,@8F5E;B!D;VYE7&XB.PH`
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
 # TABDOC: foo  Does a 'nice' foo
 foo() {
         echo "Does a foo"

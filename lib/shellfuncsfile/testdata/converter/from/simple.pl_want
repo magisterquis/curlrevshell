@@ -1,1 +1,5 @@
-simple() { SFF_1720354778930267614=7072696e74202254686973206973207065726c215c6e223b0a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+simple() {(
+(exit $((0 != $#))) || set -- -e "" "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+9<s)I;G0@(E1H:7,@:7,@<&5R;"%<;B(["@``
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}

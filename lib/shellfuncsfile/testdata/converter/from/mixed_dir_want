@@ -5,4 +5,8 @@ function foo {
 }
 # A perl function
 # TABDOC: foo bar
-b() { SFF_1720354778930267614=0a0a0a0a7072696e742022546869732069732061207065726c2066756e6374696f6e220a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+b() {(
+(exit $((0 != $#))) || set -- -e "" "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+D"@H*"G!R:6YT(")4:&ES(&ES(&$@<&5R;"!F=6YC=&EO;B(*
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}

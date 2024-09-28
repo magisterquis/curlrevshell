@@ -1,1 +1,6 @@
-shebang() { SFF_1720354778930267614=0a0a757365207761726e696e67733b0a757365207374726963743b0a0a7072696e742022497420776f726b65645c6e220a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+shebang() {(
+(exit $((0 != $#))) || set -- -e "" "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+M"@IU<V4@=V%R;FEN9W,["G5S92!S=s)I8W0["@IP<FEN="`B270@=V]R:V5D
+$7&XB"@``
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}

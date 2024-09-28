@@ -5,37 +5,32 @@ package shellfuncsfile
  * Turn a perl script into a shell function
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20240728
+ * Last Modified 20240928
  */
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
-	"testing"
 	"text/template"
-	"time"
+
+	"github.com/magisterquis/curlrevshell/lib/uu"
 )
 
-// EnvVarPrefix is the prefix for the environment variable we use for passing
-// perl code via an environment variable.  A timestamp will be appended.
-const EnvVarPrefix = "SFF"
+const (
+	singleQuote     = "'" /* Can't have this in our UUEncoded script. */
+	safeSingleQuote = "s" /* Use this instead. */
+)
 
-// testEnvVar is like the generated environment variable from EnvVarPrefix,
-// but static when used in a test.
-const testEnvVar = "SFF_1720354778930267614"
-
-// perlTemplate is what we use to convert hexed perl into a shell function.
-var perlTemplate = template.Must(template.New("perl").Parse(
-	`{{.LeadComments}}` +
-		`{{.FuncName}}() { {{.EnvName}}={{.PerlHex}} ` +
-		`perl -e '` +
-		`eval(pack"H*",$ENV{ {{- .EnvName -}} });` +
-		`die"Error: $@"if(""ne$@)' ` +
-		`"$@"; }` + "\n",
+// perlTemplate is what we use to convert uuencoded perl into a shell function.
+var perlTemplate = template.Must(template.New("perl").Parse(`
+{{- .LeadComments}}{{.FuncName}}() {(
+(exit $((0 != $#))) || set -- -e "" "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{` + "`" + `
+{{.PerlUU}}
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}` + "\n",
 ))
 
 // FromPerl converts the Perl script read from r into a shell function.  If
@@ -52,25 +47,17 @@ func FromPerl(name string, r io.Reader) ([]byte, error) {
 	}
 	leadComments, perl := cleanPerl(string(b))
 
-	/* Work out the environment variable. */
-	var envVarName string
-	if testing.Testing() {
-		envVarName = testEnvVar
-	} else {
-		envVarName = fmt.Sprintf(
-			"%s_%d",
-			EnvVarPrefix,
-			time.Now().UnixNano(),
-		)
-	}
+	/* UUEncode, removing single quotes and trailing whitespace. */
+	perlUU := string(uu.AppendEncode(nil, []byte(perl)))
+	perlUU = strings.TrimSpace(perlUU)
+	perlUU = strings.ReplaceAll(perlUU, singleQuote, safeSingleQuote)
 
 	/* Write a shell function. */
 	ret := new(bytes.Buffer)
 	if err := perlTemplate.Execute(ret, map[string]string{
-		"LeadComments": leadComments,
-		"EnvName":      envVarName,
 		"FuncName":     funcName,
-		"PerlHex":      hex.EncodeToString([]byte(perl)),
+		"LeadComments": leadComments,
+		"PerlUU":       perlUU,
 	}); nil != err {
 		return nil, fmt.Errorf("rolling shell function: %w", err)
 	}

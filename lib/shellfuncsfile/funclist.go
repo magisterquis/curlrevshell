@@ -5,7 +5,7 @@ package shellfuncsfile
  * Shell function to print the list of functions we offer.
  * By J. Stuart McMurray
  * Created 20240728
- * Last Modified 20240728
+ * Last Modified 20240928
  */
 
 import (
@@ -27,7 +27,7 @@ const (
 	ListFuncDesc = "This function list"
 )
 
-// funcListTemplate is what we use to convert hexed perl into a shell function.
+// funcListTemplate makes a nice table of TABDOC'd functions.
 var funcListTemplate = template.Must(template.New("funcList").Parse(
 	ListFuncName + `() {
 {{ range . }}        echo '{{ . }}'

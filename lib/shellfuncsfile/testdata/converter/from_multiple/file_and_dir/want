@@ -1,6 +1,10 @@
 File A
 b/a
-b() { SFF_1720354778930267614=7072696e742022612f625c6e223b0a perl -e 'eval(pack"H*",$ENV{SFF_1720354778930267614});die"Error: $@"if(""ne$@)' "$@"; }
+b() {(
+(exit $((0 != $#))) || set -- -e "" "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+/<s)I;G0@(F$O8EQN(CL*
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
 
 tab_list() {
         echo 'tab_list  - This function list'
