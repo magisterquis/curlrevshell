@@ -98,7 +98,7 @@ Endpoint          | Description
 ------------------|------------
 `/i/{id}`         | Long-lived connection for input from you to the shell.
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
-`/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate low PIDs.
+`/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate admins not using `ps awwwfux`.
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
 Callback Template
