@@ -6,7 +6,7 @@ package chanlog
  * Log to a channel, for testing
  * By J. Stuart McMurray
  * Created 20240925
- * Last Modified 20240925
+ * Last Modified 20240930
  */
 
 import (
@@ -60,7 +60,7 @@ func (cl ChanLog) Expect(t *testing.T, lines ...string) {
 		if !ok { /* Channel closed early. */
 			t.Errorf(
 				"Log channel closed while waiting for %q",
-				got,
+				want,
 			)
 			return
 		} else if got != want { /* Wrong line. */
@@ -69,6 +69,45 @@ func (cl ChanLog) Expect(t *testing.T, lines ...string) {
 				got,
 				want,
 			)
+		}
+	}
+}
+
+// ExpectUnordered is like Expect, but doesn't require the lines come in order.
+func (cl ChanLog) ExpectUnordered(t *testing.T, lines ...string) {
+	t.Helper()
+	/* Work out the lines we'll want to see. */
+	want := make(map[string]int, len(lines))
+	for _, line := range lines {
+		want[line]++
+	}
+	/* Make sure we get them all. */
+	for 0 != len(want) {
+		/* Grab a line. */
+		got, ok := <-cl
+		if !ok { /* Didn't get them all. */
+			/* Work out how many were missing. */
+			var rem int
+			for _, v := range want {
+				rem += v
+			}
+			/* Note things didn't work. */
+			t.Errorf(
+				"Log channel closed while waiting for "+
+					"%d messages",
+				rem,
+			)
+			return
+		}
+		/* Make sure this line was one we wanted. */
+		if _, ok := want[got]; !ok {
+			t.Errorf("Unexpected log line: %s", got)
+			return
+		}
+		/* Note we've found it. */
+		want[got]--
+		if 0 == want[got] {
+			delete(want, got)
 		}
 	}
 }
