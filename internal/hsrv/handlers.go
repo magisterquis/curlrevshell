@@ -43,6 +43,8 @@ func (s *Server) newMux() *http.ServeMux {
 	/* Shellish handlers. */
 	mux.HandleFunc("/i/{"+idParam+"}", s.inputHandler)  /* Shell input. */
 	mux.HandleFunc("/o/{"+idParam+"}", s.outputHandler) /* Shell output. */
+	mux.HandleFunc("/io", s.inOutHandler)               /* Shell I/O. */
+	mux.HandleFunc("/io/", s.inOutHandler)              /* Shell I//O. */
 	mux.HandleFunc("/c", s.scriptHandler)               /* Callback script. */
 
 	/* If we're serving static files, do that. */
@@ -85,7 +87,7 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.Dir(s.fdir)).ServeHTTP(w, r)
 }
 
-// inputHandler accepts a connection from a shell and sends it input.
+// inputHandler sends input to a shell.
 func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 	s.iob.ConnectIn(
 		r.Context(),
@@ -96,8 +98,7 @@ func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-// outputHandler receives a line of output from the shell and prints it, if the
-// id matches the currently-connected shell.
+// outputHandler receives output from a shell.
 func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 	s.iob.ConnectOut(
 		r.Context(),
@@ -105,6 +106,17 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 		remoteHost(r),
 		r.Body,
 		r.PathValue(idParam),
+	)
+}
+
+// inOutHandler handles both input and output for a shell.
+func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
+	s.iob.ConnectInOut(
+		r.Context(),
+		s.requestLogger(r),
+		remoteHost(r),
+		w,
+		r.Body,
 	)
 }
 

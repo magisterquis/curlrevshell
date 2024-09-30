@@ -98,6 +98,7 @@ Endpoint          | Description
 ------------------|------------
 `/i/{id}`         | Long-lived connection for input from you to the shell.
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
+`/io`             | A bidirectional connection between you and the shell, kinda `/i` and `/o` at the same time.
 `/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate low PIDs.
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 

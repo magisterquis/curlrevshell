@@ -6,7 +6,7 @@ package iobroker
  * Turn stream I/O into shell-friendly I/O
  * By J. Stuart McMurray
  * Created 20240919
- * Last Modified 20240926
+ * Last Modified 20240930
  */
 
 import (
@@ -134,22 +134,24 @@ func (b *Broker) ConnectOut(
 	)
 }
 
-// ConnectInOut connects a bidirectional connection to a shell.
+// ConnectInOut connects a bidirectional connection to a shell.  w and r may
+// be the same io.ReadWriter.
 func (b *Broker) ConnectInOut(
 	ctx context.Context,
 	sl *slog.Logger,
 	addr string,
-	rw io.ReadWriter,
+	w io.Writer,
+	r io.Reader,
 ) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		b.ConnectIn(ctx, sl, addr, rw, b.bidirKey)
+		b.ConnectIn(ctx, sl, addr, w, b.bidirKey)
 	}()
 	go func() {
 		defer wg.Done()
-		b.ConnectOut(ctx, sl, addr, rw, b.bidirKey)
+		b.ConnectOut(ctx, sl, addr, r, b.bidirKey)
 	}()
 	wg.Wait()
 }
@@ -192,25 +194,44 @@ func (b *Broker) connect(
 	/* Make sure the previous shell isn't still disconnecting. */
 	if "" == b.key && (nil != *cancelUs || nil != *cancelOther) {
 		sl.Error(LMDisconnecting)
-		b.Errorf(
-			addr,
-			"Rejected %s connection with ID %q while waiting "+
-				"for shell disconnect",
-			string(dir),
-			key,
-		)
+		if key == b.bidirKey {
+			b.Errorf(
+				addr,
+				"Rejected %s side of bidirectional "+
+					"connection while waiting for shell "+
+					"disconnect",
+				string(dir),
+			)
+		} else {
+			b.Errorf(
+				addr,
+				"Rejected %s connection with ID %q "+
+					"while waiting for shell disconnect",
+				string(dir),
+				key,
+			)
+		}
 		return
 	}
 
 	/* Don't double-connect. */
 	if nil != *cancelUs {
 		sl.Error(LMAlreadyConnected)
-		b.Errorf(
-			addr,
-			"Rejected unexpected %s connection with ID %q",
-			string(dir),
-			key,
-		)
+		if key == b.bidirKey {
+			b.Errorf(
+				addr,
+				"Rejected unexpected %s side of "+
+					"bidirectinoal connection",
+				string(dir),
+			)
+		} else {
+			b.Errorf(
+				addr,
+				"Rejected unexpected %s connection with ID %q",
+				string(dir),
+				key,
+			)
+		}
 		return
 	}
 
@@ -224,13 +245,26 @@ func (b *Broker) connect(
 			LKKey, b.key,
 			LKIncorrectKey, key,
 		)
-		b.Errorf(
-			addr,
-			"Rejected %s connection with ID %q, expected %q",
-			string(dir),
-			key,
-			b.key,
-		)
+		if key == b.bidirKey {
+			b.Errorf(
+				addr,
+				"Rejected %s side of bidirectonal "+
+					"connection, expected unidirectional "+
+					"%s connection with ID %q",
+				string(dir),
+				string(dir),
+				b.key,
+			)
+		} else {
+			b.Errorf(
+				addr,
+				"Rejected %s connection with ID %q, "+
+					"expected %q",
+				string(dir),
+				key,
+				b.key,
+			)
+		}
 		return
 	}
 
@@ -240,7 +274,9 @@ func (b *Broker) connect(
 
 	/* Note we've a new connection. */
 	sl.Info(LMNewConnection)
-	b.Logf(addr, "%s connected: ID %q", dirT, key)
+	if key != b.bidirKey {
+		b.Logf(addr, "%s connected: ID %q", dirT, key)
+	}
 
 	/* If we've got both sides, let the user know. */
 	if nil != *cancelUs && nil != *cancelOther {
@@ -255,7 +291,11 @@ func (b *Broker) connect(
 	b.mu.Unlock()
 
 	/* Actually do the proxy. */
-	msg := fmt.Sprintf("%s connection closed", dirT)
+	ct := "connection"
+	if key == b.bidirKey {
+		ct = "side of bidirectional " + ct
+	}
+	msg := fmt.Sprintf("%s %s closed", dirT, ct)
 	if err := proxy(cctx, sl); nil != err {
 		sl.Error(LMDisconnected, LKError, err)
 		b.Errorf(addr, "%s: %s", msg, err)
@@ -390,8 +430,9 @@ func (b *Broker) proxyOut(
 
 	/* Some errors just indicate "normal" termination. */
 	if errors.Is(err, io.EOF) ||
-		errors.Is(err, io.ErrUnexpectedEOF) ||
-		errors.Is(err, context.Canceled) {
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, io.ErrClosedPipe) ||
+		errors.Is(err, io.ErrUnexpectedEOF) {
 		return nil
 	}
 

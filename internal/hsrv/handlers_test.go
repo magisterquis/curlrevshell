@@ -5,12 +5,13 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240926
+ * Last Modified 20240930
  */
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -820,4 +821,180 @@ func TestServerOutputHandler_DisconnectInput(t *testing.T) {
 			`"user_agent":"","id":"kittens"},"direction":"input"}`,
 	)
 	opshell.ExpectNoShellMessages(t, och, shutdown)
+}
+
+func TestServerInOutHandler(t *testing.T) {
+	cl, ich, och, s, shutdown := newTestServer(t)
+	defer close(ich) /* Don't keep server hanging. */
+
+	/* Hook up a connection. */
+	pr, pw := io.Pipe()
+	rr := httptest.NewRecorder()
+	rr.Body = new(bytes.Buffer)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/io",
+		pr,
+	)
+
+	/* Set the handler handling. */
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.inOutHandler(rr, req)
+	}()
+
+	/* Make sure we got a connection. */
+	cl.ExpectUnordered(
+		t,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"POST","request_uri":"/io",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":""},`+
+			`"direction":"output"}`,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
+			`"method":"POST","request_uri":"/io",`+
+			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
+			`"user_agent":"","id":""},`+
+			`"direction":"input"}`,
+	)
+	opshell.ExpectShellMessages(t, och, opshell.CLine{
+		Color: ConnectedColor,
+		Line: fmt.Sprintf(
+			"[192.0.2.1] %s",
+			iobroker.ShellReadyMessage,
+		),
+	})
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	/* Make sure we can send to the shell. */
+	t.Run("input", func(t *testing.T) {
+		have := "kittens"
+		/* Send the input. */
+		ich <- have
+		/* Make sure we got it back and logged it properly. */
+		want := have + "\n"
+		wantJSON, err := json.Marshal(want)
+		if nil != err {
+			t.Fatalf("Error JSONifying %q: %s", want, err)
+		}
+		cl.Expect(
+			t,
+			`{"time":"","level":"INFO","msg":"Shell I/O",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"POST","request_uri":"/io",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"direction":"input",`+
+				`"data":`+string(wantJSON)+`}`,
+		)
+		if got := rr.Body.String(); got != want {
+			t.Errorf(
+				"Shell got wrong data:\n"+
+					"have: %q\n"+
+					" got: %q\n"+
+					"want: %q",
+				have,
+				got,
+				want,
+			)
+		}
+	})
+
+	/* Make sure we can receive from the shell. */
+	t.Run("output", func(t *testing.T) {
+		var (
+			have = "kittens"
+			werr error
+			wg   sync.WaitGroup
+		)
+		/* Send the output. */
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, werr = pw.Write([]byte(have))
+		}()
+		/* Make sure we logged it and displayed it properly. */
+		wantJSON, err := json.Marshal(have)
+		if nil != err {
+			t.Fatalf("Error JSONifying %q: %s", have, err)
+		}
+		cl.Expect(
+			t,
+			`{"time":"","level":"INFO","msg":"Shell I/O",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"POST","request_uri":"/io",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"direction":"output",`+
+				`"data":`+string(wantJSON)+`}`,
+		)
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Line:  have,
+			Plain: true,
+		})
+		/* Make sure our write actually worked. */
+		wg.Wait()
+		if nil != werr {
+			t.Errorf("Error sending shell output: %s", err)
+		}
+	})
+
+	/* Make sure we disconnect properly. */
+	t.Run("disconnect", func(t *testing.T) {
+		/* Kill our shell. */
+		pw.Close()
+		/* Make sure we got a connection. */
+		cl.ExpectUnordered(
+			t,
+			`{"time":"","level":"INFO","msg":"Disconnected",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"POST","request_uri":"/io",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"direction":"input"}`,
+			`{"time":"","level":"INFO","msg":"Disconnected",`+
+				`"http_request":{`+
+				`"remote_addr":"192.0.2.1:1234",`+
+				`"method":"POST","request_uri":"/io",`+
+				`"protocol":"HTTP/1.1","host":"example.com",`+
+				`"sni":"","user_agent":"","id":""},`+
+				`"direction":"output"}`,
+		)
+		opshell.ExpectShellMessages(t, och, []opshell.CLine{{
+			Color: ErrorColor,
+			Line: fmt.Sprintf(
+				"[192.0.2.1] Output side of bidirectional " +
+					"connection closed",
+			),
+		}, {
+			Color: ErrorColor,
+			Line: fmt.Sprintf(
+				"[192.0.2.1] Input side of bidirectional " +
+					"connection closed",
+			),
+		}, {
+			Color: ErrorColor,
+			Line: fmt.Sprintf(
+				"[192.0.2.1] %s",
+				iobroker.ShellDisconnectedMessage,
+			),
+		}, {
+			Color: ScriptColor,
+			Line:  "To get a shell:",
+		}, {
+			Color:       ScriptColor,
+			Line:        s.cbHelp,
+			NoTimestamp: true,
+		}}...)
+		opshell.ExpectNoShellMessages(t, och, shutdown)
+	})
 }

@@ -23,7 +23,14 @@ import (
 	"golang.org/x/text/language"
 )
 
-func newTestBroker(t *testing.T) (*Broker, chan string, chan opshell.CLine) {
+// newTestBroker returns a new broker, as well as its channels going in and
+// out.  The Broker's Do method will already be running in a separate
+// goroutine.
+func newTestBroker(t *testing.T) (
+	*Broker,
+	chan string, /* ich */
+	chan opshell.CLine, /* och */
+) {
 	var (
 		ich = make(chan string, 1024)
 		och = make(chan opshell.CLine, 1024)
@@ -282,4 +289,181 @@ func TestBroker_Disconnect(t *testing.T) {
 	for n, f := range cs {
 		t.Run(n, func(t *testing.T) { testDisconnect(t, f) })
 	}
+}
+
+func TestBrokerConnectInOut(t *testing.T) {
+	iob, ich, och := newTestBroker(t)
+	var (
+		addr        = "kittens"
+		cl, sl      = chanlog.New()
+		ctx, cancel = context.WithCancel(context.Background())
+		evCh        = make(chan Event, EVChanLen)
+		inHave      = "moose"
+		inWant      = inHave + "\n"
+		inr, inw    = io.Pipe()
+		outHave     = "zoomies!"
+		outr, outw  = io.Pipe()
+		wg          sync.WaitGroup
+	)
+	defer cancel()
+
+	/* Sign up to get events. */
+	iob.AddEventListener(evCh)
+
+	/* Start the broker proxying. */
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		iob.ConnectInOut(ctx, sl, addr, inw, outr)
+	}()
+
+	/* Make sure we got a connection. */
+	wantEvent := Event{Type: EventTypeConnected}
+	if got := <-evCh; got != wantEvent {
+		t.Fatalf(
+			"Incorrect event after connecting\n"+
+				" got: %+v\n"+
+				"want: %+v",
+			wantEvent,
+			got,
+		)
+	}
+	cl.ExpectUnordered(
+		t,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"direction":"output"}`,
+		`{"time":"","level":"INFO","msg":"New connection",`+
+			`"direction":"input"}`,
+	)
+	opshell.ExpectShellMessages(t, och, opshell.CLine{
+		Color: logColor,
+		Line: fmt.Sprintf(
+			"[%s] %s",
+			addr,
+			ShellReadyMessage,
+		),
+	})
+	if t.Failed() {
+		t.FailNow()
+	}
+
+	/* Make sure in and out work. */
+	t.Run("input", func(t *testing.T) {
+		/* Send some input to the shell. */
+		go func() { ich <- inHave }()
+		/* Make sure the shell gets the message. */
+		b := make([]byte, len(inWant))
+		if _, err := io.ReadFull(inr, b); nil != err {
+			t.Errorf("Error reading shell input: %s", err)
+		} else if got := string(b); got != inWant {
+			t.Errorf(
+				"Input incorrect\n"+
+					"have: %q\n"+
+					"got: %q\n"+
+					"want: %q",
+				inHave,
+				got,
+				inWant,
+			)
+		}
+		/* Make sure logging works. */
+		wantJSON, err := json.Marshal(inWant)
+		if nil != err {
+			t.Fatalf("Could not marshal %q to JSON: %s",
+				inWant,
+				err,
+			)
+		}
+		cl.Expect(
+			t,
+			`{"time":"","level":"INFO",`+
+				`"msg":"Shell I/O","direction":"input",`+
+				`"data":`+string(wantJSON)+`}`,
+		)
+	})
+
+	t.Run("output", func(t *testing.T) {
+		/* Send some output from the shell. */
+		var (
+			wg   sync.WaitGroup
+			werr error
+		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, werr = outw.Write([]byte(outHave))
+		}()
+		/* Make sure output works. */
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Line:  outHave,
+			Plain: true,
+		})
+		/* Make sure logging works. */
+		wantJSON, err := json.Marshal(outHave)
+		if nil != err {
+			t.Fatalf("Could not marshal %q to JSON: %s",
+				outHave,
+				err,
+			)
+		}
+		cl.Expect(
+			t,
+			`{"time":"","level":"INFO",`+
+				`"msg":"Shell I/O","direction":"output",`+
+				`"data":`+string(wantJSON)+`}`,
+		)
+		/* Make sure write worked. */
+		wg.Wait()
+		if nil != werr {
+			t.Errorf("Error writing output: %s", err)
+		}
+	})
+
+	/* Disconnect ourselves. */
+	t.Run("disconnect", func(t *testing.T) {
+		/* Close ALL the things. */
+		for _, v := range []io.Closer{inr, inw, outr, outw} {
+			v.Close()
+		}
+		/* Make sure we got a disconnection. */
+		wantEvent := Event{Type: EventTypeDisconnected}
+		if got := <-evCh; got != wantEvent {
+			t.Errorf(
+				"Incorrect event after connecting\n"+
+					" got: %+v\n"+
+					"want: %+v",
+				wantEvent,
+				got,
+			)
+		}
+		cl.Expect(
+			t,
+			`{"time":"","level":"INFO","msg":"Disconnected",`+
+				`"direction":"output"}`,
+			`{"time":"","level":"INFO","msg":"Disconnected",`+
+				`"direction":"input"}`,
+		)
+		opshell.ExpectShellMessages(t, och, []opshell.CLine{{
+			Color: errColor,
+			Line: fmt.Sprintf(
+				"[%s] Output side of bidirectional "+
+					"connection closed",
+				addr,
+			),
+		}, {
+			Color: errColor,
+			Line: fmt.Sprintf(
+				"[%s] Input side of bidirectional "+
+					"connection closed",
+				addr,
+			),
+		}, {
+			Color: errColor,
+			Line: fmt.Sprintf(
+				"[%s] %s",
+				addr,
+				ShellDisconnectedMessage,
+			),
+		}}...)
+	})
 }

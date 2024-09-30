@@ -17,6 +17,8 @@ go install github.com/magisterquis/curlrevshell@betterdisconnects
 - [`chanlog`](../lib/chanlog): It's a
   [slog.Logger](https://pkg.go.dev/log/slog#Logger).  It's also a channel.
   It's also an easier way to test logging.
+- [`/io`]: Added an HTTP endpoint for when you'd kinda prefer a single
+  connection over two parallel connections.
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================
