@@ -5,7 +5,7 @@ package iobroker
  * Tests for iobroker.go
  * By J. Stuart McMurray
  * Created 20240925
- * Last Modified 20240926
+ * Last Modified 20240930
  */
 
 import (
@@ -59,7 +59,7 @@ func TestBroker_Disconnect(t *testing.T) {
 		disconnect disconnectFunc,
 	) {
 		var (
-			iob, _, _         = newTestBroker(t)
+			iob, _, och       = newTestBroker(t)
 			evCh              = make(chan Event, EVChanLen)
 			inr, inw          = io.Pipe()
 			outr, outw        = io.Pipe()
@@ -95,14 +95,14 @@ func TestBroker_Disconnect(t *testing.T) {
 			`{"time":"","level":"INFO","msg":"New connection",`+
 				`"direction":"input"}`,
 		)
-		//opshell.ExpectShellMessages(t, och, opshell.CLine{
-		//	Color: logColor,
-		//	Line: fmt.Sprintf(
-		//		"[%s] Input connected: ID %q",
-		//		addrIn,
-		//		key,
-		//	),
-		//})
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Color: logColor,
+			Line: fmt.Sprintf(
+				"[%s] Input connected: ID %q",
+				addrIn,
+				key,
+			),
+		})
 		go func() {
 			defer wg.Done()
 			go iob.ConnectOut(outctx, sl, addrOut, outr, key)
@@ -112,14 +112,14 @@ func TestBroker_Disconnect(t *testing.T) {
 			`{"time":"","level":"INFO","msg":"New connection",`+
 				`"direction":"output"}`,
 		)
-		//opshell.ExpectShellMessages(t, och, opshell.CLine{
-		//	Color: logColor,
-		//	Line: fmt.Sprintf(
-		//		"[%s] Output connected: ID %q",
-		//		addrOut,
-		//		key,
-		//	),
-		//})
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Color: logColor,
+			Line: fmt.Sprintf(
+				"[%s] Output connected: ID %q",
+				addrOut,
+				key,
+			),
+		})
 
 		/* Make sure connecting worked. */
 		wantEvent := Event{Type: EventTypeConnected}
@@ -134,14 +134,14 @@ func TestBroker_Disconnect(t *testing.T) {
 				wantEvent,
 			)
 		}
-		//opshell.ExpectShellMessages(t, och, opshell.CLine{
-		//	Color: logColor,
-		//	Line: fmt.Sprintf(
-		//		"[%s] %s",
-		//		addrOut,
-		//		ShellReadyMessage,
-		//	),
-		//})
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Color: logColor,
+			Line: fmt.Sprintf(
+				"[%s] %s",
+				addrOut,
+				ShellReadyMessage,
+			),
+		})
 		/* Test-specific disconnect. */
 		closeLogs := disconnect(t, inr, outw, incancel, outcancel)
 
@@ -206,7 +206,7 @@ func TestBroker_Disconnect(t *testing.T) {
 		)
 		expectedMessages = append(expectedMessages, gone)
 
-		//opshell.ExpectShellMessages(t, och, expectedMessages...)
+		opshell.ExpectShellMessages(t, och, expectedMessages...)
 	}
 
 	/* Test ALL the disconnects. */
