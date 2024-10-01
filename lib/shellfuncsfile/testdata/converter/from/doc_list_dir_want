@@ -1,7 +1,7 @@
 # A simple perl program
 # TABDOC: a A perl script to do a thing
 a() {(
-(exit $((0 != $#))) || set -- -e "" "$@";
+(exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 M"@H*"@IU<V4@=V%R;FEN9W,["G5S92!S=s)I8W0["@IP<FEN="`B02!T:&EN
 49R!H87,@8F5E;B!D;VYE7&XB.PH`

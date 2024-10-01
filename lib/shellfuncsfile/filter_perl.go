@@ -5,7 +5,7 @@ package shellfuncsfile
  * Turn a perl script into a shell function
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20240928
+ * Last Modified 20240930
  */
 
 import (
@@ -27,7 +27,7 @@ const (
 // perlTemplate is what we use to convert uuencoded perl into a shell function.
 var perlTemplate = template.Must(template.New("perl").Parse(`
 {{- .LeadComments}}{{.FuncName}}() {(
-(exit $((0 != $#))) || set -- -e "" "$@";
+(exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{` + "`" + `
 {{.PerlUU}}
 }=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}` + "\n",

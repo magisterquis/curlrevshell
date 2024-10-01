@@ -1,5 +1,5 @@
 simple() {(
-(exit $((0 != $#))) || set -- -e "" "$@";
+(exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 9<s)I;G0@(E1H:7,@:7,@<&5R;"%<;B(["@``
 }=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}

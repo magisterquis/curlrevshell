@@ -1,5 +1,5 @@
 remove_whitespace() {(
-(exit $((0 != $#))) || set -- -e "" "$@";
+(exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 1<s)I;G0@(E=O<FMY+EQN(@H`
 }=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
