@@ -5,7 +5,7 @@ package iobroker
  * Tests for iobroker.go
  * By J. Stuart McMurray
  * Created 20240925
- * Last Modified 20240930
+ * Last Modified 20241003
  */
 
 import (
@@ -443,27 +443,13 @@ func TestBrokerConnectInOut(t *testing.T) {
 			`{"time":"","level":"INFO","msg":"Disconnected",`+
 				`"direction":"input"}`,
 		)
-		opshell.ExpectShellMessages(t, och, []opshell.CLine{{
-			Color: errColor,
-			Line: fmt.Sprintf(
-				"[%s] Output side of bidirectional "+
-					"connection closed",
-				addr,
-			),
-		}, {
-			Color: errColor,
-			Line: fmt.Sprintf(
-				"[%s] Input side of bidirectional "+
-					"connection closed",
-				addr,
-			),
-		}, {
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
 			Color: errColor,
 			Line: fmt.Sprintf(
 				"[%s] %s",
 				addr,
 				ShellDisconnectedMessage,
 			),
-		}}...)
+		})
 	})
 }

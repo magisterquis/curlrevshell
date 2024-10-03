@@ -5,7 +5,7 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240930
+ * Last Modified 20241003
  */
 
 import (
@@ -970,18 +970,6 @@ func TestServerInOutHandler(t *testing.T) {
 				`"direction":"output"}`,
 		)
 		opshell.ExpectShellMessages(t, och, []opshell.CLine{{
-			Color: ErrorColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Output side of bidirectional " +
-					"connection closed",
-			),
-		}, {
-			Color: ErrorColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Input side of bidirectional " +
-					"connection closed",
-			),
-		}, {
 			Color: ErrorColor,
 			Line: fmt.Sprintf(
 				"[192.0.2.1] %s",

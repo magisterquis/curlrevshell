@@ -6,7 +6,7 @@ package iobroker
  * Turn stream I/O into shell-friendly I/O
  * By J. Stuart McMurray
  * Created 20240919
- * Last Modified 20240930
+ * Last Modified 20241003
  */
 
 import (
@@ -301,7 +301,9 @@ func (b *Broker) connect(
 		b.Errorf(addr, "%s: %s", msg, err)
 	} else {
 		sl.Info(LMDisconnected)
-		b.Errorf(addr, "%s", msg)
+		if key != b.bidirKey {
+			b.Errorf(addr, "%s", msg)
+		}
 	}
 
 	/* Relock B, which will be unlocked by a defer, above, and start the
