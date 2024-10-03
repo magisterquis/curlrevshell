@@ -6,7 +6,7 @@ package sstls
  * TLS listener with a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20240327
+ * Last Modified 20241003
  */
 
 import (
@@ -56,7 +56,7 @@ func Listen(
 	}
 
 	/* Work out fingerprint. */
-	if l.Fingerprint, err = pubkeyFingerprint(cert); nil != err {
+	if l.Fingerprint, err = PubkeyFingerprintTLS(cert); nil != err {
 		return Listener{}, fmt.Errorf(
 			"getting certificate fingerprint: %w",
 			err,
@@ -73,17 +73,11 @@ func Listen(
 	return l, nil
 }
 
-// pubkeyFingerprint returns the SHA256 hash of the public key fingerprint
-// for the cert.  This is used for curl's --pinnedpubkey.  If the certificate's
-// Leaf isn't set, an error is returned.
-func pubkeyFingerprint(cert tls.Certificate) (string, error) {
-	/* Make sure we have a parsed cert. */
-	if nil == cert.Leaf {
-		return "", errors.New("missing leaf")
-	}
-
+// PubkeyFingerprint returns the SHA256 hash of the public key fingerprint
+// for the cert.  This is used for curl's --pinnedpubkey.
+func PubkeyFingerprint(cert *x509.Certificate) (string, error) {
 	/* Marshal to nicely-hashable DER. */
-	b, err := x509.MarshalPKIXPublicKey(cert.Leaf.PublicKey)
+	b, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
 	if nil != err {
 		return "", fmt.Errorf("marshalling to DER: %w", err)
 	}
@@ -91,4 +85,16 @@ func pubkeyFingerprint(cert tls.Certificate) (string, error) {
 	/* Hash and encode. */
 	h := sha256.Sum256(b)
 	return base64.StdEncoding.EncodeToString(h[:]), nil
+}
+
+// PubkeyFingerprintTLS is like PubkeyFingerprint, but uses the public key of
+// the leaf x509 certificate in cert.
+// If the certificate's Leaf isn't set, an error is returned.
+func PubkeyFingerprintTLS(cert tls.Certificate) (string, error) {
+	/* Make sure we have a parsed cert. */
+	if nil == cert.Leaf {
+		return "", errors.New("missing leaf x509 certificate")
+	}
+
+	return PubkeyFingerprint(cert.Leaf)
 }
