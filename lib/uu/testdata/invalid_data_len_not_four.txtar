@@ -1,0 +1,4 @@
+-- enc --
+(:VET=&5N<PH`ABC
+-- decerr --
+decoding failed at line 0, offset 0: encoded data not a multiple of four characters

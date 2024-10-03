@@ -8,9 +8,14 @@ but with the following "features":
 - Optionally serves static files
 - Accepts multiple shells in series, like `nc -lk` but in color
 - IPv6-ready
+- Logged [feature creep](./doc/changelog.md)
 - Non-zero [documentation](./doc/README.md)
+- Makefiles which coldheartedly assume
+  [BSD Make](https://man.openbsd.org/make)
+- Easyish in-target-memory [shell function sender](./doc/flags.md#-ctrl-i)
+- Other [tool~s~](./doc/tools.md)
 
-For legal use only
+For legal use only.
 
 Quickstart
 ----------
@@ -29,12 +34,13 @@ Example
 It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@dev
-go: downloading golang.org/x/sync v0.7.0
+go: downloading golang.org/x/sync v0.8.0
+go: downloading golang.org/x/net v0.29.0
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/net v0.27.0
-go: downloading golang.org/x/tools v0.23.0
-go: downloading golang.org/x/sys v0.22.0
-go: downloading golang.org/x/text v0.16.0
+go: downloading golang.org/x/tools v0.25.0
+go: downloading golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+go: downloading golang.org/x/sys v0.25.0
+go: downloading golang.org/x/text v0.18.0
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
@@ -65,29 +71,33 @@ Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
 
 Options:
   -callback-address address
-        Additional callback address or domain, for one-liner printing (may be repeated)
+    	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
-        Optional callback template file, used if it exists
+    	Optional callback template file, used if it exists
+  -ctrl-i source
+    	Tab/Ctrl+I's insertion source file or directory
   -icanhazip
-        Query icanhazip.com for a callback address
+    	Query icanhazip.com for a callback address
   -ipv6-one-liners
-        Also print callback one-liners with IPv6 addresses
+    	Also print callback one-liners with IPv6 addresses
   -listen-address address
-        Listen address (default "0.0.0.0:4444")
+    	Listen address (default "0.0.0.0:4444")
   -log file
-        Optional file to which to write JSON logs
+    	Optional file to which to write JSON logs
   -no-timestamps
-        Don't print timestamps
+    	Don't print timestamps
   -one-shell
-        Close listening socket when first shell connects
+    	Close listening socket when first shell connects
+  -print-ctrl-i
+    	Print what would be sent with Tab/Ctrl+I and exit
   -print-default-template
-        Write the default template to stdout and exit
+    	Write the default template to stdout and exit
   -prompt string
-        Terminal prompt; don't forget a trailing space (default "> ")
+    	Terminal prompt; don't forget a trailing space (default "> ")
   -serve-files-from directory
-        Optional directory from which to serve static files
+    	Optional directory from which to serve static files
   -tls-certificate-cache file
-        Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
+    	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
 ```
 
 Details
@@ -115,6 +125,12 @@ The struct passed to the template is `TemplateParams` in
 [script.go](internal/hsrv/script.go).  The default template is
 [script.tmpl](internal/hsrv/script.tmpl).  It's re-read every time it's needed,
 so feel free to change it as often as you'd like.
+
+A script to generate a custom callback template with embedded shell functions
+can be made with `make tools/funcgen` and is found in `tools/funcgen`.
+
+On Linux, you'll probably need BSD make(`apt/yum/such install bmake`, or
+thereabouts) and add a `b` before the `make`s.
 
 Callback Address
 ----------------
@@ -160,3 +176,13 @@ TLS is all via a pinned self-signed certificate.  By default, the certificate
 is cached in a file, mostly to keep from having to copy/paste a new fingerprint
 every time a ragey Ctrl+C kills the current shell.  Caching can be disabled
 with `-tls-certificate-cache ""`.
+
+File Insertion
+--------------
+It's kinda nice to bring your own functions, even nicer to not have to
+drop them to disk, and even nice still to not have to copy/paste a few hundred
+lines of shell script by hand.
+
+Works with single files, Perl scripts, and even entire directories.
+
+More info in [the docs](./doc/flags.md#-ctrl-i).

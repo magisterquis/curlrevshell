@@ -6,5 +6,7 @@ Contents
 --------
 File                             | Description
 ---------------------------------|------------
-[`flags.md`](./flags.md)         | What are all of those `-things`?
 [`changelog.md`](./changelog.md) | A tribute to feature-creep
+[`flags.md`](./flags.md)         | What are all of those `-things`?
+[`keys.md`](./keys.md)           | Keyboard gymnastics
+[`tools.md`](./tools.md)         | Curlrevshell-adjacent tooling

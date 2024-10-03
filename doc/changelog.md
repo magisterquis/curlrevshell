@@ -14,6 +14,23 @@ go install github.com/magisterquis/curlrevshell@dev
 - Extracting Shell I/O from logs with [`jq`](https://jqlang.github.io/jq/) is
   quite a bit less painful.
 - Tests are less racy.
+- [`-ctrl-i`](./flags.md#-ctrl-i): In-memory, over-the-wire, on-demand module
+  loading.  Or just sending the contents of a file (or directory or magically
+  shellified Perl script) to the remote shell.  Trigger it with `Ctrl+I`, or
+  use `Ctrl+J` to just see what `Ctrl+I` would send.
+- [`shellfuncsfile`](../lib/shellfuncsfile): a nifty library to roll a
+  file or directory into a single gob of shell functions; does a lot of
+  `-ctrl-i`'s heavy lifting.
+- Updated dependencies.
+- [`shellfuncsfile` the tool](../lib/shellfuncsfile/cmd/shellfuncsfile): A
+  wrapper around [`shellfuncsfile` the library](../lib/shellfuncsfile) to
+  generate shell functions files like [`-ctrl-i`](./flags.md#-ctrl-i) does, but
+  standalone.
+- [`-print-ctrl-i`](./flags.md#-print-ctrl-i): Like [`shellfuncsfile`
+  the tool](../lib/shellfuncsfile/cmd/shellfuncsfile), but
+  without having to remember to build and run something else
+- [`uu`](../lib/uu): Little library to do uuencoding/uudecoding, compatibly
+  with perl's `pack("u", ...)`.
 - Updated dependencies.
 
 `v0.0.1-beta.6` (2024-05-22)

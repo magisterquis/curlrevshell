@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240520
+ * Last Modified 20240728
  */
 
 import (
@@ -23,6 +23,7 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/shellfuncsfile"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
@@ -97,6 +98,16 @@ func rmain() int {
 			false,
 			"Close listening socket when first shell connects",
 		)
+		insertFile = flag.String(
+			"ctrl-i",
+			"",
+			"Tab/Ctrl+I's insertion `source` file or directory",
+		)
+		printCtrlI = flag.Bool(
+			"print-ctrl-i",
+			false,
+			"Print what would be sent with Tab/Ctrl+I and exit",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -121,7 +132,10 @@ func rmain() int {
 Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
+Ctrl+I - Insert the file or directory specified with -ctrl-i
+Ctrl+J - Print locally what Ctrl+I would send
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
+Tab    - Same as Ctrl+I
 
 Options:
 `,
@@ -169,18 +183,83 @@ Options:
 		och = make(chan opshell.CLine, 1024)
 	)
 
+	/* Converter for Ctrl+I. */
+	ctrlIConv := shellfuncsfile.NewDefaultConverter()
+	ctrlIConv.AddListFunction = true
+	insertGen := func() ([]byte, error) {
+		/* Make sure we have something to insert. */
+		if "" == *insertFile {
+			return nil, errors.New("no source configured")
+		}
+		/* Send it for inserting. */
+		b, err := ctrlIConv.From(*insertFile)
+		if nil != err {
+			return nil, fmt.Errorf(
+				"preparing %s: %w",
+				*insertFile,
+				err,
+			)
+		}
+		return b, nil
+	}
+
+	/* If we're just printing it, life's easy. */
+	if *printCtrlI {
+		b, err := insertGen()
+		if nil != err {
+			log.Fatalf("Error generating Ctrl+I file: %s", err)
+		}
+		os.Stdout.Write(b)
+		return 0
+	}
+
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(
 		ich,
 		och,
 		Prompt,
 		*noTimestamps,
+		insertGen,
+		*insertFile,
 	)
-	och <- opshell.CLine{Prompt: shell.WrapInColor(Prompt, opshell.ColorCyan)}
+	och <- opshell.CLine{Prompt: shell.WrapInColor(
+		Prompt,
+		opshell.ColorCyan,
+	)}
 	if nil != err {
 		log.Printf("Error setting up shell: %s", err)
 	}
 	defer cleanup()
+
+	/* Warn the user if the insertion file isn't there or looks empty. */
+	if "" != *insertFile {
+		fi, err := os.Stat(*insertFile)
+		if errors.Is(err, os.ErrNotExist) {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Warning: Ctrl+I file %s does not exist (yet)",
+				*insertFile,
+			)
+		} else if nil != err {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Warning: Could not get info about Ctrl+I "+
+					"file %s: %s",
+				*insertFile,
+				err,
+			)
+		} else if 0 == fi.Size() {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Warning: Ctrl+I file %s looks empty",
+				*insertFile,
+			)
+		}
+
+	}
 
 	/* Ask icanhazip for our IP address. */
 	if *useIcanhazip {

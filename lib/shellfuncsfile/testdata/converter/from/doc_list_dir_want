@@ -1,0 +1,24 @@
+# A simple perl program
+# TABDOC: a A perl script to do a thing
+a() {(
+(exit $((0 != $#))) || set -- -e "" -- "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+M"@H*"@IU<V4@=V%R;FEN9W,["G5S92!S=s)I8W0["@IP<FEN="`B02!T:&EN
+49R!H87,@8F5E;B!D;VYE7&XB.PH`
+}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+# TABDOC: foo  Does a 'nice' foo
+foo() {
+        echo "Does a foo"
+}
+
+# TABDOC: bar A "questionable" bar
+bar() {
+        printf "bar\tbar\n"
+}
+
+tab_list() {
+        echo 'a         - A perl script to do a thing'
+        echo 'bar       - A "questionable" bar'
+        echo 'foo       - Does a '\''nice'\'' foo'
+        echo 'tab_list  - This function list'
+}

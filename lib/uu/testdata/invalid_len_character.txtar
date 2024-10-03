@@ -1,0 +1,4 @@
+-- enc --
+	bcde
+-- decerr --
+decoding failed at line 0, offset 0: invalid length character '\t'

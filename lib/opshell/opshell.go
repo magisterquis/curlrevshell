@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240517
+ * Last Modified 20240707
  */
 
 import (
@@ -66,7 +66,9 @@ type Shell struct {
 	och          <-chan CLine
 	ttyF         *os.File
 	noTimestamps bool
-	wL           sync.Mutex /* Write lock. */
+	insertGen    func() ([]byte, error) /* Bytes-generator for ^I. */
+	insertName   string                 /* Loggable name for insertGen. */
+	wL           sync.Mutex             /* Write lock. */
 
 	silenced       bool        /* Don't write plain messages for a bit. */
 	silenceTimer   *time.Timer /* Unsilences after output's quiet. */
@@ -78,11 +80,15 @@ type Shell struct {
 // call the returned function to restore the TTY's state and clean up other
 // resources.  ich will be closed before Shell.Do returns.  IF noTimestamps is
 // true, no timestamps will be printed.
+// insertGen will be called to generate bytes to send to the shell on Ctrl+I
+// and will be logged as if it were inserting data from insertName.
 func New(
 	ich chan<- string,
 	och <-chan CLine,
 	prompt string,
 	noTimestamps bool,
+	insertGen func() ([]byte, error),
+	insertName string,
 ) (*Shell, func(), error) {
 	/* Shell to return. */
 	s := Shell{
@@ -90,6 +96,8 @@ func New(
 		ich:          ich,
 		och:          och,
 		noTimestamps: noTimestamps,
+		insertGen:    insertGen,
+		insertName:   insertName,
 	}
 	/* Set up a timer to unsilence the shell after there's been a lull. */
 	s.silenceTimer = time.AfterFunc(0, func() {
@@ -131,6 +139,19 @@ func New(
 				"Muting until we get %s of calm",
 				PlainWritePause,
 			)
+		case 0x09: /* ^I, paste from file. */
+			go s.insert()
+		case 0x0a: /* ^J, like ^I but just locally. */
+			go s.pretendInsert()
+			/* This is left here but commented out to make it that
+			much easier to add another Ctrl+Key. */
+			//default:
+			//	go s.Logf(
+			//		ColorGreen,
+			//		false,
+			//		"Got key: ^%c 0x%02x %q",
+			//		key+'@', key, key,
+			//	)
 		}
 	}
 	/* Open the controlling TTY, for raw mode and output. */
@@ -170,9 +191,8 @@ func New(
 }
 
 // Do proxies between the channels with which the shell was made and stdio as
-// well as watches for SIGWINCH to handle shell resizing.  Do closes the
-// input channel passed to New.  Do returns ErrOutputClosed if the output
-// channel passed to New is closed.
+// well as watches for SIGWINCH to handle shell resizing.
+// Do returns ErrOutputClosed if the output channel passed to New is closed.
 func (s *Shell) Do(ctx context.Context) error {
 	/* Do ALL the things. */
 	eg, ectx := ctxerrgroup.WithContext(ctx)
@@ -182,59 +202,25 @@ func (s *Shell) Do(ctx context.Context) error {
 
 	/* Read lines from stdin, send them out.  It'd be nice to do this in
 	the errgroup, but goxterm.Terminal.ReadLine doesn't let us stop it. */
-	var (
-		ech  = make(chan error, 1)
-		ich  = s.ich
-		ichL sync.Mutex
-	)
-	go func() {
-		for {
+	eg.Go(func() error {
+		for nil == ectx.Err() {
 			/* Get a line from the input. */
 			l, err := s.t.ReadLine()
 			if nil != err {
-				ech <- err
-				return
+				return err
 			}
 			/* Send it out. */
-			ichL.Lock()
-			if nil == ich {
-				ichL.Unlock()
-				return
-			}
 			s.ich <- l
-			ichL.Unlock()
 		}
-	}()
-
-	/* Watch for lines read from the shell, send them out.  We do this in
-	two goroutines to kinda sorta stop ReadLine as well as to stop other
-	goroutines and so on. */
-	eg.GoContext(ectx, func(ctx context.Context) error {
-		/* Stop sending to ich when we're done. */
-		defer func() {
-			ichL.Lock()
-			defer ichL.Unlock()
-			close(ich)
-			ich = nil
-		}()
-		/* Wait for something to go wrong. */
-		for {
-			select {
-			case <-ctx.Done():
-				return context.Cause(ctx)
-			case err := <-ech:
-				return fmt.Errorf(
-					"reading input line: %w",
-					err,
-				)
-			}
-		}
+		return context.Cause(ectx)
 	})
 
 	/* Send lines sent to us to the shell. */
 	eg.GoContext(ectx, s.handleOutput)
 
+	/* Wait for something to go wrong. */
 	return eg.Wait()
+
 }
 
 // resize resizes t to the size of its underlying TTY.
