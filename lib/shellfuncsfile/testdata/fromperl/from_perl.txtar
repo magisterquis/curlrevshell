@@ -8,7 +8,7 @@ simple() {(
 (exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 3<s)I;G0@(DMI=s1E;G-<;B(["@``
-}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
 -- header.have --
 #!/usr/bin/env perl
 #
@@ -31,7 +31,7 @@ header() {(
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 M"@H*"@IP<FEN="`B2VET=&5N<UQN(CL*"G-L965P(#$["@ID:64@(E=E(s1R
 &:65D(CL*
-}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
 -- empty.have --
 -- empty.want --
 empty() {}
@@ -43,4 +43,12 @@ args() {(
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 M<s)I;G0@(EPD(T%21U8Z("0C05)s5EQN(CL@9F]R(&UY("1I("@P+BXD(T%2
 >1U8I(sMP<FEN="`B)&E<="1!4D=66R1I75QN(GT*
-}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+-- backslash.have --
+echo "x_!Pp"
+-- backslash.want --
+backslash() {(
+(exit $((0 != $#))) || set -- -e "" -- "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+-96-H;R`B>%bA4s`B"@``
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}

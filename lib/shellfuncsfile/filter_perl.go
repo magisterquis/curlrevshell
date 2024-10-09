@@ -5,7 +5,7 @@ package shellfuncsfile
  * Turn a perl script into a shell function
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20240930
+ * Last Modified 20241009
  */
 
 import (
@@ -22,6 +22,8 @@ import (
 const (
 	singleQuote     = "'" /* Can't have this in our UUEncoded script. */
 	safeSingleQuote = "s" /* Use this instead. */
+	backslash       = `\` /* Can't have this either. */
+	safeBackslash   = "b" /* Use this instead. */
 )
 
 // perlTemplate is what we use to convert uuencoded perl into a shell function.
@@ -30,7 +32,7 @@ var perlTemplate = template.Must(template.New("perl").Parse(`
 (exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{` + "`" + `
 {{.PerlUU}}
-}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}` + "\n",
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}` + "\n",
 ))
 
 // FromPerl converts the Perl script read from r into a shell function.  If
@@ -51,6 +53,7 @@ func FromPerl(name string, r io.Reader) ([]byte, error) {
 	perlUU := string(uu.AppendEncode(nil, []byte(perl)))
 	perlUU = strings.TrimSpace(perlUU)
 	perlUU = strings.ReplaceAll(perlUU, singleQuote, safeSingleQuote)
+	perlUU = strings.ReplaceAll(perlUU, backslash, safeBackslash)
 
 	/* Write a shell function. */
 	ret := new(bytes.Buffer)

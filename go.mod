@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/magisterquis/mqd v0.0.0-20241001021702-3d5960510fbc // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 )

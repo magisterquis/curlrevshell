@@ -9,4 +9,4 @@ b() {(
 (exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 D"@H*"G!R:6YT(")4:&ES(&ES(&$@<&5R;"!F=6YC=&EO;B(*
-}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}

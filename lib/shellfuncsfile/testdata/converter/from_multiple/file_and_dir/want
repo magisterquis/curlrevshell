@@ -4,7 +4,7 @@ b() {(
 (exit $((0 != $#))) || set -- -e "" -- "$@";
 PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 /<s)I;G0@(F$O8EQN(CL*
-}=~y/s/\47/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
 
 tab_list() {
         echo 'tab_list  - This function list'
