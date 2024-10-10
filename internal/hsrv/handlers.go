@@ -9,9 +9,11 @@ package hsrv
  */
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"testing"
 )
 
 // Log messages and keys.
@@ -111,6 +113,15 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 
 // inOutHandler handles both input and output for a shell.
 func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
+	/* Full duplex is required by real HTTP clients, but doesn't work
+	with the handler-tester. */
+	if err := http.NewResponseController(
+		w,
+	).EnableFullDuplex(); nil != err &&
+		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
+		s.RErrorLogf(r, "Error enabling duplex comms: %s", err)
+		return
+	}
 	s.iob.ConnectInOut(
 		r.Context(),
 		s.requestLogger(r),
