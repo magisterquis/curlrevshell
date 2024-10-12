@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240924
+ * Last Modified 20241012
  */
 
 import (
@@ -186,7 +186,6 @@ Options:
 	)
 	och <- opshell.CLine{Prompt: shell.WrapInColor(Prompt, opshell.ColorCyan)}
 	if nil != err {
-		/* TODO: Die if this happens. */
 		log.Fatalf("Error setting up shell: %s", err)
 	}
 	defer cleanup()
