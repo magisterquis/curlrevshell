@@ -19,6 +19,12 @@ go install github.com/magisterquis/curlrevshell@betterdisconnects
   It's also an easier way to test logging.
 - [`/io`]: Added an HTTP endpoint for when you'd kinda prefer a single
   connection over two parallel connections.
+- [`simpleshell`](./lib/simpleshell): A small library for connecting up a shell
+  or other such thing with minimal effort.
+- [`simpleshell` the program](./lib/simpleshell/cmd/simpleshell): A wrapper
+  around [`simpleshell` the program](./lib/simpleshell/cmd/simpleshell) which
+  can be built as a standalone binary or an injectable shared object file.
+  It's about the closest thing there is to a proper Curlrevshell implant.
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================
