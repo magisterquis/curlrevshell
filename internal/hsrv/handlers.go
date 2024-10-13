@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240930
+ * Last Modified 20241013
  */
 
 import (
@@ -113,14 +113,22 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 
 // inOutHandler handles both input and output for a shell.
 func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
+	rc := http.NewResponseController(w)
 	/* Full duplex is required by real HTTP clients, but doesn't work
 	with the handler-tester. */
-	if err := http.NewResponseController(
-		w,
-	).EnableFullDuplex(); nil != err &&
+	if err := rc.EnableFullDuplex(); nil != err &&
 		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
 		s.RErrorLogf(r, "Error enabling duplex comms: %s", err)
 		return
+	}
+	/* Write the header from the get-go.  Helps with clients waiting on
+	a proper go-ahead. */
+	if err := rc.Flush(); nil != err {
+		s.RErrorLogf(
+			r,
+			"Error sending initial HTTP response header: %s",
+			err,
+		)
 	}
 	s.iob.ConnectInOut(
 		r.Context(),
