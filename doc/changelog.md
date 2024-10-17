@@ -2,12 +2,12 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`betterdisconnects`
-===================
-The following changes are available on this branch and will (probably) be
+`dev`
+=====
+The following changes are available on the dev branch and will (probably) be
 in the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@betterdisconnects
+go install github.com/magisterquis/curlrevshell@dev
 ```
  `-callback-template`: Missing templates are probably not what you want.  Red
   text should help.
