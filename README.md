@@ -106,9 +106,10 @@ Under the hood, it's really just a little HTTP server with four endpoints:
 
 Endpoint          | Description
 ------------------|------------
-`/i/{id}`         | Long-lived connection for input from you to the shell.
-`/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
 `/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate admins not using `ps awwwfux`.
+`/i/{id}`         | Long-lived connection for input from you to the shell.
+`/io`             | A bidirectional connection between you and the shell, kinda `/i` and `/o` at the same time.
+`/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
 Callback Template

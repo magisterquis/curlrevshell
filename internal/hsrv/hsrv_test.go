@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240731
+ * Last Modified 20240926
  */
 
 import (
@@ -15,14 +15,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"maps"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
-	"time"
 
+	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/chanlog"
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
@@ -30,34 +32,53 @@ var (
 	// errTestEnding indicates we're cancelling a context because the test
 	// is over.
 	errTestEnding = errors.New("test ending")
-	// errServerDone indicates Server.Do returned
-	errServerDone = errors.New("server.Do returned")
 )
 
+// newTestServer is newTestServerMaybeWithDir without a static files directory.
 func newTestServer(t *testing.T) (
-	chanLog, /* Server logs. */
+	chanlog.ChanLog, /* Server logs. */
 	chan<- string, /* From shell */
 	<-chan opshell.CLine,
 	*Server,
+	func(),
+) {
+	return newTestServerMaybeWithDir(t, false)
+}
+
+// newTestServerMaybeWithDir returns a new server, suitable for testing.
+// The returned function may be called to shut down the server, which will
+// closs the chanLog and CLine channels.  It need not be explicitly called.
+// By default, no static files directory will be made.  Set makeFDir to true
+// to create one.
+func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
+	chanlog.ChanLog, /* Server logs. */
+	chan<- string, /* From shell */
+	<-chan opshell.CLine,
+	*Server,
+	func(),
 ) {
 	var (
-		cl  = chanLog(make(chan string, 1024))
-		ich = make(chan string, 10)
-		och = make(chan opshell.CLine, 10)
-		ech = make(chan error, 1)
-		td  = t.TempDir()
+		cl, sl = chanlog.New()
+		ich    = make(chan string, 1024)
+		och    = make(chan opshell.CLine, 1024)
 	)
+	var td string
+	if makeFDir {
+		td = t.TempDir()
+	}
+	iob, err := iobroker.New(ich, och)
+	if nil != err {
+		t.Fatalf("Error setting up IO Broker: %s", err)
+	}
 	cbAddrs := []string{"kittens.com:8888", "moose.com"}
-	s, cleanup, err := New(
-		slog.New(slog.NewJSONHandler(
-			chanLog(cl),
-			&slog.HandlerOptions{Level: slog.LevelDebug},
-		)),
+	s, err := New(
+		sl,
 		"127.0.0.1:0",
 		td,
 		"",
 		ich,
 		och,
+		iob,
 		"",
 		cbAddrs,
 		true,
@@ -69,30 +90,25 @@ func newTestServer(t *testing.T) (
 
 	/* Start the server going. */
 	ctx, cancel := context.WithCancelCause(context.Background())
-	go func() { ech <- s.Do(ctx); close(ech); cancel(errServerDone) }()
+	eg, ectx := ctxerrgroup.WithContext(ctx)
+	eg.GoContext(ectx, s.Do)
+	eg.GoContext(ectx, iob.Do)
 
-	t.Cleanup(func() {
-		cleanup()   /* Stop the server politely. */
-		go func() { /* And forcefully after a second. */
-			timer := time.NewTimer(time.Second)
-			select {
-			case <-ctx.Done():
-			case <-time.After(time.Second):
-				cancel(errTestEnding)
-			}
-			if !timer.Stop() {
-				<-timer.C
-			}
-		}()
-		err := <-ech
-		if nil != err && !errors.Is(
-			err,
-			ErrOneShellClosed,
-		) && !errors.Is(err, net.ErrClosed) {
+	/* Function to shut down the server. */
+	shutdown := sync.OnceFunc(func() {
+		/* Tell everything to stop. */
+		cancel(errTestEnding)
+		err := eg.Wait()
+		if nil != err &&
+			!errors.Is(err, ErrOneShellClosed) &&
+			!errors.Is(err, net.ErrClosed) &&
+			!errors.Is(err, context.Canceled) {
 			t.Fatalf("Unexpected server error: %s", err)
 		}
 		close(cl)
+		close(och)
 	})
+	t.Cleanup(shutdown)
 
 	/* Work out our listen port. */
 	_, listenPort, err := net.SplitHostPort(s.l.Addr().String())
@@ -106,14 +122,16 @@ func newTestServer(t *testing.T) (
 	}
 
 	/* Make sure we get a listening on message. */
-	wantCLines := []struct {
+	type wantCLine struct {
 		prep func(s string) string
 		want opshell.CLine
-	}{{
+	}
+	listeningWCLs := []wantCLine{{
 		want: opshell.CLine{
 			Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
 		},
-	}, {
+	}}
+	fileWCLs := []wantCLine{{
 		want: opshell.CLine{
 			Color: ScriptColor,
 			Line:  "To get files from " + td + ":",
@@ -160,7 +178,8 @@ func newTestServer(t *testing.T) (
 			Line:        "\n",
 			NoTimestamp: true,
 		},
-	}, {
+	}}
+	shellWCLs := []wantCLine{{
 		want: opshell.CLine{
 			Color: ScriptColor,
 			Line:  "To get a shell:",
@@ -191,6 +210,16 @@ func newTestServer(t *testing.T) (
 			NoTimestamp: true,
 		},
 	}}
+	wantCLines := make(
+		[]wantCLine,
+		0,
+		len(listeningWCLs)+len(fileWCLs)+len(shellWCLs),
+	)
+	wantCLines = append(wantCLines, listeningWCLs...)
+	if makeFDir {
+		wantCLines = append(wantCLines, fileWCLs...)
+	}
+	wantCLines = append(wantCLines, shellWCLs...)
 	for i, want := range wantCLines {
 		got := <-och
 		if nil != want.prep {
@@ -220,11 +249,15 @@ func newTestServer(t *testing.T) (
 		t.FailNow()
 	}
 
-	return cl, ich, och, s
+	return cl, ich, och, s, shutdown
 }
 
 func TestServer_Smoketest(t *testing.T) {
 	newTestServer(t)
+}
+
+func TestServer_SmoketestWithDir(t *testing.T) {
+	newTestServerMaybeWithDir(t, true)
 }
 
 func TestSortAddresses(t *testing.T) {
@@ -293,93 +326,9 @@ func TestSortAddresses(t *testing.T) {
 	}
 }
 
-// chanLog wraps a chan string as a blockingish logfile.  Writes are sent as
-// strings less timestamps and surrounding whitespace to the wrapped chan.
-// Don't send it anything which isn't a log line.
-type chanLog chan string
-
-// Write converts b to a string and sends it to cl.  It always returns
-// len(b), nil.
-func (cl chanLog) Write(b []byte) (int, error) {
-	line := string(b)
-
-	/* Set the timestamp to the empty string. */
-	parts := strings.Split(line, `"`)
-	parts[3] = ""
-	line = strings.Join(parts, `"`)
-
-	/* Remove excess spaces. */
-	line = strings.TrimSpace(line)
-
-	/* Send it out. */
-	cl <- string(line)
-	return len(b), nil
-}
-
-// Expect expects the log entries on cl.  It calls t.Errorf for mismatches and
-// blocks until as many log entries as supplied lines are read.
-func (cl chanLog) Expect(t *testing.T, lines ...string) {
-	t.Helper()
-	for _, want := range lines { /* Make sure we get each line. */
-		got, ok := <-cl
-		if !ok { /* Channel closed early. */
-			t.Errorf(
-				"Log channel closed while waiting for %q",
-				got,
-			)
-			return
-		} else if got != want { /* Wrong line. */
-			t.Errorf(
-				"Unexpected log line:\n got: %s\nwant: %s",
-				got,
-				want,
-			)
-		}
-	}
-}
-
-// ExpectEmpty is like cl.Expect, except it checks that the log is empty and
-// calls t.Errorf which each line if not.  This is inherently racy and should
-// be called concurrently to calls to cl.Write.
-func (cl chanLog) ExpectEmpty(t *testing.T, lines ...string) {
-	t.Helper()
-	/* Check for lines we want. */
-	cl.Expect(t, lines...)
-	/* Anything left is an error. */
-	for 0 != len(cl) {
-		select { /* Check to see if we have anything.  */
-		case l, ok := <-cl: /* We do, nuts. */
-			if !ok { /* Closed.  This works. */
-				return
-			}
-			/* Tell someone about the unexpected line. */
-			t.Errorf("Unexpected log line: %s", l)
-		default: /* Empty, good. */
-			return
-		}
-	}
-}
-
-func TestChanLog(t *testing.T) {
-	cl := chanLog(make(chan string, 10))
-	sl := slog.New(slog.NewJSONHandler(chanLog(cl), nil))
-	have := "kittens"
-	want := `{"time":"","level":"INFO","msg":"kittens"}`
-
-	t.Run("Expect", func(t *testing.T) {
-		sl.Info(have)
-		cl.Expect(t, want)
-	})
-
-	t.Run("ExpectEmpty", func(t *testing.T) {
-		sl.Info(have)
-		cl.ExpectEmpty(t, want)
-	})
-}
-
 // Make sure the server returns after a single shell, if oneShell is set.
 func TestServer_OneShell(t *testing.T) {
-	cl, _, _, s := newTestServer(t)
+	cl, _, _, s, shutdown := newTestServer(t)
 	s.oneShell = true /* Only handle one shell. */
 
 	/* HTTP Client which does not certificate validation. */
@@ -390,9 +339,11 @@ func TestServer_OneShell(t *testing.T) {
 	}
 
 	/* Connect a shell. */
-	id := "kittens"
-	ech := make(chan error, 2)
-	doneCh := make(chan struct{})
+	var (
+		id     = "kittens"
+		doneCh = make(chan struct{})
+		ech    = make(chan error, 2)
+	)
 	go func() {
 		res, err := httpc.Get(
 			"https://" + s.l.Addr().String() + "/i/" + id,
@@ -438,45 +389,57 @@ func TestServer_OneShell(t *testing.T) {
 		ech <- nil
 	}()
 
-	/* Wait for connections to happen and the listener to close. */
+	/* A different cl.Expect to account for port numbers. */
 	type lmsg struct {
 		Msg       string
 		Direction string
 	}
-	var (
-		got  = make(map[lmsg]int)
-		want = map[lmsg]int{
-			{Msg: LMOneShellClosingListener}:            1,
-			{Msg: LMNewConnection, Direction: "input"}:  1,
-			{Msg: LMNewConnection, Direction: "output"}: 1,
+	expectLogMessages := func(want map[lmsg]int) {
+		got := make(map[lmsg]int)
+		for i := 0; i < len(want); i++ {
+			select {
+			case l := <-cl:
+				var msg lmsg
+				if err := json.Unmarshal(
+					[]byte(l),
+					&msg,
+				); nil != err {
+					t.Fatalf(
+						"Error unmarshaling %s: %s",
+						l,
+						err,
+					)
+				}
+				/* Direction doesn't matter when we close the
+				listener. */
+				if LMOneShellClosingListener == msg.Msg {
+					msg.Direction = ""
+				}
+				got[msg]++
+			case err := <-ech:
+				t.Fatalf("Request error: %s", err)
+			}
 		}
-	)
-	for i := 0; i < 3; i++ {
-		select {
-		case l := <-cl:
-			var msg lmsg
-			if err := json.Unmarshal([]byte(l), &msg); nil != err {
-				t.Fatalf("Error unmarshaling %s: %s", l, err)
-			}
-			/* Direction doesn't matter when we close the
-			listener. */
-			if LMOneShellClosingListener == msg.Msg {
-				msg.Direction = ""
-			}
-			got[msg]++
-		case err := <-ech:
+		if !maps.Equal(got, want) {
 			t.Fatalf(
-				"Request error before listener closed: %s",
-				err,
+				"Incorrect logs:\ngot: %q\nwant: %q",
+				got,
+				want,
 			)
 		}
 	}
-	if !maps.Equal(got, want) {
-		t.Fatalf("Incorrect logs:\ngot: %q\nwant: %q", got, want)
-	}
 
+	/* Wait for connections to happen and the listener to close. */
+	expectLogMessages(map[lmsg]int{
+		{Msg: LMOneShellClosingListener}:                     1,
+		{Msg: iobroker.LMNewConnection, Direction: "input"}:  1,
+		{Msg: iobroker.LMNewConnection, Direction: "output"}: 1,
+	})
+
+	/* Close the shell and make sure we're told about the disconnect. */
 	close(doneCh)
-	for i := 0; i < len(ech); i++ {
+	shutdown()
+	for i := 0; i < cap(ech); i++ {
 		if err := <-ech; nil != err {
 			t.Errorf(
 				"Request error after listener closed: %s",
@@ -484,6 +447,9 @@ func TestServer_OneShell(t *testing.T) {
 			)
 		}
 	}
-
+	expectLogMessages(map[lmsg]int{
+		{Msg: iobroker.LMDisconnected, Direction: "input"}:  1,
+		{Msg: iobroker.LMDisconnected, Direction: "output"}: 1,
+	})
 	cl.ExpectEmpty(t)
 }
