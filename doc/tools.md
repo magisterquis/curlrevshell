@@ -7,6 +7,7 @@ directory.
 
 Table of Tool~s~
 ----------------
-Name           | Description
----------------|------------
+Name                                                       | Description
+-----------------------------------------------------------|------------
 [shellfuncsfile](../lib/shellfuncsfile/cmd/shellfuncsfile) | Rolls a single shell functions file, like `-ctrl-i` but curlrevshellless.
+[simpleshell](../lib/simpleshell/cmd/simpleshell)          | Standalone program or injectable library which hooks up curlrevshell and a spawend processn

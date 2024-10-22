@@ -13,7 +13,7 @@ but with the following "features":
 - Makefiles which coldheartedly assume
   [BSD Make](https://man.openbsd.org/make)
 - Easyish in-target-memory [shell function sender](./doc/flags.md#-ctrl-i)
-- Other [tool~s~](./doc/tools.md)
+- Other [tools](./doc/tools.md)
 
 For legal use only.
 
@@ -33,14 +33,14 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@dev
+$ go install github.com/magisterquis/curlrevshell@latest
+go: downloading golang.org/x/net v0.30.0
 go: downloading golang.org/x/sync v0.8.0
-go: downloading golang.org/x/net v0.29.0
+go: downloading golang.org/x/text v0.19.0
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/tools v0.25.0
-go: downloading golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
-go: downloading golang.org/x/sys v0.25.0
-go: downloading golang.org/x/text v0.18.0
+go: downloading golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+go: downloading golang.org/x/tools v0.26.0
+go: downloading golang.org/x/sys v0.26.0
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
@@ -67,7 +67,10 @@ Usage: curlrevshell [options]
 Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
+Ctrl+I - Insert the file or directory specified with -ctrl-i
+Ctrl+J - Print locally what Ctrl+I would send
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
+Tab    - Same as Ctrl+I
 
 Options:
   -callback-address address

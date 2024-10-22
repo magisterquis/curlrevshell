@@ -2,8 +2,15 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
+Bleeding-edge code can be found in the
+[`dev` branch](https://github.com/magisterquis/curlrevshell/tree/dev):
+```sh
+go install github.com/magisterquis/curlrevshell@dev
+```
+
+
+`v0.0.1-beta.7` (2024-10-22)
+============================
 The following changes are available on the dev branch and will (probably) be
 in the next tagged version.  Get them with
 ```sh
@@ -45,9 +52,10 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`simpleshell`](./lib/simpleshell): A small library for connecting up a shell
   or other such thing with minimal effort.
 - [`simpleshell` the program](./lib/simpleshell/cmd/simpleshell): A wrapper
-  around [`simpleshell` the program](./lib/simpleshell/cmd/simpleshell) which
-  can be built as a standalone binary or an injectable shared object file.
+  around [`simpleshell` the library](./lib/simpleshell/) which can be built as
+  a standalone binary or an injectable shared object file.
   It's about the closest thing there is to a proper Curlrevshell implant.
+
 
 `v0.0.1-beta.6` (2024-05-22)
 ============================
