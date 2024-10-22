@@ -11,12 +11,7 @@ go install github.com/magisterquis/curlrevshell@dev
 
 `v0.0.1-beta.7` (2024-10-22)
 ============================
-The following changes are available on the dev branch and will (probably) be
-in the next tagged version.  Get them with
-```sh
-go install github.com/magisterquis/curlrevshell@dev
-```
- `-callback-template`: Missing templates are probably not what you want.  Red
+- `-callback-template`: Missing templates are probably not what you want.  Red
   text should help.
 - Extracting Shell I/O from logs with [`jq`](https://jqlang.github.io/jq/) is
   quite a bit less painful.
