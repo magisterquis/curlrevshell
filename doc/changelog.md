@@ -15,6 +15,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterctrlc
 ```
+- Make it slightly harder to accidentally a shell by muscle-memorying Ctrl+C.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

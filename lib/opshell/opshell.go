@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240707
+ * Last Modified 20241203
  */
 
 import (
@@ -17,7 +17,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -27,9 +26,6 @@ import (
 )
 
 const (
-	// ttyPath is the path to our own TTY, which may or may not actually be
-	// hooked up.
-	ttyPath = "/dev/tty"
 	// timeFormat formats the current time the same way as the log package
 	// does by default.
 	timeFormat = "15:04:05.000 "
@@ -42,7 +38,23 @@ const (
 	// This is meant to give a user a fighting chance after he accidentally
 	// cats a large file.
 	PlainWritePause = 2 * time.Second
+
+	// CtrlCWait is the amount of time after receiving a Ctrl+C which we
+	// wait for a second one for stopping the Shell.
+	CtrlCWait = time.Second
+
+	// FirstCtrlCWarning is sent to the shell in red the first time a user
+	// hits Ctrl+C to let him know a second is needed to kill the shell.
+	FirstCtrlCWarning = "Caught Ctrl+C.  " +
+		"One more in the next second to kill the shell."
+
+	// SecondCtrlCWarning is sent to stdout in red to let the user know
+	// the shell's going away.
+	SecondCtrlCWarning = "Caught second Ctrl+C."
 )
+
+// fder is anything which will give us a file descriptor, more or less.
+type fder interface{ Fd() uintptr }
 
 // ErrOutputClosed is returned by Shell.Do when it returns because someone
 // closed the output channel.
@@ -64,7 +76,7 @@ type Shell struct {
 	t            *goxterm.Terminal
 	ich          chan<- string
 	och          <-chan CLine
-	ttyF         *os.File
+	ttyF         fder
 	noTimestamps bool
 	insertGen    func() ([]byte, error) /* Bytes-generator for ^I. */
 	insertName   string                 /* Loggable name for insertGen. */
@@ -75,10 +87,11 @@ type Shell struct {
 	lastPlainWrite time.Time   /* Last attempted write. */
 }
 
-// New puts the controlly TTY in raw mode and returns a new Shell wrapping
-// stdio.  Call Shell.Do to start processing lines and handle resizing and
+// New returns returns Shell wrapping stdin and stdout.
+// Stdin will be put in raw mode if it is a terminal.
+// Call Shell.Do to start processing lines and handle resizing and
 // call the returned function to restore the TTY's state and clean up other
-// resources.  ich will be closed before Shell.Do returns.  IF noTimestamps is
+// resources.  ich will be closed before Shell.Do returns.  If noTimestamps is
 // true, no timestamps will be printed.
 // insertGen will be called to generate bytes to send to the shell on Ctrl+I
 // and will be logged as if it were inserting data from insertName.
@@ -90,9 +103,36 @@ func New(
 	insertGen func() ([]byte, error),
 	insertName string,
 ) (*Shell, func(), error) {
+	return NewWrapping(
+		ich,
+		och,
+		prompt,
+		noTimestamps,
+		insertGen,
+		insertName,
+		os.Stdin,
+		os.Stdout,
+	)
+}
+
+// NewWrapping is like New but requires explicit input and output instead of
+// assuming stdio.
+func NewWrapping(
+	ich chan<- string,
+	och <-chan CLine,
+	prompt string,
+	noTimestamps bool,
+	insertGen func() ([]byte, error),
+	insertName string,
+	stdin io.Reader,
+	stdout io.Writer,
+) (*Shell, func(), error) {
 	/* Shell to return. */
 	s := Shell{
-		t:            goxterm.NewTerminal(stdioRW{}, prompt),
+		t: goxterm.NewTerminal(goxterm.ReadWriter{
+			Reader: stdin,
+			Writer: stdout,
+		}, prompt),
 		ich:          ich,
 		och:          och,
 		noTimestamps: noTimestamps,
@@ -154,37 +194,40 @@ func New(
 			//	)
 		}
 	}
-	/* Open the controlling TTY, for raw mode and output. */
-	var err error
-	if s.ttyF, err = os.Open(ttyPath); nil != err {
-		return nil, nil, fmt.Errorf("opening controlling TTY: %w", err)
-	}
 
 	/* Cleanup things. */
 	var oldState *goxterm.State
 	cleanup := sync.OnceFunc(func() {
-		/* Restore the terminal state. */
-		if nil != oldState {
-			goxterm.Restore(int(s.ttyF.Fd()), oldState)
+		/* Don't bother if we can't restore the state. */
+		if nil == oldState || nil == s.ttyF {
+			return
 		}
-
-		/* Close the underlying TTY. */
-		s.ttyF.Close()
+		/* Restore the terminal state. */
+		goxterm.Restore(int(s.ttyF.Fd()), oldState)
 	})
+
+	/* Use stdin's tty, if it is one. */
+	if infder, ok := stdin.(interface{ Fd() uintptr }); ok &&
+		goxterm.IsTerminal(int(infder.Fd())) {
+		/* Save stdin as our tty. */
+		s.ttyF = infder
+		/* Put tty in raw mode. */
+		var err error
+		if oldState, err = goxterm.MakeRaw(
+			int(s.ttyF.Fd()),
+		); nil != err {
+			cleanup()
+			return nil, nil, fmt.Errorf(
+				"putting terminal in raw mode: %w",
+				err,
+			)
+		}
+	}
 
 	/* Set the initial size. */
 	if err := s.resize(); nil != err {
 		cleanup()
 		return nil, nil, fmt.Errorf("setting initial size: %w", err)
-	}
-
-	/* Put the TTY in raw mode. */
-	if oldState, err = goxterm.MakeRaw(int(s.ttyF.Fd())); nil != err {
-		cleanup()
-		return nil, nil, fmt.Errorf(
-			"putting terminal in raw mode: %w",
-			err,
-		)
 	}
 
 	return &s, cleanup, nil
@@ -200,12 +243,39 @@ func (s *Shell) Do(ctx context.Context) error {
 	/* Resize on SIGWINCH. */
 	eg.GoContext(ectx, s.handleWINCH)
 
+	/* Note the last time we got a Ctrl+C, for shell-ending. */
+	var lastCtrlC time.Time
+
 	/* Read lines from stdin, send them out.  It'd be nice to do this in
 	the errgroup, but goxterm.Terminal.ReadLine doesn't let us stop it. */
 	eg.Go(func() error {
 		for nil == ectx.Err() {
 			/* Get a line from the input. */
 			l, err := s.t.ReadLine()
+			if errors.As(err, &goxterm.CtrlC{}) &&
+				(lastCtrlC.IsZero() ||
+					CtrlCWait < time.Since(lastCtrlC)) {
+				/* If we've not got one before or it's been
+				more than a second since the last one, just
+				print a warning. */
+				s.Logf(
+					ColorRed,
+					false,
+					"%s",
+					FirstCtrlCWarning,
+				)
+				lastCtrlC = time.Now()
+				continue
+			} else if errors.As(err, &goxterm.CtrlC{}) {
+				s.Logf(
+					ColorRed,
+					false,
+					"%s",
+					SecondCtrlCWarning,
+				)
+				/* Second time we've got one. */
+				return err
+			}
 			if nil != err {
 				return err
 			}
@@ -223,8 +293,13 @@ func (s *Shell) Do(ctx context.Context) error {
 
 }
 
-// resize resizes t to the size of its underlying TTY.
+// resize resizes t to the size of its underlying TTY, if we have one. */
 func (s *Shell) resize() error {
+	/* Nothing to do here if we don't have a TTY. */
+	if nil == s.ttyF {
+		return nil
+	}
+
 	/* Get the current size. */
 	w, h, err := goxterm.GetSize(int(s.ttyF.Fd()))
 	if nil != err {
@@ -343,15 +418,14 @@ func logf(
 	format string,
 	v ...any,
 ) (int, error) {
-	/* Roll a message, making sure we've a newline. */
-	m := fmt.Sprintf(format, v...)
-	if 0 != len(m) && !strings.HasSuffix(m, "\n") {
-		m += "\n"
-	}
-
-	/* No point in fiddling with colors if we have no line to write. */
-	if 0 == len(m) {
+	/* Roll the message, newlineless.  We'll add them back later. */
+	rs := []rune(fmt.Sprintf(format, v...))
+	if 0 == len(rs) { /* Nothing to do if no message. */
 		return 0, nil
+	}
+	nnl := 0
+	for i := len(rs) - 1; i >= 0 && '\n' == rs[i]; i-- {
+		nnl++
 	}
 
 	/* Add a timestamp and colors, if we have them. */
@@ -362,9 +436,17 @@ func logf(
 	if !noTS {
 		b.WriteString(time.Now().Format(timeFormat))
 	}
-	b.WriteString(m)
+	b.WriteString(string(rs[:len(rs)-nnl]))
 	if ColorNone != color {
 		b.Write(ColorEC(escape, ColorReset))
+	}
+
+	/* Put newlines back. */
+	if 0 == nnl {
+		nnl = 1
+	}
+	for range nnl {
+		b.WriteRune('\n')
 	}
 
 	/* Actually do the writing. */
