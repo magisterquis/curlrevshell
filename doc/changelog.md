@@ -11,6 +11,7 @@ go install github.com/magisterquis/curlrevshell@dev
 ```
 - `-version`: Took a first whack at version info.
 - `-h`: Invisible changes to print help a bit more nicely in strange conditions.
+- New and improved tests which now actually run curlrevshell.
 
 
 `v0.0.1-beta.7` (2024-10-22)

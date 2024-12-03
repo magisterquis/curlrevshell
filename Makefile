@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20240731
+# Last Modified 20241203
 
 BINNAME     != basename $$(pwd)
 BUILDFLAGS   = -trimpath -ldflags "-w -s"
@@ -34,6 +34,7 @@ test:
 		/.{80,}/\
 			{ print "Long usage line: " $0; exit 1 }\
 	'
+	prove -It
 
 tools: ${TOOLSRCDIRS:T:S,^,${TOOLSDIR}/,}
 
