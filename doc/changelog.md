@@ -17,6 +17,7 @@ go install github.com/magisterquis/curlrevshell@betterctrlc
 ```
 - Make it slightly harder to accidentally a shell by muscle-memorying Ctrl+C.
 - Updated dependencies.
+- New and improve tests which now actually run curlrevshell.
 
 `v0.0.1-beta.7` (2024-10-22)
 ============================
