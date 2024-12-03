@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@dev
+   go install github.com/magisterquis/curlrevshell@betterctrlc
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,14 +33,14 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@latest
-go: downloading golang.org/x/net v0.30.0
-go: downloading golang.org/x/sync v0.8.0
-go: downloading golang.org/x/text v0.19.0
-go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
-go: downloading golang.org/x/tools v0.26.0
-go: downloading golang.org/x/sys v0.26.0
+$ go install github.com/magisterquis/curlrevshell@betterctrlc
+go: downloading golang.org/x/sync v0.9.0
+go: downloading golang.org/x/text v0.20.0
+go: downloading golang.org/x/net v0.31.0
+go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2.0.20241203122007-0b5affac8356
+go: downloading golang.org/x/tools v0.27.0
+go: downloading golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
+go: downloading golang.org/x/sys v0.27.0
 $ curlrevshell
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
@@ -178,8 +178,8 @@ TLS
 ---
 TLS is all via a pinned self-signed certificate.  By default, the certificate
 is cached in a file, mostly to keep from having to copy/paste a new fingerprint
-every time a ragey Ctrl+C kills the current shell.  Caching can be disabled
-with `-tls-certificate-cache ""`.
+every time a ragey double-Ctrl+C kills the current shell.  Caching can be
+disabled with `-tls-certificate-cache ""`.
 
 File Insertion
 --------------
