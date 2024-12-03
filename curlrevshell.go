@@ -18,6 +18,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
@@ -133,7 +134,7 @@ func rmain() int {
 	)
 	flag.Usage = func() {
 		fmt.Fprintf(
-			os.Stderr,
+			flag.CommandLine.Output(),
 			`Usage: %s [options]
 
 Even worse reverse shell, powered by cURL.
@@ -146,7 +147,7 @@ Tab    - Same as Ctrl+I
 
 Options:
 `,
-			os.Args[0],
+			filepath.Base(os.Args[0]),
 		)
 		flag.PrintDefaults()
 	}
