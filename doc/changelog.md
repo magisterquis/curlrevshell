@@ -8,6 +8,14 @@ Bleeding-edge code can be found in the
 go install github.com/magisterquis/curlrevshell@dev
 ```
 
+`betterdisconnects`
+===================
+The following changes are available on this branch and will (probably) be in
+the next tagged version.  Get them with
+```sh
+go install github.com/magisterquis/curlrevshell@betterctrlc
+```
+- Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
 ============================
