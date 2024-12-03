@@ -306,6 +306,18 @@ and kinda sticks out like a sore thumb.  The default location is usually fine.
 The key and certificate are stored in a
 [txtar](https://pkg.go.dev/golang.org/x/tools/txtar#hdr-Txtar_format) archive.
 
+Generating a new TLS key and certificate is as easy as removing the existing
+one and letting curlrevshell generate a new one.  Or, for "simplicity", one can
+just use
+```sh
+mv -v $( \
+    curlrevshell -h 2>&1 |
+    grep -A1 tls-certificate-cache |
+    tail -n 1 |
+    cut -f 2 -d '"'
+){,.bak}; echo -n | curlrevshell
+```
+
 Handy for not having to copy/paste one-liners with SHA fingerprints every time.
 
 ### Example
