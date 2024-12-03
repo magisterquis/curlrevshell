@@ -101,6 +101,8 @@ Options:
     	Optional directory from which to serve static files
   -tls-certificate-cache file
     	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
+  -version
+    	Print version number and exit
 ```
 
 Details

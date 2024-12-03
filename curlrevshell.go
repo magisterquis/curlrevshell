@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241012
+ * Last Modified 20241203
  */
 
 import (
@@ -18,6 +18,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"runtime/debug"
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
@@ -109,6 +110,11 @@ func rmain() int {
 			false,
 			"Print what would be sent with Tab/Ctrl+I and exit",
 		)
+		printVersion = flag.Bool(
+			"version",
+			false,
+			"Print version number and exit",
+		)
 	)
 	flag.StringVar(
 		&Prompt,
@@ -146,7 +152,17 @@ Options:
 	}
 	flag.Parse()
 
-	/* If we're just printing the default template, life's easy. */
+	/* If we're just printing the version, life's easy. */
+	if *printVersion {
+		bi, ok := debug.ReadBuildInfo()
+		if !ok {
+			log.Fatalf("Could not get build info")
+		}
+		fmt.Printf("Version: %s\n", bi.Main.Version)
+		return 0
+	}
+
+	/* If we're just printing the default template, life's also easy. */
 	if *printDefaultTemplate {
 		if _, err := io.WriteString(
 			os.Stdout,

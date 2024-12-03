@@ -313,3 +313,9 @@ Store the certificate in `./c.txtar`.
 ```
 $ curlrevshell -tls-certificate-cache ./c.txtar
 ```
+
+`-version`
+----------
+Prints the current version, either a Git tag (e.g. `v0.0.1-beta.7`) or a tag
+plus a timestamp and hash (e.g. `v0.0.1-beta.7.0.20241203163923-a983fd8fda00`).
+This may print more information in the future.
