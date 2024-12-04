@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240707
+ * Last Modified 20241204
  */
 
 import (
@@ -27,9 +27,6 @@ import (
 )
 
 const (
-	// ttyPath is the path to our own TTY, which may or may not actually be
-	// hooked up.
-	ttyPath = "/dev/tty"
 	// timeFormat formats the current time the same way as the log package
 	// does by default.
 	timeFormat = "15:04:05.000 "
@@ -64,7 +61,7 @@ type Shell struct {
 	t            *goxterm.Terminal
 	ich          chan<- string
 	och          <-chan CLine
-	ttyF         *os.File
+	isTTY        bool
 	noTimestamps bool
 	insertGen    func() ([]byte, error) /* Bytes-generator for ^I. */
 	insertName   string                 /* Loggable name for insertGen. */
@@ -75,10 +72,11 @@ type Shell struct {
 	lastPlainWrite time.Time   /* Last attempted write. */
 }
 
-// New puts the controlly TTY in raw mode and returns a new Shell wrapping
-// stdio.  Call Shell.Do to start processing lines and handle resizing and
+// New returns returns Shell wrapping stdin and stdout.
+// Stdin will be put in raw mode if it is a terminal.
+// Call Shell.Do to start processing lines and handle resizing and
 // call the returned function to restore the TTY's state and clean up other
-// resources.  ich will be closed before Shell.Do returns.  IF noTimestamps is
+// resources.  ich will be closed before Shell.Do returns.  If noTimestamps is
 // true, no timestamps will be printed.
 // insertGen will be called to generate bytes to send to the shell on Ctrl+I
 // and will be logged as if it were inserting data from insertName.
@@ -154,37 +152,40 @@ func New(
 			//	)
 		}
 	}
-	/* Open the controlling TTY, for raw mode and output. */
-	var err error
-	if s.ttyF, err = os.Open(ttyPath); nil != err {
-		return nil, nil, fmt.Errorf("opening controlling TTY: %w", err)
-	}
 
 	/* Cleanup things. */
 	var oldState *goxterm.State
 	cleanup := sync.OnceFunc(func() {
-		/* Restore the terminal state. */
-		if nil != oldState {
-			goxterm.Restore(int(s.ttyF.Fd()), oldState)
+		/* Don't bother if we can't restore the state. */
+		if nil == oldState {
+			return
 		}
 
-		/* Close the underlying TTY. */
-		s.ttyF.Close()
+		/* Restore the terminal state. */
+		goxterm.Restore(int(os.Stdin.Fd()), oldState)
 	})
+
+	/* Use stdin's tty, if it is one. */
+	if goxterm.IsTerminal(int(os.Stdin.Fd())) {
+		/* Note we have a TTY. */
+		s.isTTY = true
+		/* Put tty in raw mode. */
+		var err error
+		if oldState, err = goxterm.MakeRaw(
+			int(os.Stdin.Fd()),
+		); nil != err {
+			cleanup()
+			return nil, nil, fmt.Errorf(
+				"putting terminal in raw mode: %w",
+				err,
+			)
+		}
+	}
 
 	/* Set the initial size. */
 	if err := s.resize(); nil != err {
 		cleanup()
 		return nil, nil, fmt.Errorf("setting initial size: %w", err)
-	}
-
-	/* Put the TTY in raw mode. */
-	if oldState, err = goxterm.MakeRaw(int(s.ttyF.Fd())); nil != err {
-		cleanup()
-		return nil, nil, fmt.Errorf(
-			"putting terminal in raw mode: %w",
-			err,
-		)
 	}
 
 	return &s, cleanup, nil
@@ -225,8 +226,13 @@ func (s *Shell) Do(ctx context.Context) error {
 
 // resize resizes t to the size of its underlying TTY.
 func (s *Shell) resize() error {
+	/* Nothing to do here if we don't have a TTY. */
+	if !s.isTTY {
+		return nil
+	}
+
 	/* Get the current size. */
-	w, h, err := goxterm.GetSize(int(s.ttyF.Fd()))
+	w, h, err := goxterm.GetSize(int(os.Stdin.Fd()))
 	if nil != err {
 		return fmt.Errorf("getting tty size: %w", err)
 	}

@@ -15,6 +15,7 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`-tls-certificate-cache`](./flags.md#-tls-certificate-cache): Added a
   "simple" command to generate a new cert and key.
 - New friendly welcome message with the current version.
+- Leave the local tty un-raw'd if stdin isn't a terminal.
 
 
 `v0.0.1-beta.7` (2024-10-22)
