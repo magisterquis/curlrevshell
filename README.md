@@ -42,6 +42,7 @@ go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
 go: downloading golang.org/x/tools v0.27.0
 go: downloading golang.org/x/sys v0.27.0
 $ curlrevshell
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
@@ -101,8 +102,6 @@ Options:
     	Optional directory from which to serve static files
   -tls-certificate-cache file
     	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
-  -version
-    	Print version number and exit
 ```
 
 Details
