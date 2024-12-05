@@ -9,13 +9,16 @@ in the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
-- `-h`: Invisible changes to print help a bit more nicely in strange conditions.
+- `-h`: Invisible changes to print help a bit more nicely in strange
+  conditions.
 - New and improved tests which now actually run curlrevshell.
 - Updated dependencies.
 - [`-tls-certificate-cache`](./flags.md#-tls-certificate-cache): Added a
   "simple" command to generate a new cert and key.
 - New friendly welcome message with the current version.
 - Leave the local tty un-raw'd if stdin isn't a terminal.
+- [`shellfuncsfile`](../lib/shellfuncsfile): Prevent `tab_doc()` with
+  `# TABDOC:NOTABLIST`.
 
 
 `v0.0.1-beta.7` (2024-10-22)

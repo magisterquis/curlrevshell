@@ -19,3 +19,8 @@ tab_list() {
         echo 'fname     - A '\''quoted'\'' description'
         echo 'tab_list  - This function list'
 }
+-- nolist.have --
+foo# TABDOC:NOTABLISTbar
+tridge
+# TABDOC: kittens moose
+-- nolist.want --

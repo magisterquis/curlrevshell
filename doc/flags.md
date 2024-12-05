@@ -71,6 +71,8 @@ printed by the aptly-named `tab_list` function.  In practice, this means
 sticking something like `# TABDOC: my_thing A thing, that is mine` above your
 functions and calling `tab_list` when you're ten functions in and don't
 remember which is which.
+If `# TABDOC:NOTABLIST` is anywhere, no `tab_list` function will be generated,
+handy for when you're using something which doesnt speak Unix shell.
 
 For testing, `Ctrl+J` will print out what would be sent with `Ctrl+I`.
 Alternatively, running with [`-print-ctrl-i`](#-print-ctrl-i) will print the

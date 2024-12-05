@@ -5,7 +5,7 @@ package shellfuncsfile
  * Tests for funclist.go
  * By J. Stuart McMurray
  * Created 20240728
- * Last Modified 20240731
+ * Last Modified 20241205
  */
 
 import (
