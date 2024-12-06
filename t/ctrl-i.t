@@ -6,7 +6,7 @@
 # Created 20241204
 # Last Modified 20241205
 
-#set -e
+set -e
 
 . t/shmore.subr
 
