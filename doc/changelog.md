@@ -19,6 +19,7 @@ go install github.com/magisterquis/curlrevshell@dev
 - Leave the local tty un-raw'd if stdin isn't a terminal.
 - [`shellfuncsfile`](../lib/shellfuncsfile): Prevent `tab_doc()` with
   `# TABDOC:NOTABLIST`.
+- `make help` now prints out nifty targets in the [`Makefile`](../Makefile).
 
 
 `v0.0.1-beta.7` (2024-10-22)
