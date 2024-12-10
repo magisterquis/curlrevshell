@@ -2,13 +2,21 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
+`bettertemplates`
+=================
+The following changes are available on this branch and will (probably) be in
+the next tagged version.  Get them with
+```sh
+go install github.com/magisterquis/curlrevshell@bettertemplates
+```
+- [`crstemplate`](./lib/crstemplate): New library to make it slightly easier to
+  roll fancypants `-callback-template` templates.
+- Added compile-time i/o/io/c-changey variables.
+- Added the aptly-named [`config.md`](./config.md).
+
+
 `dev`
 =====
-The following changes are available on the dev branch and will (probably) be
-in the next tagged version.  Get them with
-```sh
-go install github.com/magisterquis/curlrevshell@dev
-```
 - `-h`: Invisible changes to print help a bit more nicely in strange
   conditions.
 - New and improved tests which now actually run curlrevshell.

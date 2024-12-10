@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240731
+ * Last Modified 20241205
  */
 
 import (
@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"text/template"
 
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"golang.org/x/net/idna"
 )
 
@@ -27,25 +28,14 @@ import (
 // generated scripts.
 const HTTPSPort = "443"
 
-// TemplateParams are combined with the callback template to generate the
-// callback script.
-type TemplateParams struct {
-	PubkeyFP string
-	URL      string
-	ID       string
-}
-
 // C2Param is a URL parameter or header which may be set in requetss to /c to
 // give the URL to which to call back.
 const C2Param = "c2"
 
-//go:embed script.tmpl
-var DefaultTemplate string
-
 // parseDefaultTemplate is the parsed form of DefaultTemplate.  We won't get
 // very far if it doesn't parse.
 var parsedDefaultTemplate = template.Must(
-	template.New("").Parse(DefaultTemplate),
+	template.New("").Parse(crstemplate.DefaultTemplate),
 )
 
 // scriptHandler serves up a script for calling us back.  Hope we like fork and
@@ -66,10 +56,11 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	params := TemplateParams{
+	params := crstemplate.Params{
 		PubkeyFP: s.l.Fingerprint,
 		ID:       strconv.FormatUint(rand.Uint64(), 36),
 		URL:      c2,
+		URLPaths: s.ups,
 	}
 
 	/* Execute the template and send it back. */

@@ -3,14 +3,14 @@
      * Callback script template
      * By J. Stuart McMurray
      * Created 20240325
-     * Last Modified 20240406
+     * Last Modified 20241205
      */ -}}
 {{- define "curl" -}}
 curl -Nsk --pinnedpubkey "sha256//{{.PubkeyFP}}" https://{{.URL}}
 {{- end -}}
 #!/bin/sh
 
-{{template "curl" .}}/i/{{.ID}} </dev/null 2>&0 |
+{{template "curl" .}}/{{.URLPaths.In}}/{{.ID}} </dev/null 2>&0 |
 /bin/sh 2>&1 |
-{{template "curl" .}}/o/{{.ID}} -T- >/dev/null 2>&1
+{{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
 {{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}

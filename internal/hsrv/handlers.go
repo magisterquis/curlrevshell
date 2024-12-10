@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241013
+ * Last Modified 20241210
  */
 
 import (
@@ -42,12 +42,15 @@ const (
 func (s *Server) newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	/* Shellish handlers. */
-	mux.HandleFunc("/i/{"+idParam+"}", s.inputHandler)  /* Shell input. */
-	mux.HandleFunc("/o/{"+idParam+"}", s.outputHandler) /* Shell output. */
-	mux.HandleFunc("/io", s.inOutHandler)               /* Shell I/O. */
-	mux.HandleFunc("/io/", s.inOutHandler)              /* Shell I//O. */
-	mux.HandleFunc("/c", s.scriptHandler)               /* Callback script. */
+	/* Shell I/O handler. */
+	mux.HandleFunc("/"+s.ups.InOut, s.inOutHandler)
+	mux.HandleFunc("/"+s.ups.InOut+"/", s.inOutHandler)
+	/* Shell input handler. */
+	mux.HandleFunc("/"+s.ups.In+"/{"+idParam+"}", s.inputHandler)
+	/* Shell output handler. */
+	mux.HandleFunc("/"+s.ups.Out+"/{"+idParam+"}", s.outputHandler)
+	/* Callback script handler. */
+	mux.HandleFunc("/"+s.ups.Script, s.scriptHandler)
 
 	/* If we're serving static files, do that. */
 	if "" != s.fdir {

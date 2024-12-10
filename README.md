@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@dev
+   go install github.com/magisterquis/curlrevshell@bettertemplates
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,14 +33,14 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@dev
-go: downloading golang.org/x/sync v0.9.0
-go: downloading golang.org/x/text v0.20.0
-go: downloading golang.org/x/net v0.31.0
-go: downloading golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
+$ go install github.com/magisterquis/curlrevshell@bettertemplates
+go: downloading golang.org/x/sync v0.10.0
+go: downloading golang.org/x/text v0.21.0
+go: downloading golang.org/x/net v0.32.0
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/tools v0.27.0
-go: downloading golang.org/x/sys v0.27.0
+go: downloading golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
+go: downloading golang.org/x/tools v0.28.0
+go: downloading golang.org/x/sys v0.28.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630
 01:04:42.760 Listening on 0.0.0.0:4444
@@ -116,6 +116,9 @@ Endpoint          | Description
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
+The endpoints can be changed (for evasion, humor, etc); see
+[the docs](./doc/config.md) for more details.
+
 Callback Template
 -----------------
 The script generated with `/c` can be changed by writing a new template and
@@ -126,10 +129,11 @@ $ curlrevshell -print-default-template >custom.tmpl # Get the default template t
 $ vim ./custom.tmpl                                 # Mod ALL the things!
 $ curlrevshell -callback-template ./custom.tmpl     # Run with your fancy new template
 ```
-The struct passed to the template is `TemplateParams` in
-[script.go](internal/hsrv/script.go).  The default template is
-[script.tmpl](internal/hsrv/script.tmpl).  It's re-read every time it's needed,
-so feel free to change it as often as you'd like.
+The struct passed to the template is `Params` in
+[crstemplate.go](lib/crstemplate/crstemplate.go).
+The default template is [script.tmpl](lib/crstemplate/script.tmpl).
+It's re-read every time it's needed, so feel free to change it as often as
+you'd like.
 
 A script to generate a custom callback template with embedded shell functions
 can be made with `make tools/funcgen` and is found in `tools/funcgen`.

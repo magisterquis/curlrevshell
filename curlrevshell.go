@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241204
+ * Last Modified 20241205
  */
 
 import (
@@ -23,6 +23,7 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
@@ -37,6 +38,15 @@ var (
 	// LogEnvVar is the environment variable we use for the default
 	// logfile, which will be "" if unset.
 	LogEnvVar = "CURLREVSHELL_LOG"
+)
+
+// URL Paths, which may be set at compile-time to change from /i and /o and
+// so on.
+var (
+	URLPathIn     = crstemplate.DefaultURLPathIn
+	URLPathInOut  = crstemplate.DefaultURLPathInOut
+	URLPathOut    = crstemplate.DefaultURLPathOut
+	URLPathScript = crstemplate.DefaultURLPathScript
 )
 
 // Log messages and keys.
@@ -152,7 +162,7 @@ Options:
 	if *printDefaultTemplate {
 		if _, err := io.WriteString(
 			os.Stdout,
-			hsrv.DefaultTemplate,
+			crstemplate.DefaultTemplate,
 		); nil != err {
 			log.Printf("Error printing template: %s", err)
 			return 1
@@ -312,6 +322,12 @@ Options:
 		cbAddrs,
 		*printIPv6,
 		*oneShell,
+		crstemplate.URLPaths{
+			In:     URLPathIn,
+			InOut:  URLPathInOut,
+			Out:    URLPathOut,
+			Script: URLPathScript,
+		},
 	)
 	if nil != err {
 		shell.Logf(

