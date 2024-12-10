@@ -5,7 +5,7 @@ package simpleshell
  * Shell (or similar) subprocess
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20241013
+ * Last Modified 20241210
  */
 
 import (
@@ -81,18 +81,29 @@ func (c *CmdShell) Output() io.ReadCloser { return c.outr }
 // Go runs c's [exec.Cmd].  ctx is not used; use [exec.CommandContext] or cause
 // an EOF on the [io.Reader] set via c.SetInPipe to stop Go.
 func (c *CmdShell) Go(ctx context.Context) error {
-	/* Start proxying output. */
-	var peg errgroup.Group
-	peg.Go(func() error { _, err := io.Copy(c.outw, c.sout); return err })
-	peg.Go(func() error { _, err := io.Copy(c.outw, c.serr); return err })
+	/* Start the command going. */
+	if err := c.cmd.Start(); nil != err {
+		return fmt.Errorf("starting command: %w", err)
+	}
 
-	/* Start the process going. */
+	/* Wait for output to finish. */
 	var eg errgroup.Group
-	eg.Go(func() error { return c.cmd.Run() })
-	eg.Go(func() error { return c.outw.CloseWithError(peg.Wait()) })
+	eg.Go(func() error { _, err := io.Copy(c.outw, c.sout); return err })
+	eg.Go(func() error { _, err := io.Copy(c.outw, c.serr); return err })
+	perr := c.outw.CloseWithError(eg.Wait())
 
-	/* Wait until everything finishes. */
-	return eg.Wait()
+	/* Wait for the command to finish.  We assume this error is importanter
+	than closing the output pipe. */
+	if err := c.cmd.Wait(); nil != err {
+		return fmt.Errorf("running command: %w", err)
+	}
+
+	/* Command exited ok.  Tell someone if we couldn't close the output. */
+	if nil != perr {
+		return fmt.Errorf("closing output: %w", perr)
+	}
+
+	return nil
 }
 
 // String calls c's [exec.Cmd.String].

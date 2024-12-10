@@ -5,7 +5,7 @@ package simpleshell
  * Tests for shell.go
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20241013
+ * Last Modified 20241210
  */
 
 import (
@@ -46,13 +46,18 @@ func testShell(t *testing.T, ctx context.Context, s Shell, have, want string) {
 }
 
 func TestCmdShell(t *testing.T) {
+	/* We'd like to bring along our own cat, but building it can time out
+	the test.  So, instead, we'll use the system cat and nuts if it's not
+	there. */
+	cat := "/bin/cat"
+	if _, err := exec.LookPath("/bin/cat"); nil != err {
+		t.Skipf("Could not find %s: %s", cat, err)
+	}
+
 	/* Setup a new shell to run test_cat. */
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s, err := NewCmdShell(exec.CommandContext(
-		ctx,
-		"go", "run", "./testdata/test_cat",
-	))
+	s, err := NewCmdShell(exec.CommandContext(ctx, "/bin/cat"))
 	if nil != err {
 		t.Fatalf("Error setting up shell: %s", err)
 	}

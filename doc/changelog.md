@@ -20,6 +20,9 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`shellfuncsfile`](../lib/shellfuncsfile): Prevent `tab_doc()` with
   `# TABDOC:NOTABLIST`.
 - `make help` now prints out nifty targets in the [`Makefile`](../Makefile).
+- [`simpleshell`](../lib/simpleshell): Less racy
+- [`simpleshell`](../lib/simpleshell): Use the system `cat(1)` for less-faily
+  tests when the build cache is empty.
 
 
 `v0.0.1-beta.7` (2024-10-22)
