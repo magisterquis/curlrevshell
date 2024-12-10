@@ -2,8 +2,8 @@ Non-Flag Configuration
 ======================
 Aside from using [command-line flags](./flags.md) at runtime, curlrevshell can
 be configured at runtime with
-[environment variable~s~](#Environment-Variable~s~)
-and at compile-time with [linker flags](#Linker-Flags)
+[environment variable~s~](#environment-variables)
+and at compile-time with [linker flags](#linker-flags)
 
 Environment Variable~s~
 -----------------------
