@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241205
+ * Last Modified 20241222
  */
 
 import (
@@ -71,9 +71,9 @@ func rmain() int {
 				"static files",
 		)
 		tmplf = flag.String(
-			"callback-template",
+			"template",
 			"",
-			"Optional callback `template` file, used if it exists",
+			"Optional `template` file, used if it exists",
 		)
 		printDefaultTemplate = flag.Bool(
 			"print-default-template",
@@ -134,6 +134,26 @@ func rmain() int {
 			"one-liner printing (may be repeated)",
 		func(s string) error {
 			cbAddrs = append(cbAddrs, s)
+			return nil
+		},
+	)
+	flag.Func( /* Added 20241222. */
+		"callback-template",
+		"Optional `template` file, used if it exists (deprecated)",
+		func(s string) error {
+			fmt.Printf(` _______________________
+/ -callback-template is \
+| going away eventually |
+|                       |
+\ Use -callback instead /
+ -----------------------
+        \   ^__^
+         \  (!!)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+`)
+			*tmplf = s
 			return nil
 		},
 	)

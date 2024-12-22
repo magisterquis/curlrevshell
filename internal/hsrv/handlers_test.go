@@ -5,7 +5,7 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241003
+ * Last Modified 20241217
  */
 
 import (
@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
@@ -313,14 +314,8 @@ func TestServerInputHandler(t *testing.T) {
 			Color: ErrorColor,
 			Line: "[192.0.2.1] " +
 				iobroker.ShellDisconnectedMessage,
-		}, {
-			Color: ScriptColor,
-			Line:  "To get a shell:",
-		}, {
-			Color:       ScriptColor,
-			Line:        s.cbHelp,
-			NoTimestamp: true,
 		}}
+		wantCLines = appendCallbackHelp(t, s, wantCLines)
 		opshell.ExpectShellMessages(t, och, wantCLines...)
 
 		/* Make sure we log the disconnect. */
@@ -439,14 +434,9 @@ func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
 	}, {
 		Color: ErrorColor,
 		Line:  "[192.0.2.1] Shell is gone :(",
-	}, {
-		Color: ScriptColor,
-		Line:  "To get a shell:",
-	}, {
-		Color:       ScriptColor,
-		Line:        s.cbHelp,
-		NoTimestamp: true,
 	}}
+	wantCLines = appendCallbackHelp(t, s, wantCLines)
+
 	opshell.ExpectShellMessages(t, och, wantCLines...)
 	cl.ExpectEmpty(
 		t,
@@ -537,14 +527,8 @@ func TestServerOutputHandler(t *testing.T) {
 			Color: ErrorColor,
 			Line: "[192.0.2.1] " +
 				iobroker.ShellDisconnectedMessage,
-		}, {
-			Color: ScriptColor,
-			Line:  "To get a shell:",
-		}, {
-			Color:       ScriptColor,
-			Line:        s.cbHelp,
-			NoTimestamp: true,
 		}}
+		wantLogs = appendCallbackHelp(t, s, wantLogs)
 		opshell.ExpectShellMessages(t, och, wantLogs...)
 
 		/* And make sure logs look good. */
@@ -658,14 +642,8 @@ func TestServerOutputHandler(t *testing.T) {
 			Color: ErrorColor,
 			Line: "[192.0.2.1] " +
 				iobroker.ShellDisconnectedMessage,
-		}, {
-			Color: ScriptColor,
-			Line:  "To get a shell:",
-		}, {
-			Color:       ScriptColor,
-			Line:        s.cbHelp,
-			NoTimestamp: true,
 		}}
+		wantLogs = appendCallbackHelp(t, s, wantLogs)
 		opshell.ExpectShellMessages(t, och, wantLogs...)
 		cl.ExpectEmpty(
 			t,
@@ -782,14 +760,8 @@ func TestServerOutputHandler_DisconnectInput(t *testing.T) {
 	}, {
 		Color: ErrorColor,
 		Line:  "[192.0.2.1] " + iobroker.ShellDisconnectedMessage,
-	}, {
-		Color: ScriptColor,
-		Line:  "To get a shell:",
-	}, {
-		Color:       ScriptColor,
-		Line:        s.cbHelp,
-		NoTimestamp: true,
 	}}
+	wantLogs = appendCallbackHelp(t, s, wantLogs)
 	opshell.ExpectShellMessages(t, och, wantLogs...)
 	cl.ExpectEmpty(
 		t,
@@ -969,20 +941,36 @@ func TestServerInOutHandler(t *testing.T) {
 				`"sni":"","user_agent":"","id":""},`+
 				`"direction":"output"}`,
 		)
-		opshell.ExpectShellMessages(t, och, []opshell.CLine{{
+		wantCLines := []opshell.CLine{{
 			Color: ErrorColor,
 			Line: fmt.Sprintf(
 				"[192.0.2.1] %s",
 				iobroker.ShellDisconnectedMessage,
 			),
-		}, {
-			Color: ScriptColor,
-			Line:  "To get a shell:",
-		}, {
-			Color:       ScriptColor,
-			Line:        s.cbHelp,
-			NoTimestamp: true,
-		}}...)
+		}}
+		wantCLines = appendCallbackHelp(t, s, wantCLines)
+		opshell.ExpectShellMessages(t, och, wantCLines...)
 		opshell.ExpectNoShellMessages(t, och, shutdown)
 	})
+}
+
+// appendCallbackHelp appends the expected To get a shell: lines to clines and
+// returns the appended slice.
+func appendCallbackHelp(
+	t *testing.T,
+	s *Server,
+	clines []opshell.CLine,
+) []opshell.CLine {
+	clines = append(clines, []opshell.CLine{{
+		Color: ScriptColor,
+		Line:  "To get a shell:",
+	}}...)
+	for _, l := range lAddrLines(t, s, crstemplate.SubtemplateCallback) {
+		clines = append(clines, opshell.CLine{
+			Color:       ScriptColor,
+			Line:        l,
+			NoTimestamp: true,
+		})
+	}
+	return clines
 }

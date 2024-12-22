@@ -9,11 +9,17 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
-- [`crstemplate`](./lib/crstemplate): New library to make it slightly easier to
-  roll fancypants `-callback-template` templates.
+- [`-template`](./flag.md#-template): Template (nearly) ALL the things!
+- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
+  roll fancypants `-template` templates.
 - Added compile-time i/o/io/c-changey variables.
 - Added the aptly-named [`config.md`](./config.md).
-
+- Minor tweaks to the callback script.
+- Asked an excitable cow to give a warning that `-callback-template` is
+  deprecated in favor of `-callback`.
+- [`opshell`](../lib/opshell): Added `Shell.RedLogf` which does what it says on
+  the tin.
+- Updated dependencies.
 
 `dev`
 =====
