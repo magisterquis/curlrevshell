@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241204
+ * Last Modified 20241222
  */
 
 import (
@@ -321,7 +321,8 @@ func (s *Shell) writePlain(line string) error {
 
 // Logf logs a line to the shell.  It is similar to log.Printf but includes
 // a color and only logs the time, not the date.  Logf may be called from
-// multiple goroutines simultaneously.
+// multiple goroutines simultaneously.  noTS can be used to suppress logging
+// the timestamp, even if s would normally log timestamps.
 func (s *Shell) Logf(
 	color Color,
 	noTS bool, /* No timestamp. */
@@ -338,6 +339,12 @@ func (s *Shell) Logf(
 		format,
 		v...,
 	)
+}
+
+// RedLogf is a wrapper around Logf which always uses the color red and doesn't
+// suppress timestamps.  This is handy for logging errors.
+func (s *Shell) RedLogf(format string, v ...any) (int, error) {
+	return s.Logf(ColorRed, false, format, v...)
 }
 
 // logf does what Shell.Logf says it does, but without assuming a shell.
