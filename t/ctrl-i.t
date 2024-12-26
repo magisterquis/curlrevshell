@@ -4,9 +4,9 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20241205
+# Last Modified 20241226
 
-#set -e
+set -e
 
 . t/shmore.subr
 
