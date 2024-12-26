@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241204
+ * Last Modified 20241226
  */
 
 import (
@@ -325,9 +325,9 @@ Options:
 
 	/* Start ALL the things. */
 	eg, ectx := ctxerrgroup.WithContext(context.Background())
-	eg.GoContext(ectx, shell.Do)
-	eg.GoContext(ectx, svr.Do)
-	eg.GoContext(ectx, iob.Do)
+	eg.GoTag(ectx, "shell", shell.Do)
+	eg.GoTag(ectx, "server", svr.Do)
+	eg.GoTag(ectx, "i/o broker", iob.Do)
 
 	/* Wait for something to go wrong. */
 	err = eg.Wait()

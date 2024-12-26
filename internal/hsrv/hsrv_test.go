@@ -91,8 +91,8 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 	/* Start the server going. */
 	ctx, cancel := context.WithCancelCause(context.Background())
 	eg, ectx := ctxerrgroup.WithContext(ctx)
-	eg.GoContext(ectx, s.Do)
-	eg.GoContext(ectx, iob.Do)
+	eg.GoTag(ectx, "Server", s.Do)
+	eg.GoTag(ectx, "i/o broker", iob.Do)
 
 	/* Function to shut down the server. */
 	shutdown := sync.OnceFunc(func() {
