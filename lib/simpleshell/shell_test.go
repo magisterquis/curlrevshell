@@ -5,19 +5,19 @@ package simpleshell
  * Tests for shell.go
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20241210
+ * Last Modified 20241226
  */
 
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
-	"golang.org/x/sync/errgroup"
 )
 
 func testShell(t *testing.T, ctx context.Context, s Shell, have, want string) {
@@ -27,8 +27,14 @@ func testShell(t *testing.T, ctx context.Context, s Shell, have, want string) {
 	buf := new(bytes.Buffer)
 
 	eg, ectx := ctxerrgroup.WithContext(ctx)
-	eg.GoContext(ectx, s.Go)
-	eg.Go(func() error { _, err := buf.ReadFrom(o); return err })
+	eg.GoTag(ectx, "shell", s.Go)
+	eg.Go(func() error {
+		_, err := buf.ReadFrom(o)
+		if nil != err {
+			err = fmt.Errorf("reading output: %w", err)
+		}
+		return err
+	})
 	if err := eg.Wait(); nil != err {
 		t.Errorf("Shell error: %s", err)
 	}
@@ -66,25 +72,24 @@ func TestCmdShell(t *testing.T) {
 }
 
 func TestEchoShell(t *testing.T) {
-	ctx := context.Background()
 	t.Run("setting_io", func(t *testing.T) {
 		_, _, s := NewEchoShell()
-		testShell(t, ctx, s, "kittens", "kittens")
+		testShell(t, context.Background(), s, "kittens", "kittens")
 	})
 
 	t.Run("io_from_New", func(t *testing.T) {
 		data := "kittens"
 		in, out, s := NewEchoShell()
 		buf := new(bytes.Buffer)
-		var eg errgroup.Group
-		eg.Go(func() error {
+		eg, ectx := ctxerrgroup.WithContext(context.Background())
+		eg.GoTag(ectx, "write", func(_ context.Context) error {
 			_, err := io.WriteString(in, data)
 			return err
 		})
-		eg.Go(func() error {
+		eg.GoTag(ectx, "read", func(_ context.Context) error {
 			_, err := buf.ReadFrom(out)
 			return err
 		})
-		eg.Go(func() error { return s.Go(ctx) })
+		eg.GoTag(ectx, "shell", s.Go)
 	})
 }

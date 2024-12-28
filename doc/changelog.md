@@ -2,13 +2,18 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
-The following changes are available on the dev branch and will (probably) be
+`ctxerrgroup`
+=============
+The following changes are available on this branch and will (probably) be
 in the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev
+go install github.com/magisterquis/curlrevshell@ctxerrgroup
 ```
+- [`ctxerrgroup`](../lib/ctxerrgroup): Slightly less labor-intensive to run a
+  bunch of things but know which sent back an error.
+
+`dev`
+====
 - `-h`: Invisible changes to print help a bit more nicely in strange
   conditions.
 - New and improved tests which now actually run curlrevshell.

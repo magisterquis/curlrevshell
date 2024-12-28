@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241204
+ * Last Modified 20241226
  */
 
 import (
@@ -199,7 +199,7 @@ func (s *Shell) Do(ctx context.Context) error {
 	eg, ectx := ctxerrgroup.WithContext(ctx)
 
 	/* Resize on SIGWINCH. */
-	eg.GoContext(ectx, s.handleWINCH)
+	eg.GoTag(ectx, "handling SIGWINCH", s.handleWINCH)
 
 	/* Read lines from stdin, send them out.  It'd be nice to do this in
 	the errgroup, but goxterm.Terminal.ReadLine doesn't let us stop it. */
@@ -208,7 +208,7 @@ func (s *Shell) Do(ctx context.Context) error {
 			/* Get a line from the input. */
 			l, err := s.t.ReadLine()
 			if nil != err {
-				return err
+				return fmt.Errorf("reading line: %w", err)
 			}
 			/* Send it out. */
 			s.ich <- l
@@ -217,7 +217,7 @@ func (s *Shell) Do(ctx context.Context) error {
 	})
 
 	/* Send lines sent to us to the shell. */
-	eg.GoContext(ectx, s.handleOutput)
+	eg.GoTag(ectx, "sending output", s.handleOutput)
 
 	/* Wait for something to go wrong. */
 	return eg.Wait()
