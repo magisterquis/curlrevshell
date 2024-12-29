@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20241210
+# Last Modified 20241229
 
 BINNAME     != basename $$(pwd)
 BUILDFLAGS   = -trimpath -ldflags "-w -s"
@@ -12,7 +12,7 @@ TOOLSDIR     = tools
 TOOLSRCDIRS != find ./lib/*/cmd -type d -maxdepth 1 -mindepth 1
 
 
-.PHONY: all test install clean
+.PHONY: all build test tools help install clean
 
 all: test tools build ## Build ALL the things (default)
 
