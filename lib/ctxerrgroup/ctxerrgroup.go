@@ -6,39 +6,53 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250105
+ * Last Modified 20250109
  */
 
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
 
 // Group wraps golang.org/x/sync/errgroup.Group but makes it slightly easier to
-// add goroutines.  Group's undocumented methods directly wrap its embedded
-// errgroup.Group.
+// add goroutines.  Group's undocumented methods directly wrap its internal
+// [errgroup.Group].  All of Group's methods are safe to be simultaneously
+// called from multiple goroutines.
 type Group struct {
-	errgroup.Group
+	p  *errgroup.Group
+	mu sync.Mutex
 }
 
 // WithContext returns a new Group, similar to errgroup.WithContext.
 func WithContext(ctx context.Context) (*Group, context.Context) {
 	eg, ectx := errgroup.WithContext(ctx)
-	return &Group{Group: *eg}, ectx
+	return &Group{p: eg}, ectx
+}
+
+// eg returns the wrapped errgroup.Group, safely allocating it if it doesn't
+// exist.
+func (g *Group) eg() *errgroup.Group {
+	g.mu.Lock()
+	if nil == g.p {
+		g.p = new(errgroup.Group)
+	}
+	g.mu.Unlock()
+	return g.p
 }
 
 // GoContext is like errgroup.Group.Go, but passes ctx to the called function.
 // The passed-in context is usually the context returned from WithContext.
 func (g *Group) GoContext(ctx context.Context, f func(context.Context) error) {
-	g.Group.Go(func() error { return f(ctx) })
+	g.eg().Go(func() error { return f(ctx) })
 }
 
 // GoTag is like GoContext, but errors returned by f will be wrapped in a
 // TaggedError..
 func (g *Group) GoTag(ctx context.Context, tag string, f func(context.Context) error) {
-	g.Group.Go(func() error {
+	g.eg().Go(func() error {
 		err := f(ctx)
 		if nil != err {
 			err = TaggedError{Tag: tag, Err: err}
@@ -47,6 +61,10 @@ func (g *Group) GoTag(ctx context.Context, tag string, f func(context.Context) e
 	})
 }
 
+func (g *Group) Go(f func() error)         { g.eg().Go(f) }
+func (g *Group) SetLimit(n int)            { g.eg().SetLimit(n) }
+func (g *Group) TryGo(f func() error) bool { return g.eg().TryGo(f) }
+func (g *Group) Wait() error               { return g.eg().Wait() }
 
 // TaggedError is the error type returned by [Group.GoTag].
 type TaggedError struct {
