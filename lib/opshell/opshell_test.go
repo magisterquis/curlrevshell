@@ -5,15 +5,22 @@ package opshell
  * Tests for opshell.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240507
+ * Last Modified 20241203
  */
 
 import (
+	"bufio"
 	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/goxterm"
 )
 
@@ -33,6 +40,36 @@ var testEscapeCodes = &goxterm.EscapeCodes{
 	Reset:   []byte("\x1b[0m"),
 }
 
+// newTestShell returns a new Shell, ready for use.  The net.Conn plays the
+// role of stdio.
+func newTestShell(t *testing.T) (
+	net.Conn,
+	chan<- string,
+	<-chan CLine,
+	*Shell,
+) {
+	var (
+		rw, sc              = net.Pipe()
+		ich                 = make(chan<- string, 1024)
+		och                 = make(<-chan CLine, 1024)
+		shell, cleanup, err = NewWrapping(
+			ich,
+			och,
+			"",
+			true,
+			nil,
+			"",
+			sc,
+			sc,
+		)
+	)
+	t.Cleanup(cleanup)
+	if nil != err {
+		t.Fatalf("Could not make test shell: %s", err)
+	}
+	return rw, ich, och, shell
+}
+
 func TestLogf(t *testing.T) {
 	for _, c := range []struct {
 		color  Color
@@ -44,7 +81,7 @@ func TestLogf(t *testing.T) {
 		color:  ColorRed,
 		format: "kittens %d %t",
 		args:   []any{123, true},
-		want:   "\x1b[31mkittens 123 true\n\x1b[0m",
+		want:   "\x1b[31mkittens 123 true\x1b[0m\n",
 	}, {
 		color:  ColorNone,
 		format: "%s",
@@ -54,7 +91,7 @@ func TestLogf(t *testing.T) {
 		color:  ColorRed,
 		format: "kittens %d %t\n\n\n\n",
 		args:   []any{123, true},
-		want:   "\x1b[31mkittens 123 true\n\n\n\n\x1b[0m",
+		want:   "\x1b[31mkittens 123 true\x1b[0m\n\n\n\n",
 	}, {
 		color:  ColorNone,
 		format: "%s\n\n\n\n",
@@ -69,7 +106,7 @@ func TestLogf(t *testing.T) {
 		color:  ColorRed,
 		format: "kittens %d %t",
 		args:   []any{123, true},
-		want:   "\x1b[31mkittens 123 true\n\x1b[0m",
+		want:   "\x1b[31mkittens 123 true\x1b[0m\n",
 		noTS:   true,
 	}, {
 		color:  ColorNone,
@@ -77,6 +114,36 @@ func TestLogf(t *testing.T) {
 		args:   []any{"kittens"},
 		want:   "kittens\n",
 		noTS:   true,
+	}, {
+		color:  ColorRed,
+		format: "kittens",
+		args:   nil,
+		want:   "\x1b[31mkittens\x1b[0m\n",
+	}, {
+		color:  ColorNone,
+		format: "kittens",
+		args:   nil,
+		want:   "kittens\n",
+	}, {
+		color:  ColorRed,
+		format: "kittens\n",
+		args:   nil,
+		want:   "\x1b[31mkittens\x1b[0m\n",
+	}, {
+		color:  ColorNone,
+		format: "kittens\n",
+		args:   nil,
+		want:   "kittens\n",
+	}, {
+		color:  ColorRed,
+		format: "kittens\n\n",
+		args:   nil,
+		want:   "\x1b[31mkittens\x1b[0m\n\n",
+	}, {
+		color:  ColorNone,
+		format: "kittens\n\n",
+		args:   nil,
+		want:   "kittens\n\n",
 	}} {
 		t.Run("", func(t *testing.T) {
 			b := new(bytes.Buffer)
@@ -177,5 +244,84 @@ func TestRemoveTimestamp(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestShell_Smoketest(t *testing.T) { newTestShell(t) }
+
+func TestShell_CtrlC(t *testing.T) {
+	/* Make a shell and work out the message we expect. */
+	rw, _, _, shell := newTestShell(t)
+
+	/* Start the shell going. */
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	eg, ectx := ctxerrgroup.WithContext(ctx)
+	eg.Go(func() error {
+		if err := shell.Do(ectx); nil != err &&
+			!errors.Is(err, io.EOF) {
+			return err
+		}
+		cancel()
+		return nil
+	})
+	obuf := make(chan string, 1024)
+	eg.Go(func() error {
+		scanner := bufio.NewScanner(rw)
+		for scanner.Scan() {
+			l := scanner.Text()
+			obuf <- l
+		}
+		if err := scanner.Err(); nil != err &&
+			!errors.Is(err, io.ErrClosedPipe) {
+			return fmt.Errorf("reading shell output: %w", err)
+		}
+		return nil
+	})
+	/* Close our terminal pipe when the shell dies. */
+	eg.Go(func() error {
+		<-ectx.Done()
+		return rw.Close()
+	})
+
+	/* Send a Ctrl+C. */
+	sendCtrlC := func(s string) {
+		eg.Go(func() error {
+			if _, err := rw.Write([]byte{0x03}); nil != err {
+				return fmt.Errorf(
+					"writing %s Ctrl+C: %w",
+					s,
+					err,
+				)
+			}
+			return nil
+		})
+	}
+	sendCtrlC("first")
+
+	/* Get what should be the warning. */
+	want := shell.WrapInColor(FirstCtrlCWarning, ColorRed)
+	if got := <-obuf; got != want {
+		t.Errorf(
+			"Incorrect warning from shell:\n got: %q\nwant: %q",
+			got,
+			want,
+		)
+	}
+
+	/* Send a second, which should kill the shell. */
+	sendCtrlC("second")
+	want = shell.WrapInColor(SecondCtrlCWarning, ColorRed)
+	if got := <-obuf; got != want {
+		t.Errorf(
+			"Incorrect warning from shell:\n got: %q\nwant: %q",
+			got,
+			want,
+		)
+	}
+
+	/* Make sure everything worked. */
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Shell error: %s", err)
 	}
 }

@@ -34,13 +34,13 @@ Example
 It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@dev
-go: downloading golang.org/x/net v0.33.0
+go: downloading golang.org/x/net v0.34.0
 go: downloading golang.org/x/sync v0.10.0
 go: downloading golang.org/x/text v0.21.0
-go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
-go: downloading golang.org/x/tools v0.28.0
-go: downloading golang.org/x/sys v0.28.0
+go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2.0.20241203122007-0b5affac8356
+go: downloading golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
+go: downloading golang.org/x/tools v0.29.0
+go: downloading golang.org/x/sys v0.29.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630
 01:04:42.760 Listening on 0.0.0.0:4444
@@ -179,8 +179,8 @@ TLS
 ---
 TLS is all via a pinned self-signed certificate.  By default, the certificate
 is cached in a file, mostly to keep from having to copy/paste a new fingerprint
-every time a ragey Ctrl+C kills the current shell.  Caching can be disabled
-with `-tls-certificate-cache ""`.
+every time a ragey double-Ctrl+C kills the current shell.  Caching can be
+disabled with `-tls-certificate-cache ""`.
 
 File Insertion
 --------------

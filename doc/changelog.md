@@ -14,7 +14,6 @@ go install github.com/magisterquis/curlrevshell@dev
 - New and improved tests which now actually run curlrevshell.
 - More new and improved tests which make sure the [README](../README.md) is
   up-to-dater.
-- Updated dependencies.
 - [`-tls-certificate-cache`](./flags.md#-tls-certificate-cache): Added a
   "simple" command to generate a new cert and key.
 - New friendly welcome message with the current version.
@@ -27,7 +26,9 @@ go install github.com/magisterquis/curlrevshell@dev
   tests when the build cache is empty.
 - [`ctxerrgroup`](../lib/ctxerrgroup): Slightly less labor-intensive to run a
   bunch of things but know which sent back an error.
-
+- Make it slightly harder to accidentally a shell by muscle-memorying Ctrl+C.
+- New and improve tests which now actually run curlrevshell.
+- Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
 ============================
