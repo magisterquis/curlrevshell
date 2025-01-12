@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241217
+ * Last Modified 20250112
  */
 
 import (
@@ -45,6 +45,14 @@ const (
 // ErrOneShellClosed indicates that the listener was closed as expected after
 // receiving a single shell.
 var ErrOneShellClosed = errors.New("closed after shell received")
+
+// DefaultURLPaths are the URL paths we use if we don't have any others.
+var DefaultURLPaths = crstemplate.URLPaths{
+	In:     crstemplate.DefaultURLPathIn,
+	InOut:  crstemplate.DefaultURLPathInOut,
+	Out:    crstemplate.DefaultURLPathOut,
+	Script: crstemplate.DefaultURLPathScript,
+}
 
 // Server serves implants over HTTPS.
 type Server struct {
@@ -138,13 +146,7 @@ func New(
 	}
 
 	/* Log the paths we're using if they're not the defaults. */
-	defUPS := crstemplate.URLPaths{
-		In:     crstemplate.DefaultURLPathIn,
-		InOut:  crstemplate.DefaultURLPathInOut,
-		Out:    crstemplate.DefaultURLPathOut,
-		Script: crstemplate.DefaultURLPathScript,
-	}
-	if s.ups != defUPS {
+	if s.ups != DefaultURLPaths {
 		sl.LogAttrs(
 			context.Background(),
 			slog.LevelInfo,

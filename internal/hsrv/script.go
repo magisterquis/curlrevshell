@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241222
+ * Last Modified 20250112
  */
 
 import (
@@ -31,6 +31,12 @@ const HTTPSPort = "443"
 // C2Param is a URL parameter or header which may be set in requetss to /c to
 // give the URL to which to call back.
 const C2Param = "c2"
+
+// noSubtemplateWarning is printed to the user to warn about a template file
+// with template data but no subtemplates.
+var noSubtemplateWarning = "\tYou probably need {{define \"" +
+	crstemplate.SubtemplateCallback +
+	"\"}} ... {{end}} around your template."
 
 // parseDefaultTemplate is the parsed form of DefaultTemplate.  We won't get
 // very far if it doesn't parse.
@@ -70,6 +76,7 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 			crstemplate.SubtemplateScript,
 			err,
 		)
+		s.maybeRecommendSubtemplate(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -137,6 +144,7 @@ func (s *Server) printCallbackHelp() {
 	ls, err := s.lAddrLines(crstemplate.SubtemplateCallback)
 	if nil != err {
 		s.ErrorLogf("Error generating callback one-liners: %s", err)
+		s.maybeRecommendSubtemplate(err)
 		return
 	}
 	s.Logf(ScriptColor, "To get a shell:")
@@ -155,6 +163,7 @@ func (s *Server) printStaticFileHelp() {
 			"Error generating static files one-liners: %s",
 			err,
 		)
+		s.maybeRecommendSubtemplate(err)
 		return
 	}
 	s.Logf(ScriptColor, "To get files from %s:", s.fdir)
@@ -212,4 +221,12 @@ func (s *Server) lAddrLines(st string) ([]string, error) {
 	ret = append(ret, "\n")
 
 	return ret, nil
+}
+
+// maybeRecommendSubtemplate recommends turning the template into a subtemplate
+// if err is crstemplate.ErrOutsideSubtemplate.
+func (s *Server) maybeRecommendSubtemplate(err error) {
+	if errors.Is(err, crstemplate.ErrOutsideSubtemplate) {
+		s.ErrorLogf("%s", noSubtemplateWarning)
+	}
 }

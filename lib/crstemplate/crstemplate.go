@@ -7,7 +7,7 @@ package crstemplate
  * Curlrevshell template things
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20241222
+ * Last Modified 20250111
  */
 
 import (
@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -49,9 +50,9 @@ var DefaultTemplate string
 // parsedDefaultTemplate is DefaultTemplate, parsed.
 var parsedDefaultTemplate = template.Must(newTemplate(DefaultTemplate))
 
-// ErrNoSubtemplates is returned from Execute when it is passed the name of a
-// template file which has no subtemplates defined.
-var ErrNoSubtemplates = errors.New("no subtemplates found")
+// ErrOutsideSubtemplate is returned from Execute when it is passed the name of
+// a template file which has template data outside named templates.
+var ErrOutsideSubtemplate = errors.New("template data outside of subtemplates")
 
 // Execute executes the given subtemplate with the given parameters.
 //
@@ -64,11 +65,10 @@ var ErrNoSubtemplates = errors.New("no subtemplates found")
 // warning that a template file is missing but the returned string will still
 // be the result of executing DefaultTemplate's subtemplate.
 func Execute(subtemplate, file string, params Params) (string, error) {
-
 	/* Try to parse the user's template if we have one. */
 	tmpl, uErr := mergeTemplateFrom(file)
 	if nil != uErr && !errors.Is(uErr, fs.ErrNotExist) {
-		return "", fmt.Errorf("adding templates: %w", uErr)
+		return "", fmt.Errorf("adding custom templates: %w", uErr)
 	}
 
 	/* Execute the template. */
@@ -77,7 +77,7 @@ func Execute(subtemplate, file string, params Params) (string, error) {
 		return "", fmt.Errorf("executing template: %w", err)
 	}
 
-	return b.String(), uErr /* Make be ENOENT. */
+	return b.String(), uErr /* Might be ENOENT. */
 
 }
 
@@ -102,20 +102,34 @@ func mergeTemplateFrom(fn string) (*template.Template, error) {
 		)
 	}
 
-	/* Make sure it parses as a template and has its own subtemplates. */
+	/* Make sure everything is in subtemplates. */
 	t, err := newTemplate(string(b))
 	if nil != err {
 		return nil, fmt.Errorf("parsing template: %w", err)
 	}
-	if 2 > len(t.Templates()) { /* Should always be at least one. */
-		return nil, ErrNoSubtemplates
+	o := new(bytes.Buffer)
+	if err := t.Execute(o, Params{
+		PubkeyFP: "bWMSMaxMaBCoToBgBkSzy2C5CSSMifm52x4x/oaBKos=",
+		URL:      "https://example.com",
+		ID:       "random_id",
+		URLPaths: URLPaths{
+			In:     DefaultURLPathIn,
+			InOut:  DefaultURLPathInOut,
+			Out:    DefaultURLPathOut,
+			Script: DefaultURLPathScript,
+		},
+	}); nil != err {
+		return nil, fmt.Errorf("test-executing template: %w", err)
+	} else if "" != strings.TrimSpace(o.String()) {
+		return nil, ErrOutsideSubtemplate
 	}
 
 	/* Add to the default templates. */
 	return template.Must(parsedDefaultTemplate.Clone()).Parse(string(b))
 }
 
-// newTemplate returns a new template from s with the main template name baseName.
+// newTemplate returns a new template from s with the main template name
+// baseName.
 func newTemplate(s string) (*template.Template, error) {
 	return template.New(baseName).Parse(s)
 }

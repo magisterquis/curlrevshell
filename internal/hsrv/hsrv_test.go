@@ -87,12 +87,7 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		cbAddrs,
 		true,
 		false,
-		crstemplate.URLPaths{
-			In:     crstemplate.DefaultURLPathIn,
-			InOut:  crstemplate.DefaultURLPathInOut,
-			Out:    crstemplate.DefaultURLPathOut,
-			Script: crstemplate.DefaultURLPathScript,
-		},
+		DefaultURLPaths,
 	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
