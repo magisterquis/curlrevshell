@@ -13,7 +13,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.
 - Added compile-time i/o/io/c-changey variables.
-- Added the aptly-named [`config.md`](./config.md).
+- Added the aptly-named [`config.md`](./config.md) and
+  [`template.md`](./template.md).
 - Minor tweaks to the callback script.
 - Asked an excitable cow to give a warning that `-callback-template` is
   deprecated in favor of `-callback`.
