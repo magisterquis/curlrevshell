@@ -4,7 +4,7 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20241222
+# Last Modified 20250112
 
 set -e
 
@@ -26,7 +26,7 @@ tap_like \
         "$GOT" \
         '(?s:-callback-template is.*'\
 'going away eventually.*'\
-'Use -callback instead)' \
+'Use -template instead)' \
         "Deprecation warning for -callback-template" \
         "$0" $LINENO
 

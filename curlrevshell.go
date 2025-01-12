@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241222
+ * Last Modified 20250112
  */
 
 import (
@@ -145,7 +145,7 @@ func rmain() int {
 / -callback-template is \
 | going away eventually |
 |                       |
-\ Use -callback instead /
+\ Use -template instead /
  -----------------------
         \   ^__^
          \  (!!)\_______
