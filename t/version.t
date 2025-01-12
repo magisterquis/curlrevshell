@@ -4,13 +4,13 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20241226
+# Last Modified 20250112
 
 set -e
 
 . t/shmore.subr
 
-tap_plan 6
+tap_plan 7
 
 # Tag we expect to use for installing
 TAG="$(git branch --show-current)"
@@ -86,5 +86,17 @@ tap_is "$GOT" "$WANT" "Correct downloaded modules in README" "$0" $LINENO
 # Make sure the top of the changelog has the right version
 GOT="$(awk '5==NR' doc/changelog.md | cut -f 2 -d '`')"
 tap_is "$GOT" "$TAG" "Changelog has correct tag" "$0" $LINENO
+
+# Make sure we don't need to update anything.
+tap_is \
+        "$(go list -u \
+                -f '{{if (and (not (or .Main .Indirect)) .Update)}}
+                        {{- .Path}}: {{.Version}} -> {{.Update.Version -}}
+                {{end}}' \
+                -m all)" \
+        "" \
+        "Packages up-to-date" \
+        "$0" $LINENO
+# Idea stolen from https://github.com/fogfish/go-check-updates
 
 # vim: ft=sh

@@ -27,7 +27,8 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`ctxerrgroup`](../lib/ctxerrgroup): Slightly less labor-intensive to run a
   bunch of things but know which sent back an error.
 - Make it slightly harder to accidentally a shell by muscle-memorying Ctrl+C.
-- New and improve tests which now actually run curlrevshell.
+- New and improve tests which now actually run curlrevshell and make sure
+  dependencies are up-to-date.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
