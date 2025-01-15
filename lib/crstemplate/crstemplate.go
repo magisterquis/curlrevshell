@@ -42,7 +42,7 @@ const (
 )
 
 // DefaultTemplate is the default callback script template.  It can be
-// overridden at runtime with -callback-template
+// overridden at runtime with -template.
 //
 //go:embed script.tmpl
 var DefaultTemplate string

@@ -49,8 +49,8 @@ curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' '
 Specifies a file or directory with a bunch of shell functions to send to
 the shell.  If it's a directory, the files in the directory will be sent over,
 but not files in subdirectories or which start with a dot.
-Like with `-callback-template`, the file is re-read every time it's needed,
-so no need to restart curlrevshell if you change it.
+Like with `-template`, the file is re-read every time it's needed, so no need
+to restart curlrevshell if you change it.
 
 Files ending in `.pl` will be turned into shell function which call perl under
 the hood.  Stdio and argv and so on (should) work more or less like normal.
@@ -250,8 +250,8 @@ functions file for other purposes.
 
 `-print-default-template`
 -------------------------
-Prints the default callback script template.  See
-[`-callback-template`](#-callback-template) for more information.
+Prints the default template.  See [`-template`](#-template) for more
+information.
 
 `-prompt`
 ---------

@@ -129,7 +129,7 @@ like
 ```sh
 $ curlrevshell -print-default-template >custom.tmpl # Get the default template to start with
 $ vim ./custom.tmpl                                 # Mod ALL the things!
-$ curlrevshell -callback-template ./custom.tmpl     # Run with your fancy new template
+$ curlrevshell -template ./custom.tmpl              # Run with your fancy new template
 ```
 The struct passed to the template is `Params` in
 [crstemplate.go](lib/crstemplate/crstemplate.go).
