@@ -100,7 +100,7 @@ Subtemplate | Generates a...
 
 Any or all may be put into a `-template` file.
 
-If a subtemplate isn't specified, a [built-in](../lib/crstemplate/script.tmpl)
+If a subtemplate isn't specified, a [built-in](../lib/crstemplate/default.tmpl)
 default will be used.
 
 Dot

@@ -121,8 +121,8 @@ Endpoint          | Description
 The endpoints can be changed (for evasion, humor, etc); see
 [the docs](./doc/config.md) for more details.
 
-Callback Template
------------------
+Template
+--------
 The script generated with `/c` can be changed by writing a new template and
 telling the program about it with `-print-default-template`.  It usually looks
 like
@@ -133,7 +133,7 @@ $ curlrevshell -template ./custom.tmpl              # Run with your fancy new te
 ```
 The struct passed to the template is `Params` in
 [crstemplate.go](lib/crstemplate/crstemplate.go).
-The default template is [script.tmpl](lib/crstemplate/script.tmpl).
+The default template is [default.tmpl](lib/crstemplate/default.tmpl).
 It's re-read every time it's needed, so feel free to change it as often as
 you'd like.
 
