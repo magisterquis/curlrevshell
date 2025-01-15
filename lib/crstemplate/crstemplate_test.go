@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20250111
+ * Last Modified 20250115
  */
 
 import (
@@ -36,14 +36,15 @@ func TestDefaultTemplate_SubtemplatesExist(t *testing.T) {
 
 // Make sure we can execute things.
 func TestExecute(t *testing.T) {
-	/* tmplFilename is where we stil the template we'll write. */
+	/* tmplFilename is where we'll store the template we'll write. */
 	var (
 		tmplFilename = "test.tmpl"
 		testID       = "testID"
 		params       = Params{
 			PubkeyFP: "testFPtestFPtestFPtestFPtestFPtestFPtestFPx=",
-			URL:      "testURL.test:4444",
+			Host:     "testURL.test:4444",
 			ID:       testID,
+			Path:     "/c/test/test",
 			URLPaths: URLPaths{
 				In:     "testI",
 				InOut:  "testIO",

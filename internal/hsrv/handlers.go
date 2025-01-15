@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241210
+ * Last Modified 20250115
  */
 
 import (
@@ -51,6 +51,7 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/"+s.ups.Out+"/{"+idParam+"}", s.outputHandler)
 	/* Callback script handler. */
 	mux.HandleFunc("/"+s.ups.Script, s.scriptHandler)
+	mux.HandleFunc("/"+s.ups.Script+"/", s.scriptHandler)
 
 	/* If we're serving static files, do that. */
 	if "" != s.fdir {

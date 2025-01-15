@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250112
+ * Last Modified 20250115
  */
 
 import (
@@ -51,7 +51,8 @@ func TestServerScriptHandler(t *testing.T) {
 	gotLog.Line = strings.ReplaceAll(gotLog.Line, id, "IDID")
 	wantLog := opshell.CLine{
 		Color: ScriptColor,
-		Line:  "[192.0.2.1] Sent script: ID:IDID URL:example.com",
+		Line: "[192.0.2.1] Sent script: ID:IDID " +
+			"Host:example.com Path:/c",
 	}
 	if gotLog != wantLog {
 		t.Errorf(
@@ -82,6 +83,88 @@ curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2
 		)
 	}
 	cl.ExpectEmpty(t)
+}
+
+// Make sure we get the right Path, for complicated /c templates.
+func TestServerScriptHandler_Path(t *testing.T) {
+	/* Make a server with a script template which just returns the path. */
+	cl, _, _, s, _ := newTestServer(t)
+	defer cl.ExpectEmpty(t)
+	s.tmplf = filepath.Join(t.TempDir(), "kittens.tmpl")
+	if err := os.WriteFile(
+		s.tmplf,
+		[]byte(`
+{{ define "script" -}}
+{{- if eq "/c/one" .Path -}}
+	one
+{{- else if eq "/c/two" .Path -}}
+	two
+{{- else -}}
+	{{.Path}}
+{{- end -}}
+{{ end }}
+`),
+		0600,
+	); nil != err {
+		t.Fatalf("Error writing template: %s", err)
+	}
+
+	/* Make sure .Path works. */
+	for _, c := range []struct {
+		have string
+		want string
+	}{{
+		have: "/",
+		want: "/",
+	}, {
+		have: "/c",
+		want: "/c",
+	}, {
+		have: "/c/",
+		want: "/c/",
+	}, {
+		have: "/c/kittens",
+		want: "/c/kittens",
+	}, {
+		have: "/c?kittens=moose",
+		want: "/c",
+	}, {
+		have: "/c/kittens?moose=nuts",
+		want: "/c/kittens",
+	}, {
+		have: "/c/one",
+		want: "one",
+	}, {
+		have: "/c/two",
+		want: "two",
+	}} {
+		t.Run(c.have, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			rr.Body = new(bytes.Buffer)
+			s.scriptHandler(
+				rr,
+				httptest.NewRequest(
+					http.MethodGet,
+					c.have,
+					nil,
+				),
+			)
+			if http.StatusOK != rr.Code {
+				t.Errorf("Non-OK Code %d", rr.Code)
+			}
+			if got := rr.Body.String(); got != c.want {
+				t.Errorf(
+					"Path incorrect:\n"+
+						"have: %q\n"+
+						" got: %q\n"+
+						"want: %q",
+					c.have,
+					got,
+					c.want,
+				)
+			}
+		})
+	}
 }
 
 // Make sure changing and deleting a template file works.
@@ -133,7 +216,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			fn,
 			[]byte(
 				`{{define "script"}}`+
-					`templatey kittens: {{.URL}}`+
+					`templatey kittens: {{.Host}}`+
 					`{{end}}`,
 			),
 			0660,
@@ -152,7 +235,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 				`{{define "critter_name"}}moose{{end}}
 				{{define "script"}}templatey `+
 					`{{template "critter_name" .}}: `+
-					`{{.URL}}{{end}}`,
+					`{{.Host}}{{end}}`,
 			),
 			0660,
 		); nil != err {
@@ -166,7 +249,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	t.Run("changed_file", func(t *testing.T) {
 		if err := os.WriteFile(
 			fn,
-			[]byte(`{{define "script"}}moose: {{.URL}}{{end}}`),
+			[]byte(`{{define "script"}}moose: {{.Host}}{{end}}`),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
@@ -214,7 +297,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	t.Run("unused_subtemplate", func(t *testing.T) {
 		if err := os.WriteFile(
 			fn,
-			[]byte(`{{define "kittens"}}moose: {{.URL}}{{end}}`),
+			[]byte(`{{define "kittens"}}moose: {{.Host}}{{end}}`),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)

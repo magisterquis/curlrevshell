@@ -20,6 +20,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
   deprecated in favor of `-callback`.
 - [`opshell`](../lib/opshell): Added `Shell.RedLogf` which does what it says on
   the tin.
+- Renamed `{{.URL}}` to `{{.Host}}` and added `{{.Path}`, for overengineered
+  templates to serve different `{{.script}}` sections based on URL.
 - Updated dependencies.
 
 `dev`

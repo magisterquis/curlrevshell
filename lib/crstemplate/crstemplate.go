@@ -7,7 +7,7 @@ package crstemplate
  * Curlrevshell template things
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20250111
+ * Last Modified 20250115
  */
 
 import (
@@ -110,7 +110,7 @@ func mergeTemplateFrom(fn string) (*template.Template, error) {
 	o := new(bytes.Buffer)
 	if err := t.Execute(o, Params{
 		PubkeyFP: "bWMSMaxMaBCoToBgBkSzy2C5CSSMifm52x4x/oaBKos=",
-		URL:      "https://example.com",
+		Host:     "example.com",
 		ID:       "random_id",
 		URLPaths: URLPaths{
 			In:     DefaultURLPathIn,

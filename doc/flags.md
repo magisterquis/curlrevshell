@@ -301,6 +301,8 @@ well as the helpful one-liners printed when curlrevshell starts.  The
 default is in [`lib/crstemplate/script.tmpl`](../lib/crstemplate/script.tmpl)
 and can be printed with `-print-default-template`.
 
+See [template.md](./template.md) for more details.
+
 Like with `-ctrl-i`, everything is re-read every time it's needed,
 so no need to restart curlrevshell if you change it.
 

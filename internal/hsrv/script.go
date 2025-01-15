@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250112
+ * Last Modified 20250115
  */
 
 import (
@@ -57,7 +57,8 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 	params := crstemplate.Params{
 		PubkeyFP: s.l.Fingerprint,
 		ID:       strconv.FormatUint(rand.Uint64(), 36),
-		URL:      c2,
+		Host:     c2,
+		Path:     r.URL.Path,
 		URLPaths: s.ups,
 	}
 
@@ -89,9 +90,10 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 	s.RLogf(
 		ScriptColor,
 		r,
-		"Sent script: ID:%s URL:%s",
+		"Sent script: ID:%s Host:%s Path:%s",
 		params.ID,
-		params.URL,
+		params.Host,
+		params.Path,
 	)
 }
 
@@ -189,7 +191,7 @@ func (s *Server) lAddrLines(st string) ([]string, error) {
 		/* Roll a line. */
 		l, err := crstemplate.Execute(st, s.tmplf, crstemplate.Params{
 			PubkeyFP: s.l.Fingerprint,
-			URL:      la,
+			Host:     la,
 			URLPaths: s.ups,
 		})
 		/* Note if we're missing the template. */
