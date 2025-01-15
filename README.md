@@ -77,7 +77,7 @@ Options:
   -callback-address address
     	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
-    	Optional callback template file, used if it exists
+    	Optional template file, used if it exists (deprecated)
   -ctrl-i source
     	Tab/Ctrl+I's insertion source file or directory
   -icanhazip
@@ -100,6 +100,8 @@ Options:
     	Terminal prompt; don't forget a trailing space (default "> ")
   -serve-files-from directory
     	Optional directory from which to serve static files
+  -template template
+    	Optional template file, used if it exists
   -tls-certificate-cache file
     	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
 ```
