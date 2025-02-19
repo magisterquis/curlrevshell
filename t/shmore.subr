@@ -2,7 +2,7 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20241203
+# Last Modified 20250219
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
@@ -24,11 +24,14 @@ tap_note() {(
                 return
         fi
         # Print each line.
-        IFS='
+        (
+        set -f # This is silly, but prevents wildcard expansion
+        export IFS='
 '
-        for line in $(echo "$*"); do # echo because zsh, apparently.
+        for line in $(echo "$@"); do
                 _tap_echo "# $line"
         done
+        )
 )}
 
 # tap_like tests whether something we got matches a regex.  This uses Perl
@@ -164,12 +167,20 @@ tap_cmp_ok() {
 
 	# Report the fail nicely.
 	case $2 in
-		"="|"=="|"-eq")
+		"="|"==") # Strings
 			${_tap_pf} "         got: '$1'"
 			${_tap_pf} "    expected: '$3'"
+                        ;;
+                "-eq")   # Numbers
+			${_tap_pf} "         got: $1"
+			${_tap_pf} "    expected: $3"
 			;;
-		"!="|"-ne")   
+                "!=")     # Strings
 			${_tap_pf} "         got: '$1'"
+			${_tap_pf} "    expected: anything else"
+			;;
+                "-ne")    # Numbers
+			${_tap_pf} "         got: $1"
 			${_tap_pf} "    expected: anything else"
 			;;
 		*)        
@@ -194,7 +205,7 @@ tap_BAIL_OUT() {
                 _tap_bailo="${_tap_bailo}  $*"
         fi
         echo "${_tap_bailo}"
-        return $TAP_RETURN_BAIL_OUT
+        return $TAP_RETURN_BAILED_OUT
 }
 
 # tap_skip is equivalent to a number of tap_ok 0's, plus some TAP which notes
@@ -246,8 +257,6 @@ _tap_skip() {
         _TAP_OK_SEPARATOR=${_tap_ok_separator_orig}
 }
 
-# TODO: Try checking for redefined functions?
-
 # TAP_TODO, if set, notes that tests are expected to fail.  Output will include
 # a flag indicating the tests are TODO for test harness bookkeeping.
 # Surrounding a group of tests in TAP_TODO=... / TAP_TODO= makes for a
@@ -266,6 +275,7 @@ TAP_RETURN_INVALID_OPERATOR=241
 TAP_RETURN_NOT_ENOUGH_ARGUMENTS=242
 TAP_RETURN_PLAN_ALREADY_PRINTED=243
 TAP_RETURN_WRONG_TEST_COUNT=244
+TAP_RETURN_NO_SUBTESTS_RUN=245
 TAP_RETURN_BAILED_OUT=255
 
 # This all works until we run multi-threaded.
@@ -334,13 +344,19 @@ actually ran ${_tap_ntest}"
         fi
         # Note if we failed tests.
         if [ 0 -ne ${_tap_nfail} ]; then
-                tap_diag "Looks like you failed ${_tap_nfail} tests \
+                _tap_s=tests
+                if [ 1 -eq ${_tap_nfail} ]; then
+                        _tap_s=test
+                fi
+                tap_diag "Looks like you failed ${_tap_nfail} ${_tap_s} \
 of ${_tap_ntest}." >&2
         fi
         return ${_tap_doner}
 }
 if [ -z "$TAP_NOTRAP" ]; then
-        trap tap_done_testing EXIT
+        # Apparently zsh doesn't use the last exit status as its exit status
+        # like EVERY OTHER SHELL.
+        trap 'set +e; tap_done_testing; exit $?' EXIT
 fi
 
 # tap_plan prints the number of tests we expect
@@ -368,8 +384,8 @@ tap_plan() {
         _tap_echo "1..${_tap_nplan}"
 }
 
-# tap_subtest runs a subtest, which should noramlly be its own function
-# wrapping i.e. mysubtest() {( tap_... )}; tap_subtest "foo" mysubtest.
+# tap_subtest runs a subtest, which should normally be its own function
+# i.e. mysubtest() { tap_... }; tap_subtest "foo" mysubtest.
 # The subtest function should return 0 on success.
 # See examples/subtest.sh for an example.
 #
@@ -401,15 +417,29 @@ tap_subtest() {
                 _tap_space="    ${_tap_save_space}"
                 _tap_save_space=
                 "$2"
-                tap_done_testing
+                RET=$?
+                # If we didn't run any tests at all let someone know.
+                if [ 0 -eq ${_tap_ntest} ] && [ -z "${_tap_bailo}" ]; then
+                        _tap_echo "1..0"
+                        tap_diag "No tests run!"
+                        RET=$TAP_RETURN_NO_SUBTESTS_RUN
+                fi
+                tap_done_testing && exit "$RET"
         ) || _tap_ret=$?
 
         # If we've bailed, note it for the rest of testing.  There's no really
         # good way to pass things back from subshells.
-        if [ $TAP_RETURN_BAILED_OUT -eq ${_tap_ret} ]; then
+        if [ -z "$_tap_bailo" ] && \
+                [ $TAP_RETURN_BAILED_OUT -eq ${_tap_ret} ]; then
+
                 _tap_bailo="Bailed in subtest $2"
                 return
+        # If we didn't get any subtests, note it as an error.
+        elif [ $TAP_RETURN_NO_SUBTESTS_RUN -eq ${_tap_ret} ]; then
+                tap_ok 1 "No tests run for subtest "'"'"$1"'"' "$3" "$4"
+                return
         fi
+
 
         # Emit the ok/not ok message and note success/fail.
         tap_ok "${_tap_ret}" "$1" "$3" "$4"
@@ -461,7 +491,7 @@ _tap_ok() {
         fi
 
         # Need at least an ok or not.
-        if [ 1 -gt $# ]; then
+        if [ 1 -gt $# ] || [ -z "$1" ] ; then
                 echo "Not enough arguments" >&2
                 return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
         fi
@@ -500,12 +530,21 @@ _tap_ok() {
         if [ -n "$TAP_TODO" ]; then
                 _tap_msg=" (TODO)"
                 _tap_pf=tap_note
+        elif [ -n "$HARNESS_ACTIVE" ]; then
+                # If we're in a harness and not TODOing, we put a blank line
+                # above fails, apparently.
+                echo >&2 # Just a newline
         fi
+
+        # Whether we use one line or two depends on whether or not we have a
+        # test name.
+        _tap_l1="Failed${_tap_msg} test"
+        _tap_l2="at ${3:-"???"} line ${4:-"???"}."
         if [ -n "$2" ]; then
-                ${_tap_pf} "  Failed${_tap_msg} test '$2'"
-        fi
-        if [ -n "$3" ]; then
-                ${_tap_pf} "  at $3 line ${4:-"???"}."
+                ${_tap_pf} "  ${_tap_l1} '$2'"
+                ${_tap_pf} "  ${_tap_l2}"
+        else
+                ${_tap_pf} "  ${_tap_l1} ${_tap_l2}"
         fi
 }
 
