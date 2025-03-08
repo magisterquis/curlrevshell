@@ -49,3 +49,7 @@ install:
 
 clean:
 	rm -rf ${BINNAME} ${TOOLSDIR}
+
+help: .NOTMAIN ## This help
+	@perl -ne '/^(\S+?):+.*?##\s*(.*)/&&print"$$1\t-\t$$2\n"' \
+		${MAKEFILE_LIST} | column -ts "$$(printf "\t")"
