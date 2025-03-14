@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250112
+ * Last Modified 20250312
  */
 
 import (
@@ -18,8 +18,10 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"syscall"
 
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
@@ -51,7 +53,10 @@ var (
 
 // Log messages and keys.
 const (
-	LKTerminating = "Program terminating"
+	LMStarting    = "Program starting"
+	LMTerminating = "Program terminating"
+
+	LKPID = "PID"
 )
 
 func main() { os.Exit(rmain()) }
@@ -222,6 +227,7 @@ Options:
 		lw = f
 	}
 	sl := slog.New(slog.NewJSONHandler(lw, nil))
+	sl.Info(LMStarting, LKPID, os.Getpid())
 
 	/* Converter for Ctrl+I. */
 	ctrlIConv := shellfuncsfile.NewDefaultConverter()
@@ -333,7 +339,6 @@ Options:
 	svr, err := hsrv.New(
 		sl,
 		*addr,
-		*fdir,
 		*tmplf,
 		ich,
 		och,
@@ -365,6 +370,21 @@ Options:
 	eg.GoContext(ectx, svr.Do)
 	eg.GoContext(ectx, iob.Do)
 
+	/* SIGUSR1 is equivalent to Ctrl+I. */
+	eg.GoContext(ectx, func(ctx context.Context) error {
+		sch := make(chan os.Signal, 1)
+		signal.Notify(sch, syscall.SIGUSR1)
+		defer signal.Stop(sch)
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sch:
+				shell.Insert()
+			}
+		}
+	})
+
 	/* Wait for something to go wrong. */
 	err = eg.Wait()
 	shell.SetPrompt("")
@@ -372,11 +392,11 @@ Options:
 		!errors.Is(err, io.EOF) &&
 		!errors.Is(err, hsrv.ErrOneShellClosed) {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
-		sl.Info(LKTerminating, hsrv.LKError, err)
+		sl.Info(LMTerminating, hsrv.LKError, err)
 		return 1
 	}
 	shell.Logf(opshell.ColorGreen, false, "Goodbye.")
-	sl.Info(LKTerminating)
+	sl.Info(LMTerminating)
 
 	return 0
 }

@@ -13,10 +13,11 @@ import (
 	"io"
 )
 
-// insert inserts the data returned by s.insertGen, as on Ctrl+I.
+// Insert inserts the data returned by the insertGen function passed to New.
+// This is what Ctrl+I uses.
 // No error is returned; all errors are handled by sending messages to the
 // user.
-func (s *Shell) insert() {
+func (s *Shell) Insert() {
 	/* Get the bytes to insert. */
 	b, err := s.insertGen()
 	if nil != err {

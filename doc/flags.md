@@ -47,10 +47,10 @@ curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' '
 `-ctrl-i`
 ---------
 Specifies a file or directory with a bunch of shell functions to send to
-the shell.  If it's a directory, the files in the directory will be sent over,
-but not files in subdirectories or which start with a dot.
-Like with `-template`, the file is re-read every time it's needed, so no need
-to restart curlrevshell if you change it.
+the shell with `Ctrl+I`.  If it's a directory, the files in the directory will
+be sent over, but not files in subdirectories or which start with a dot.  Like
+with `-template`, the file is re-read every time it's needed, so no need to
+restart curlrevshell if you change it.
 
 Files ending in `.pl` will be turned into shell function which call perl under
 the hood.  Stdio and argv and so on (should) work more or less like normal.
@@ -68,6 +68,21 @@ functions and calling `tab_list` when you're ten functions in and don't
 remember which is which.
 If `# TABDOC:NOTABLIST` is anywhere, no `tab_list` function will be generated,
 handy for when you're using something which doesnt speak Unix shell.
+
+`SIGUSR1` does the same as `Ctrl+I`.  For the brave, it works well with
+[`jq`](https://jqlang.org) and [`fwa`](https://github.com/PeterHajdu/fwa) to
+send the latest and greatest `-ctrl-i` functions to a connected shell:
+```sh
+# In one shell
+curlrevshell -log ./log.json -ctrl-i ./ctrl-i.subr
+# In another shell
+PID=$(jq '.PID | select(.)' log.json | tail -n 1)
+fwa ./ctrl-i.subr | while read; do
+        kill -USR1 $PID
+done
+# In a third shell
+vim ./ctrl-i.subr
+```
 
 For testing, `Ctrl+J` will print out what would be sent with `Ctrl+I`.
 Alternatively, running with [`-print-ctrl-i`](#-print-ctrl-i) will print the

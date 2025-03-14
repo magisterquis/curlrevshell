@@ -97,6 +97,14 @@ func New(
 		insertGen:    insertGen,
 		insertName:   insertName,
 	}
+	/* Work out the underlying terminal, which will be a lot simpler if
+	we're not using a TTY. */
+	var cooked bool
+	if !goxterm.IsTerminal(int(os.Stdin.Fd())) ||
+		!goxterm.IsTerminal(int(os.Stdout.Fd())) {
+		cooked = true
+		s.t.Cooked()
+	}
 	/* Set up a timer to unsilence the shell after there's been a lull. */
 	s.silenceTimer = time.AfterFunc(0, func() {
 		s.wL.Lock()
@@ -138,7 +146,7 @@ func New(
 				PlainWritePause,
 			)
 		case 0x09: /* ^I, paste from file. */
-			go s.insert()
+			go s.Insert()
 		case 0x0a: /* ^J, like ^I but just locally. */
 			go s.pretendInsert()
 			/* This is left here but commented out to make it that
@@ -166,7 +174,7 @@ func New(
 	})
 
 	/* Use stdin's tty, if it is one. */
-	if goxterm.IsTerminal(int(os.Stdin.Fd())) {
+	if !cooked {
 		/* Note we have a TTY. */
 		s.isTTY = true
 		/* Put tty in raw mode. */
