@@ -26,6 +26,7 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - [`-ctrl-i`]: Fewer stray newlines.
 - [`Makefile`](./Makefile): Make `make help` make help.  Make `make update`
   make updates.
+- Somewhat less fragile tests in [`t/`](../t/).
 - Updated dependencies.
 
 `dev`
