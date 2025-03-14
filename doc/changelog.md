@@ -22,9 +22,10 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
   the tin.
 - Renamed `{{.URL}}` to `{{.Host}}` and added `{{.Path}`, for overengineered
   templates to serve different `{{.script}}` sections based on URL.
-- Help for `make` is now available with `make help`.
 - [`README.md`](../README.md): No more out-of-date references to `funcgen`.
 - [`-ctrl-i`]: Fewer stray newlines.
+- [`Makefile`](./Makefile): Make `make help` make help.  Make `make update`
+  make updates.
 - Updated dependencies.
 
 `dev`

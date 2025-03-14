@@ -2,14 +2,15 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20241204
+# Last Modified 20250314
 
 BINNAME     != basename $$(pwd)
 BUILDFLAGS   = -trimpath -ldflags "-w -s"
+SHMOREURL    = https://raw.githubusercontent.com/magisterquis/shmore/refs/heads/master/shmore.subr
 TESTFLAGS   += -timeout 3s
-VETFLAGS     = -printf.funcs 'debugf,errorf,erorrlogf,logf,printf,rerrorlogf,rlogf'
 TOOLSDIR     = tools
 TOOLSRCDIRS != find ./lib/*/cmd -type d -maxdepth 1 -mindepth 1
+VETFLAGS     = -printf.funcs 'debugf,errorf,erorrlogf,logf,printf,rerrorlogf,rlogf'
 
 
 .PHONY: all test install clean
@@ -43,6 +44,11 @@ ${TOOLSDIR}/${TOOLSRCDIR:T}! ${TOOLSRCDIR}
 	go build ${BUILDFLAGS} -o $@ $>
 .endfor
 
+update: ## Fetch the latest Shmore and up-to-date Go things
+	curl --fail --show-error --silent --output t/shmore.subr ${SHMOREURL}
+	go get go
+	go get -u
+	go mod tidy
 
 install:
 	go install ${BUILDFLAGS}
