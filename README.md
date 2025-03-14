@@ -123,8 +123,9 @@ The endpoints can be changed (for evasion, humor, etc); see
 
 Template
 --------
-The script generated with `/c` can be changed by writing a new template and
-telling the program about it with `-print-default-template`.  It usually looks
+The script generated with `/c` as well as the helpful one-lines printed on
+startup can be changed by writing a new template and telling the program about
+it with `-template`.  It usually looks
 like
 ```sh
 $ curlrevshell -print-default-template >custom.tmpl # Get the default template to start with
@@ -136,9 +137,6 @@ The struct passed to the template is `Params` in
 The default template is [default.tmpl](lib/crstemplate/default.tmpl).
 It's re-read every time it's needed, so feel free to change it as often as
 you'd like.
-
-A script to generate a custom callback template with embedded shell functions
-can be made with `make tools/funcgen` and is found in `tools/funcgen`.
 
 On Linux, you'll probably need BSD make(`apt/yum/such install bmake`, or
 thereabouts) and add a `b` before the `make`s.
