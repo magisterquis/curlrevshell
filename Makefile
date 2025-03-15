@@ -15,14 +15,14 @@ VETFLAGS     = -printf.funcs 'debugf,errorf,erorrlogf,logf,printf,rerrorlogf,rlo
 
 .PHONY: all test install clean
 
-all: test tools build
+all: test tools build ## Build ALL the things! (and test them, default)
 
 ${BINNAME}!
 	go build ${BUILDFLAGS} -o ${BINNAME}
 
-build: ${BINNAME}
+build: ${BINNAME} ## Build curlrevshell
 
-test:
+test: ## Run tests
 	go test ${BUILDFLAGS} ${TESTFLAGS} ./...
 	go vet  ${BUILDFLAGS} ${VETFLAGS} ./...
 	staticcheck ./...
@@ -37,7 +37,7 @@ test:
 	'
 	prove -It --directives
 
-tools: ${TOOLSRCDIRS:T:S,^,${TOOLSDIR}/,}
+tools: ${TOOLSRCDIRS:T:S,^,${TOOLSDIR}/,} ## Build supporting tools
 
 .for TOOLSRCDIR in ${TOOLSRCDIRS}
 ${TOOLSDIR}/${TOOLSRCDIR:T}! ${TOOLSRCDIR}
@@ -50,10 +50,10 @@ update: ## Fetch the latest Shmore and up-to-date Go things
 	go get -u
 	go mod tidy
 
-install:
+install: ## Install curlrevshell with go install
 	go install ${BUILDFLAGS}
 
-clean:
+clean: ## Remove built things
 	rm -rf ${BINNAME} ${TOOLSDIR}
 
 help: .NOTMAIN ## This help
