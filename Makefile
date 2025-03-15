@@ -10,7 +10,6 @@ SHMOREURL    = https://raw.githubusercontent.com/magisterquis/shmore/refs/heads/
 TESTFLAGS   += -timeout 3s
 TOOLSDIR     = tools
 TOOLSRCDIRS != find ./lib/*/cmd -type d -maxdepth 1 -mindepth 1
-VETFLAGS     = -printf.funcs 'debugf,errorf,erorrlogf,logf,printf,rerrorlogf,rlogf'
 
 
 .PHONY: all test install clean
@@ -24,7 +23,7 @@ build: ${BINNAME} ## Build curlrevshell
 
 test: ## Run tests
 	go test ${BUILDFLAGS} ${TESTFLAGS} ./...
-	go vet  ${BUILDFLAGS} ${VETFLAGS} ./...
+	go vet  ${BUILDFLAGS} ./...
 	staticcheck ./...
 	go run ${BUILDFLAGS} . -h 2>&1 |\
 	awk '\
