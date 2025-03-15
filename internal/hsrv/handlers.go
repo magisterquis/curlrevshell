@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250115
+ * Last Modified 20250215
  */
 
 import (
@@ -43,18 +43,24 @@ func (s *Server) newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	/* Shell I/O handler. */
-	mux.HandleFunc("/"+s.ups.InOut, s.inOutHandler)
-	mux.HandleFunc("/"+s.ups.InOut+"/", s.inOutHandler)
+	mux.HandleFunc("/"+s.params.URLPaths.InOut, s.inOutHandler)
+	mux.HandleFunc("/"+s.params.URLPaths.InOut+"/", s.inOutHandler)
 	/* Shell input handler. */
-	mux.HandleFunc("/"+s.ups.In+"/{"+idParam+"}", s.inputHandler)
+	mux.HandleFunc(
+		"/"+s.params.URLPaths.In+"/{"+idParam+"}",
+		s.inputHandler,
+	)
 	/* Shell output handler. */
-	mux.HandleFunc("/"+s.ups.Out+"/{"+idParam+"}", s.outputHandler)
+	mux.HandleFunc(
+		"/"+s.params.URLPaths.Out+"/{"+idParam+"}",
+		s.outputHandler,
+	)
 	/* Callback script handler. */
-	mux.HandleFunc("/"+s.ups.Script, s.scriptHandler)
-	mux.HandleFunc("/"+s.ups.Script+"/", s.scriptHandler)
+	mux.HandleFunc("/"+s.params.URLPaths.Script, s.scriptHandler)
+	mux.HandleFunc("/"+s.params.URLPaths.Script+"/", s.scriptHandler)
 
 	/* If we're serving static files, do that. */
-	if "" != s.fdir {
+	if "" != s.params.StaticFilesDir {
 		mux.HandleFunc("/", s.fileHandler)
 	}
 
@@ -63,20 +69,33 @@ func (s *Server) newMux() *http.ServeMux {
 
 // fileHandler logs and serves files.
 func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
-	sl := s.requestLogger(r).With(LKStaticFilesDir, s.fdir)
+	sl := s.requestLogger(r).With(
+		LKStaticFilesDir,
+		s.params.StaticFilesDir,
+	)
 
 	/* Work out what to send back. */
 	s.RLogf(FileColor, r, "File requested: %s", r.URL)
-	f, err := os.Open(s.fdir)
+	f, err := os.Open(s.params.StaticFilesDir)
 	if nil != err {
-		s.RErrorLogf(r, "Could not open %s: %s", s.fdir, err)
+		s.RErrorLogf(
+			r,
+			"Could not open %s: %s",
+			s.params.StaticFilesDir,
+			err,
+		)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 	defer f.Close()
 	fi, err := f.Stat()
 	if nil != err {
-		s.RErrorLogf(r, "Could not get info about %s: %s", s.fdir, err)
+		s.RErrorLogf(
+			r,
+			"Could not get info about %s: %s",
+			s.params.StaticFilesDir,
+			err,
+		)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
@@ -85,12 +104,18 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 	/* If we've just been given one file, send it for all requests. */
 	if fi.Mode().IsRegular() {
-		http.ServeContent(w, r, s.fdir, fi.ModTime(), f)
+		http.ServeContent(
+			w,
+			r,
+			s.params.StaticFilesDir,
+			fi.ModTime(),
+			f,
+		)
 		return
 	}
 
 	/* For everything else, let the http library do the work. */
-	http.FileServer(http.Dir(s.fdir)).ServeHTTP(w, r)
+	http.FileServer(http.Dir(s.params.StaticFilesDir)).ServeHTTP(w, r)
 }
 
 // inputHandler sends input to a shell.

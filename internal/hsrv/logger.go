@@ -5,7 +5,7 @@ package hsrv
  * io.Writer which sends pink messages to opshell.Shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240328
+ * Last Modified 20250215
  */
 
 import (
@@ -46,7 +46,7 @@ func (s *Server) Logf(color opshell.Color, format string, v ...any) {
 
 // RLogf sends a colored message to the shell with the requetsor's IP address.
 func (s *Server) RLogf(color opshell.Color, r *http.Request, format string, v ...any) {
-	s.Logf(color, fmt.Sprintf(
+	s.Logf(color, "%s", fmt.Sprintf(
 		"[%s] %s",
 		remoteHost(r),
 		fmt.Sprintf(format, v...),
@@ -60,7 +60,7 @@ func (s *Server) ErrorLogf(format string, v ...any) {
 
 // RErrorLogf sends a pink message to the shell with r's remote address.
 func (s *Server) RErrorLogf(r *http.Request, format string, v ...any) {
-	s.ErrorLogf(fmt.Sprintf(
+	s.ErrorLogf("%s", fmt.Sprintf(
 		"[%s] %s",
 		remoteHost(r),
 		fmt.Sprintf(format, v...),

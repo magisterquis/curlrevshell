@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
 var (
@@ -78,7 +80,6 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 	s, err := New(
 		sl,
 		"127.0.0.1:0",
-		td,
 		"",
 		ich,
 		och,
@@ -87,10 +88,24 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		cbAddrs,
 		true,
 		false,
-		DefaultURLPaths,
+		crstemplate.Params{
+			StaticFilesDir: td,
+		},
 	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
+	}
+
+	/* Make sure none of the URLPaths are empty. */
+	v := reflect.ValueOf(s.params.URLPaths)
+	for i := range v.NumField() {
+		if v.Field(i).IsZero() {
+			t.Fatalf(
+				"New server's crstemplate.Params.URLPaths.%s "+
+					"not set",
+				v.Type().Field(i).Name,
+			)
+		}
 	}
 
 	/* Start the server going. */
@@ -455,44 +470,6 @@ func TestServer_OneShell(t *testing.T) {
 	cl.ExpectEmpty(t)
 }
 
-func TestNewUnsetURLPath(t *testing.T) {
-	var (
-		_, sl = chanlog.New()
-	)
-	_, err := New(
-		sl,
-		"127.0.0.1:0",
-		"",
-		"",
-		nil,
-		nil,
-		nil,
-		"",
-		nil,
-		false,
-		true,
-		crstemplate.URLPaths{
-			In:    "up_In",
-			InOut: "up_InOut",
-			Out:   "up_Out",
-			/* Script missing. */
-		},
-	)
-	if nil == err {
-		t.Fatalf("Did not get error")
-	}
-	want := "URL path unset: Script"
-	if got := err.Error(); got != want {
-		t.Fatalf(
-			"Incorrect error:\n"+
-				" got: %s\n"+
-				"want: %s",
-			got,
-			want,
-		)
-	}
-}
-
 // Make sure we set ourselves up to debug-log paths correctly.
 func TestSlogAttrsFromURLPaths(t *testing.T) {
 	have := crstemplate.URLPaths{
@@ -526,84 +503,58 @@ func TestSlogAttrsFromURLPaths(t *testing.T) {
 	}
 }
 
-func TestCleanURLPaths_UnsetField(t *testing.T) {
-	full := crstemplate.URLPaths{
-		In:     "up_In",
-		InOut:  "up_InOut",
-		Out:    "up_Out",
-		Script: "up_Script",
-	}
-	cases := make(map[string]crstemplate.URLPaths) /* want -> have */
-	for _, fn := range []string{"In", "InOut", "Out", "Script"} {
-		have := full
-		reflect.ValueOf(&have).Elem().FieldByName(fn).SetString("")
-		cases[fn] = have
+// Make sure Server.listenAddresses adds port number to everything.
+func TestServerListenAddresses_AddPorts(t *testing.T) {
+	/* Listener, for default port. */
+	l, err := sstls.Listen("tcp", "127.0.0.1:0", "", 0, "")
+	if nil != err {
+		t.Fatalf("Error listening: %s", err)
 	}
 
-	for want, have := range cases {
-		t.Run(want, func(t *testing.T) {
-			got := cleanURLPaths(&have)
-			if got != want {
-				t.Errorf(
-					"Incorrect field:\n"+
-						"have: %+v\n"+
-						" got: %s\n"+
-						"want: %s",
-					have,
-					got,
-					want,
-				)
-			}
-		})
+	/* Non-listener port, for testing explicit ports. */
+	_, lPort, err := net.SplitHostPort(l.Addr().String())
+	if nil != err {
+		t.Fatalf("Error getting listener port: %s", err)
+	}
+	n, err := strconv.Atoi(lPort)
+	if nil != err {
+		t.Fatalf("Error parsing port %q: %s", lPort, err)
+	}
+	tPort := strconv.Itoa(max(10, (n+1)%65535))
+
+	/* -callback-addresses. */
+	have := []string{
+		l.Addr().String(),
+		"kittens.com",
+		net.JoinHostPort("kittens.com", tPort),
+	}
+	want := make(map[string]struct{})
+	for _, h := range have {
+		if _, p, _ := net.SplitHostPort(h); "" == p {
+			h = net.JoinHostPort(h, lPort)
+		}
+		want[h] = struct{}{}
+	}
+	if len(want) != len(have) {
+		t.Fatalf(
+			"Have %d callback addresses but %d listen addresses",
+			len(have),
+			len(want),
+		)
 	}
 
-}
-
-func TestCleanURLPaths_Trim(t *testing.T) {
-	have := crstemplate.URLPaths{
-		In:     "in/",
-		InOut:  "/in_out",
-		Out:    "out/",
-		Script: "/////script/////",
+	/* Make sure we get what we expect. */
+	gotAddrs, err := (&Server{l: l}).listenAddresses(have)
+	if nil != err {
+		t.Fatalf("Error getting listen addresses: %s", err)
 	}
-	t.Run("remove_slashes", func(t *testing.T) {
-		want := crstemplate.URLPaths{
-			In:     "in",
-			InOut:  "in_out",
-			Out:    "out",
-			Script: "script",
+	for _, a := range gotAddrs {
+		if _, ok := want[a]; !ok {
+			t.Errorf("Extraneous listen address: %s", a)
 		}
-		got := have
-		if ret := cleanURLPaths(&got); "" != ret {
-			t.Errorf("Unexpected unset field: %s", ret)
-		}
-		if got != want {
-			t.Errorf(
-				"Incorrect cleaned paths:\n"+
-					"have: %#v\n"+
-					" got: %#v\n"+
-					"want: %#v",
-				have,
-				got,
-				want,
-			)
-		}
-	})
-
-	t.Run("empty_field", func(t *testing.T) {
-		have := have
-		have.Out = "////"
-		want := "Out"
-		if got := cleanURLPaths(&have); got != want {
-			t.Errorf(
-				"Missed unset path:\n"+
-					"have: %#v\n"+
-					" got: %#v\n"+
-					"want: %#v",
-				have,
-				got,
-				want,
-			)
-		}
-	})
+		delete(want, a)
+	}
+	for _, v := range slices.Sorted(maps.Keys(want)) {
+		t.Errorf("Did not get listen address %s", v)
+	}
 }

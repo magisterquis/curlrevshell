@@ -123,10 +123,9 @@ The endpoints can be changed (for evasion, humor, etc); see
 
 Template
 --------
-The script generated with `/c` as well as the helpful one-lines printed on
+The script generated with `/c` as well as the helpful one-liners printed on
 startup can be changed by writing a new template and telling the program about
-it with `-template`.  It usually looks
-like
+it with `-template`.  It usually looks like
 ```sh
 $ curlrevshell -print-default-template >custom.tmpl # Get the default template to start with
 $ vim ./custom.tmpl                                 # Mod ALL the things!

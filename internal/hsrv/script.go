@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250115
+ * Last Modified 20250215
  */
 
 import (
@@ -13,24 +13,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"math/rand"
-	"net"
 	"net/http"
-	"strconv"
-	"text/template"
 
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
-	"golang.org/x/net/idna"
 )
-
-// HTTPSPort is the default port for HTTPS and won't be added to URLs in
-// generated scripts.
-const HTTPSPort = "443"
-
-// C2Param is a URL parameter or header which may be set in requetss to /c to
-// give the URL to which to call back.
-const C2Param = "c2"
 
 // noSubtemplateWarning is printed to the user to warn about a template file
 // with template data but no subtemplates.
@@ -38,28 +24,19 @@ var noSubtemplateWarning = "\tYou probably need {{define \"" +
 	crstemplate.SubtemplateCallback +
 	"\"}} ... {{end}} around your template."
 
-// parseDefaultTemplate is the parsed form of DefaultTemplate.  We won't get
-// very far if it doesn't parse.
-var parsedDefaultTemplate = template.Must(
-	template.New("").Parse(crstemplate.DefaultTemplate),
-)
-
 // scriptHandler serves up a script for calling us back.  Hope we like fork and
 // exec...
 func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 	/* Generate template parameters. */
-	c2, err := s.c2URL(r)
+	params, err := crstemplate.AddRequest(s.params, r)
 	if nil != err {
-		s.RErrorLogf(r, "Could not determine callback URL: %s", err)
-		w.WriteHeader(http.StatusBadRequest)
+		s.RErrorLogf(
+			r,
+			"Error generating template parameters: %s",
+			err,
+		)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
-	}
-	params := crstemplate.Params{
-		PubkeyFP: s.l.Fingerprint,
-		ID:       strconv.FormatUint(rand.Uint64(), 36),
-		Host:     c2,
-		Path:     r.URL.Path,
-		URLPaths: s.ups,
 	}
 
 	/* Execute the template. */
@@ -68,9 +45,7 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 		s.tmplf,
 		params,
 	)
-	if errors.Is(err, fs.ErrNotExist) {
-		s.RErrorLogf(r, "Error reading template: %s", err)
-	} else if nil != err {
+	if nil != err {
 		s.RErrorLogf(
 			r,
 			"Failed to execute %s template: %s",
@@ -90,53 +65,11 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 	s.RLogf(
 		ScriptColor,
 		r,
-		"Sent script: ID:%s Host:%s Path:%s",
+		"Sent script: ID:%s C2Addr:%s Path:%s",
 		params.ID,
-		params.Host,
-		params.Path,
+		params.C2Addr,
+		params.Request.URL.Path,
 	)
-}
-
-// c2URL tries to get a C2 URL from r.  We try a query/form parameter, a
-// c2: header, the Host: header, and the SNI, in that order.
-func (s *Server) c2URL(r *http.Request) (string, error) {
-	/* Parse the query and form and try to get it from there. */
-	if err := r.ParseForm(); nil != err {
-		return "", fmt.Errorf("parsing request: %w", err)
-	}
-	if p := r.Form.Get(C2Param); "" != p {
-		return p, nil
-	}
-
-	/* If it's not there, try to get it as a header. */
-	if p := r.Header.Get(C2Param); "" != p {
-		return p, nil
-	}
-
-	/* Failing that, try the Host: header. */
-	if p, err := idna.ToASCII(r.Host); nil != err {
-		return "", fmt.Errorf("punycoding %s: %w", r.Host, err)
-	} else if "" != p {
-		return p, nil
-	}
-
-	/* No Host: header.  Probably HTTP/1.0.  Try the SNI. */
-	if p := r.TLS.ServerName; "" != p {
-		/* Make sure to add the port if it's not the default.  This
-		should be infrequent enough we can do it every time.  Famous
-		last words. */
-		_, lp, err := net.SplitHostPort(s.l.Addr().String())
-		if nil != err {
-			return "", fmt.Errorf("getting listen port: %w", err)
-		}
-		if lp != HTTPSPort {
-			p = net.JoinHostPort(p, lp)
-		}
-		return p, nil
-	}
-
-	/* Out of ideas at this point. */
-	return "", errors.New("out of ideas")
 }
 
 // printCallbackHelp prints a friendly message to the user with one-liners to
@@ -168,7 +101,7 @@ func (s *Server) printStaticFileHelp() {
 		s.maybeRecommendSubtemplate(err)
 		return
 	}
-	s.Logf(ScriptColor, "To get files from %s:", s.fdir)
+	s.Logf(ScriptColor, "To get files from %s:", s.params.StaticFilesDir)
 	for _, l := range ls {
 		s.Printf(ScriptColor, "%s", l)
 	}
@@ -179,33 +112,22 @@ func (s *Server) printStaticFileHelp() {
 // crstemplate.Subtemplate* constants.
 // For convenience, the slice will start and end with strings containing a
 // single newline each and the non-empty lines will be deduped.
-func (s *Server) lAddrLines(st string) ([]string, error) {
+func (s *Server) lAddrLines(st crstemplate.SubtemplateName) ([]string, error) {
 	var (
-		ret          = []string{"\n"}
-		notedMissing bool
-		seen         = make(map[string]struct{})
+		ret    = []string{"\n"}
+		seen   = make(map[string]struct{})
+		params = s.params
 	)
 
 	/* Roll a line for each address. */
 	for _, la := range s.lAddrs {
 		/* Roll a line. */
-		l, err := crstemplate.Execute(st, s.tmplf, crstemplate.Params{
-			PubkeyFP: s.l.Fingerprint,
-			Host:     la,
-			URLPaths: s.ups,
-		})
-		/* Note if we're missing the template. */
-		if errors.Is(err, fs.ErrNotExist) {
-			if !notedMissing {
-				s.ErrorLogf(
-					"Missing template file %s",
-					s.tmplf,
-				)
-				notedMissing = true
-			}
-		} else if nil != err { /* Or other errors. */
+		params.C2Addr = la
+		l, err := crstemplate.Execute(st, s.tmplf, params)
+		if nil != err {
 			return nil, fmt.Errorf(
-				"generating line for %s: %w",
+				"executing %s subtemplate for %s: %w",
+				st,
 				la,
 				err,
 			)
@@ -228,7 +150,8 @@ func (s *Server) lAddrLines(st string) ([]string, error) {
 // maybeRecommendSubtemplate recommends turning the template into a subtemplate
 // if err is crstemplate.ErrOutsideSubtemplate.
 func (s *Server) maybeRecommendSubtemplate(err error) {
-	if errors.Is(err, crstemplate.ErrOutsideSubtemplate) {
+	if errors.Is(err, crstemplate.ErrOutsideSubtemplate) ||
+		errors.Is(err, crstemplate.ErrNoSubtemplates) {
 		s.ErrorLogf("%s", noSubtemplateWarning)
 	}
 }

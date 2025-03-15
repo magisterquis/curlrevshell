@@ -1,0 +1,5 @@
+{{- define "curl" -}}
+
+curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} --resolve kittens.com:4444:192.168.178.23 https://{{.URL}}
+
+{{- end -}}

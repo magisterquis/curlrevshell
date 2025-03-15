@@ -347,11 +347,14 @@ Options:
 		cbAddrs,
 		*printIPv6,
 		*oneShell,
-		crstemplate.URLPaths{
-			In:     URLPathIn,
-			InOut:  URLPathInOut,
-			Out:    URLPathOut,
-			Script: URLPathScript,
+		crstemplate.Params{
+			StaticFilesDir: *fdir,
+			URLPaths: crstemplate.URLPaths{
+				In:     URLPathIn,
+				InOut:  URLPathInOut,
+				Out:    URLPathOut,
+				Script: URLPathScript,
+			},
 		},
 	)
 	if nil != err {

@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250112
+ * Last Modified 20250115
  */
 
 import (
@@ -23,7 +23,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"text/template"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
@@ -46,18 +45,9 @@ const (
 // receiving a single shell.
 var ErrOneShellClosed = errors.New("closed after shell received")
 
-// DefaultURLPaths are the URL paths we use if we don't have any others.
-var DefaultURLPaths = crstemplate.URLPaths{
-	In:     crstemplate.DefaultURLPathIn,
-	InOut:  crstemplate.DefaultURLPathInOut,
-	Out:    crstemplate.DefaultURLPathOut,
-	Script: crstemplate.DefaultURLPathScript,
-}
-
 // Server serves implants over HTTPS.
 type Server struct {
 	sl       *slog.Logger
-	fdir     string /* Static files directory. */
 	ich      <-chan string
 	och      chan<- opshell.CLine
 	iob      *iobroker.Broker
@@ -66,36 +56,37 @@ type Server struct {
 	oneShell bool /* Close listener after getting a shell. */
 
 	/* Template generation. */
-	tmplf   string             /* Template file. */
-	defTmpl *template.Template /* Default template, for testing. */
-	ups     crstemplate.URLPaths
+	tmplf  string /* Template file. */
+	params crstemplate.Params
 
 	/* Things for printing help. */
-	cbAddrs   []string
 	lAddrs    []string /* Listen addresses, for help. */
 	printIPv6 bool
 }
 
 // New returns a new Server, listening on addr.  Call its Do method to start it
 // serving.
-// Static files will be served from fdir, if non-empty.  If
-// tmplf is non-empty, it is taken as a file from which to read the callback
+// tmplf is non-empty, it is taken as a file from which to read the -template
 // template.
+// params.StaticFilesDir and params.URLPaths may be set by the caller; all
+// other fields will be set by New or its handlers.
 func New(
 	sl *slog.Logger,
-	addr string,
-	fdir string,
-	tmplf string,
-	ich <-chan string,
-	och chan<- opshell.CLine,
+	addr string, /* Listen address. */
+	tmplf string, /* Template file. */
+	ich <-chan string, /* Stdin -> Shell. */
+	och chan<- opshell.CLine, /* Stdout <- Shell. */
 	iob *iobroker.Broker,
-	certFile string,
+	certFile string, /* Cert cache file. */
 	cbAddrs []string, /* Callback addresses, for one-liners. */
-	printIPv6 bool,
+	printIPv6 bool, /* Print IPv6 interface addresses. */
 	oneShell bool, /* Shut down listener after first shell. */
-	ups crstemplate.URLPaths,
+	params crstemplate.Params, /* Template params. */
 ) (*Server, error) {
 	var l sstls.Listener
+
+	/* Make sure we actually have URL Paths. */
+	crstemplate.CleanURLPaths(&params.URLPaths)
 
 	/* Make sure the listen address has a port, and if not ask the OS to
 	choose one for us. */
@@ -108,32 +99,26 @@ func New(
 	if l, err = sstls.Listen("tcp", addr, "", 0, certFile); nil != err {
 		return nil, fmt.Errorf("listening on %s: %w", addr, err)
 	}
+	params.ListenAddress = l.Addr().String()
+	params.PubkeyFP = l.Fingerprint
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())
-
-	/* Make sure our URL paths are set and don't start or end with /'s. */
-	if uf := cleanURLPaths(&ups); "" != uf {
-		return nil, fmt.Errorf("URL path unset: %s", uf)
-	}
 
 	/* Server to return. */
 	s := &Server{
 		sl:        sl,
-		fdir:      fdir,
 		ich:       ich,
 		och:       och,
 		iob:       iob,
 		l:         l,
 		ps:        pinkSender{och},
 		tmplf:     tmplf,
-		defTmpl:   parsedDefaultTemplate,
-		ups:       ups,
-		cbAddrs:   cbAddrs,
+		params:    params,
 		printIPv6: printIPv6,
 		oneShell:  oneShell,
 	}
 
 	/* Work out our listen addresses, for user help. */
-	if s.lAddrs, err = s.listenAddresses(); nil != err {
+	if s.lAddrs, err = s.listenAddresses(cbAddrs); nil != err {
 		l.Close()
 		return nil, fmt.Errorf(
 			"determining listen addresses: %w",
@@ -144,14 +129,15 @@ func New(
 		l.Close()
 		return nil, errors.New("no listen addresses")
 	}
+	params.CallbackAddresses = slices.Clone(s.lAddrs)
 
 	/* Log the paths we're using if they're not the defaults. */
-	if s.ups != DefaultURLPaths {
+	if s.params.URLPaths != crstemplate.DefaultURLPaths {
 		sl.LogAttrs(
 			context.Background(),
 			slog.LevelInfo,
 			LMURLPaths,
-			slogAttrsFromURLPaths(s.ups)...,
+			slogAttrsFromURLPaths(s.params.URLPaths)...,
 		)
 	}
 
@@ -172,7 +158,7 @@ func (s *Server) Do(ctx context.Context) error {
 	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 
 	/* Tell user where to get static files. */
-	if "" != s.fdir {
+	if "" != s.params.StaticFilesDir {
 		s.printStaticFileHelp()
 	}
 
@@ -189,8 +175,8 @@ func (s *Server) Do(ctx context.Context) error {
 	return eg.Wait()
 }
 
-// listenAddresseses gets all of the addresses we have for the box.
-func (s *Server) listenAddresses() ([]string, error) {
+// listenAddresseses gets all of the addresses we have for the box, sorted.
+func (s *Server) listenAddresses(cbAddrs []string) ([]string, error) {
 	var addrs []string
 
 	/* Parse the listen address and port, which we'll need for
@@ -207,7 +193,7 @@ func (s *Server) listenAddresses() ([]string, error) {
 	port := strconv.Itoa(int(ap.Port()))
 
 	/* Add extra addresses, for just in case. */
-	for _, a := range s.cbAddrs {
+	for _, a := range cbAddrs {
 		/* Make sure we have a port. */
 		if _, p, err := net.SplitHostPort(a); "" == p || nil != err {
 			a = net.JoinHostPort(a, port)
@@ -399,18 +385,4 @@ func slogAttrsFromURLPaths(p crstemplate.URLPaths) []slog.Attr {
 		return strings.Compare(a.Key, b.Key)
 	})
 	return ret
-}
-
-// cleanURLPaths removes leading and trailing slashes from the fields in p.
-// The first empty field in p is returned, if any.  If all goes well, the empty
-// string is returned.
-func cleanURLPaths(p *crstemplate.URLPaths) string {
-	v := reflect.ValueOf(p).Elem()
-	for i := range v.NumField() {
-		v.Field(i).SetString(strings.Trim(v.Field(i).String(), "/"))
-		if v.Field(i).IsZero() {
-			return v.Type().Field(i).Name
-		}
-	}
-	return ""
 }

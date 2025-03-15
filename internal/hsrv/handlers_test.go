@@ -5,7 +5,7 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241217
+ * Last Modified 20250215
  */
 
 import (
@@ -28,11 +28,16 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
+func TestServerNewMux_Smoketest(t *testing.T) {
+	_, _, _, s, _ := newTestServer(t)
+	s.newMux()
+}
+
 func TestServerFileHandler(t *testing.T) {
 	cl, _, och, s, _ := newTestServerMaybeWithDir(t, true)
 	data := "kittens"
 	fn := "fname"
-	ffn := filepath.Join(s.fdir, fn)
+	ffn := filepath.Join(s.params.StaticFilesDir, fn)
 	if err := os.WriteFile(ffn, []byte(data), 0600); nil != err {
 		t.Fatalf("Error writing %s: %s", ffn, err)
 	}
@@ -83,7 +88,8 @@ func TestServerFileHandler(t *testing.T) {
 				`"method":"GET","request_uri":"/",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"","id":""},`+
-				`"static_files_dir":"`+s.fdir+`"}`,
+				`"static_files_dir":"`+s.params.StaticFilesDir+
+				`"}`,
 		)
 	})
 	/* Make sure directory listing works. */
@@ -127,13 +133,14 @@ func TestServerFileHandler(t *testing.T) {
 				`"method":"GET","request_uri":"/`+fn+`",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"","id":""},`+
-				`"static_files_dir":"`+s.fdir+`"}`,
+				`"static_files_dir":"`+s.params.StaticFilesDir+
+				`"}`,
 		)
 	})
 
 	t.Run("file", func(t *testing.T) {
 		cl, _, och, s, _ := newTestServerMaybeWithDir(t, true)
-		s.fdir = ffn
+		s.params.StaticFilesDir = ffn
 		rr := httptest.NewRecorder()
 		rr.Body = new(bytes.Buffer)
 		dfn := "dummy"
@@ -174,7 +181,8 @@ func TestServerFileHandler(t *testing.T) {
 				`"method":"GET","request_uri":"/`+dfn+`",`+
 				`"protocol":"HTTP/1.1","host":"example.com",`+
 				`"sni":"","user_agent":"","id":""},`+
-				`"static_files_dir":"`+s.fdir+`"}`,
+				`"static_files_dir":"`+s.params.StaticFilesDir+
+				`"}`,
 		)
 	})
 	cl.ExpectEmpty(t)

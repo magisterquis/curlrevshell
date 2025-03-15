@@ -30,6 +30,10 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - [`Makefile`](./Makefile): Make `make help` make help.  Make `make update`
   make updates.
 - Somewhat less fragile tests in [`t/`](../t/).
+- If `-template` names a missing template file, the previously footgunful `/c`
+  script will now not be generated.  Empty template files work just fine.
+- [`-template`]: One-liners now configurable, plus way more available in
+  [Params](../lib/crstemplate/params.go).
 - Updated dependencies.
 
 `dev`
