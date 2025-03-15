@@ -45,7 +45,7 @@ ${TOOLSDIR}/${TOOLSRCDIR:T}! ${TOOLSRCDIR}
 .endfor
 
 update: ## Fetch the latest Shmore and up-to-date Go things
-	curl --fail --show-error --silent --output t/shmore.subr ${SHMOREURL}
+	curl --fail --no-progress-meter --output t/shmore.subr ${SHMOREURL}
 	go get go
 	go get -u
 	go mod tidy
