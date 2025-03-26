@@ -4,7 +4,7 @@
 # Make sure we can set URL paths
 # By J. Stuart McMurray
 # Created 20241205
-# Last Modified 20241216
+# Last Modified 20250326
 
 use warnings;
 use strict;
@@ -21,9 +21,8 @@ my $want_script = "testctest";
 # Don't wait for curlrevshell to die.
 $SIG{CHLD} = 'IGNORE';
 
-#open my $H, "-|", <<_eof or die "Starting curlrevshell: $!";
 # Start curlrevshell
-open2 my $chld_out, my $chld_in, <<_eof;
+open2 my $chld_out, my $chld_in, <<_eof or die "starting curlrevshell: $!";
 go run -ldflags '
         -X main.URLPathIn=$want_in
         -X main.URLPathOut=$want_out
@@ -55,6 +54,6 @@ my @ms = $curl_out=~ m,$ipaddr/([^/]+)/,g;
 is $ms[0], $want_in,  "Input path";
 is $ms[1], $want_out, "Output path";
 
-close $chld_in or die "Closing curlrevshell's stdout: $!";
+close $chld_in or die "Closing curlrevshell's stdin $!";
 
 done_testing;
