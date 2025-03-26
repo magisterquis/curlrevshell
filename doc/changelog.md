@@ -29,6 +29,8 @@ go install github.com/magisterquis/curlrevshell@dev
 - Make it slightly harder to accidentally a shell by muscle-memorying Ctrl+C.
 - New and improve tests which now actually run curlrevshell and make sure
   dependencies are up-to-date.
+- [`-serve-files-from`](./flags.md#-serve-files-from): Note that `index.html`
+  prevents directory listings.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

