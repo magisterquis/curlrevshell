@@ -9,7 +9,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
-- [`-template`](./flag.md#-template): Template (nearly) ALL the things!
+- [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.
 - Added compile-time i/o/io/c-changey variables.
@@ -23,17 +23,20 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - Renamed `{{.URL}}` to `{{.Host}}` and added `{{.Path}`, for overengineered
   templates to serve different `{{.script}}` sections based on URL.
 - [`README.md`](../README.md): No more out-of-date references to `funcgen`.
-- [`-ctrl-i`]: Fewer stray newlines and send with SIGUSR1 as well as Ctrl+I.
-- [`-ctrl-i`]: A friendly log message is now printed on startup with the PID,
-  to make it easier to use [fwa](https://github.com/PeterHajdu/fwa) and
-  `kill(1)` to send hot-off-the-press `-ctrl-i` functions.
+- [`-ctrl-i`](./flags.md#-ctrl-i): Fewer stray newlines and send with SIGUSR1
+  as well as Ctrl+I.
+- [`-ctrl-i`](./flags.md#-ctrl-i): A friendly log message is now printed on
+  startup with the PID, to make it easier to use
+  [fwa](https://github.com/PeterHajdu/fwa) and `kill(1)` to send
+  hot-off-the-press `-ctrl-i` functions to a connected shell.
 - [`Makefile`](./Makefile): Make `make help` make help.  Make `make update`
   make updates.
 - Somewhat less fragile tests in [`t/`](../t/).
-- If `-template` names a missing template file, the previously footgunful `/c`
-  script will now not be generated.  Empty template files work just fine.
-- [`-template`]: One-liners now configurable, plus way more available in
-  [Params](../lib/crstemplate/params.go).
+- If [`-template`](./flags.md#-template) names a missing template file, the
+  previously footgunful `/c` script will now not be generated.  Empty template
+  files work just fine.
+- [`-template`](./flags.md#-template): One-liners now configurable, plus way
+  more available in [Params](../lib/crstemplate/params.go).
 - Updated dependencies.
 
 `dev`
