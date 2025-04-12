@@ -23,8 +23,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - Renamed `{{.URL}}` to `{{.Host}}` and added `{{.Path}`, for overengineered
   templates to serve different `{{.script}}` sections based on URL.
 - [`README.md`](../README.md): No more out-of-date references to `funcgen`.
-- [`-ctrl-i`](./flags.md#-ctrl-i): Fewer stray newlines and send with SIGUSR1
-  as well as Ctrl+I.
+- [`-ctrl-i`](./flags.md#-ctrl-i): Fewer stray newlines and send with `SIGUSR1`
+  as well as `Ctrl+I`.
 - [`-ctrl-i`](./flags.md#-ctrl-i): A friendly log message is now printed on
   startup with the PID, to make it easier to use
   [fwa](https://github.com/PeterHajdu/fwa) and `kill(1)` to send
