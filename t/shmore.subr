@@ -2,55 +2,58 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20241203
+# Last Modified 20250430
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
 
 # _tap_echo is like echo, but prepends ${_tap_space} to the message, for
 # easier subtests.
-_tap_echo() { echo "${_tap_space}$*"; }
+_tap_echo() { /bin/echo "${_tap_space}${*:-""}"; }
 
 # tap_diag prints a diagnostic message similar to echo but will not interfere
 # with test output.  Similar to echo, arguments are joined with spaces.  Output
 # is sent to stderr.
-tap_diag() { tap_note "$@" >&2; }
+tap_diag() { tap_note "${@:-""}" >&2; }
 
 # Like tap_diag, but by default the message will not be seen when the test is
 # run in a harness.  Output is sent to stdout.
 tap_note() {(
         # If we've got no real arguments, emit nothing
-        if [ -z "$*" ]; then
+        if [ -z "${*:-""}" ]; then
                 return
         fi
         # Print each line.
-        IFS='
+        (
+        set -f # This is silly, but prevents wildcard expansion
+        export IFS='
 '
-        for line in $(echo "$*"); do # echo because zsh, apparently.
+        for line in $(/bin/echo "${@:-""}"); do
                 _tap_echo "# $line"
         done
+        )
 )}
 
 # tap_like tests whether something we got matches a regex.  This uses Perl
 # under the hood.
 #
 # Arguments:
-# $1 - The got 
+# $1 - The got
 # $2 - A regex
 # $3 - Test name (optional)
 # $4 - Test file (optional)
 # $5 - Test line (optional)
-tap_like() { _tap_like "$1" "=~" "$2" "$3" "$4" "$5"; }
+tap_like() { _tap_like "$1" "=~" "$2" "${3:-""}" "${4:-""}" "${5:-""}"; }
 
 # tap_unlike is like tap_like, but makes sure the regex isn't matched, a bit
 # like isnt vs is.
-tap_unlike() { _tap_like "$1" "!~" "$2" "$3" "$4" "$5"; }
+tap_unlike() { _tap_like "$1" "!~" "$2" "${3:-""}" "${4:-""}" "${5:-""}"; }
 
 # _tap_like does what tap_like and tap_unlike says they do, except the second
 # argument is either =~ or !~ to select tap_like or tap_unlike, respectively.
 #
 # Arguments:
-# $1 - The got 
+# $1 - The got
 # $2 - =~ or !~
 # $3 - A regex
 # $4 - Test name (optional)
@@ -72,12 +75,12 @@ _tap_like() {
         _tap_ok=0
         _tap_rex="$(perl -e 'print qr{$ARGV[0]}' "$3" 2>&1)" || _tap_ok=$?
         if [ 0 -ne "${_tap_ok}" ]; then
-                tap_fail "$4" "$5" "$6"
+                tap_fail "${4:-""}" "${5:-""}" "${6:-""}"
                 tap_diag "    '$3' doesn't look much like a regex to me."
                 tap_diag "    ${_tap_rex}"
                 return
         fi
-        
+
         # Make sure our matcher is a matcher
         case "$2" in
                 "=~" | "!~")                                ;; # Ok
@@ -87,12 +90,12 @@ _tap_like() {
 
         # If we have a match, life is easy.
         if ! perl -e "exit (\$ARGV[0] $2 qr{\$ARGV[1]})" "$1" "$3"; then
-                tap_pass "$4" "$5" "$6"
+                tap_pass "${4:-""}" "${5:-""}" "${6:-""}"
                 return
         fi
 
         # We don't.  Print helpful info.
-        tap_fail "$4" "$5" "$6"
+        tap_fail "${4:-""}" "${5:-""}" "${6:-""}"
         tap_diag "                  '$1'"
         if [ "=~" = "$2" ]; then
                 tap_diag "    doesn't match '${_tap_rex}'"
@@ -105,30 +108,30 @@ _tap_like() {
 # with [ ... = ... ].
 #
 # Arguments:
-# $1 - The got 
+# $1 - The got
 # $2 - The expected
 # $3 - Test name (optional)
 # $4 - Test file (optional)
 # $5 - Test line (optional)
-tap_is() { tap_cmp_ok "$1" "=" "$2" "$3" "$4" "$5"; }
+tap_is() { tap_cmp_ok "$1" "=" "$2" "${3:-""}" "${4:-""}" "${5:-""}"; }
 
 # tap_is notes whether something we got was anything but somthing.  These will
 # be compared with [ ... != ... ].
 #
 # Arguments:
-# $1 - The got 
+# $1 - The got
 # $2 - The not expected
 # $3 - Test name (optional)
 # $4 - Test file (optional)
 # $5 - Test line (optional)
-tap_isnt() { tap_cmp_ok "$1" "!=" "$2" "$3" "$4" "$5"; }
+tap_isnt() { tap_cmp_ok "$1" "!=" "$2" "${3:-""}" "${4:-""}" "${5:-""}"; }
 
 # tap_cmp_ok compares two arguments with any of test(1)'s binary operators.
 # It is similar to test $1 $2 $3; tap_ok $? but with better logging and less
 # typing.  It's also handy for comparing numbers with -eq and -ne.
 #
 # Arguments:
-# $1 - The got 
+# $1 - The got
 # $2 - test(1) operator
 # $3 - The expected
 # $4 - Test name (optional)
@@ -149,7 +152,7 @@ tap_cmp_ok() {
 	# Do the comparing itself.
 	_tap_ok=0
 	test "$1" "$2" "$3" || _tap_ok=$?
-	tap_ok "${_tap_ok}" "$4" "$5" "$6"
+	tap_ok "${_tap_ok}" "${4:-""}" "${5:-""}" "${6:-""}"
 
 	# If the test passed, no need to print anything else.
 	if [ 0 -eq ${_tap_ok} ]; then
@@ -164,15 +167,23 @@ tap_cmp_ok() {
 
 	# Report the fail nicely.
 	case $2 in
-		"="|"=="|"-eq")
+		"="|"==") # Strings
 			${_tap_pf} "         got: '$1'"
 			${_tap_pf} "    expected: '$3'"
+                        ;;
+                "-eq")   # Numbers
+			${_tap_pf} "         got: $1"
+			${_tap_pf} "    expected: $3"
 			;;
-		"!="|"-ne")   
+                "!=")     # Strings
 			${_tap_pf} "         got: '$1'"
 			${_tap_pf} "    expected: anything else"
 			;;
-		*)        
+                "-ne")    # Numbers
+			${_tap_pf} "         got: $1"
+			${_tap_pf} "    expected: anything else"
+			;;
+		*)
 			${_tap_pf} "    '$1'"
 			${_tap_pf} "        $2"
 			${_tap_pf} "    '$3'"
@@ -187,14 +198,14 @@ tap_cmp_ok() {
 # TAP_RETURN_BAILED_OUT and tap_reset, which resets the TAP state.
 #
 # Arguments:
-# $1 - The reason for the bail (optional) 
+# $1 - The reason for the bail (optional)
 tap_BAIL_OUT() {
         _tap_bailo="Bail out!"
         if [ -n "$1" ]; then
-                _tap_bailo="${_tap_bailo}  $*"
+                _tap_bailo="${_tap_bailo}  ${*:-""}"
         fi
         echo "${_tap_bailo}"
-        return $TAP_RETURN_BAIL_OUT
+        return $TAP_RETURN_BAILED_OUT
 }
 
 # tap_skip is equivalent to a number of tap_ok 0's, plus some TAP which notes
@@ -246,19 +257,17 @@ _tap_skip() {
         _TAP_OK_SEPARATOR=${_tap_ok_separator_orig}
 }
 
-# TODO: Try checking for redefined functions?
-
 # TAP_TODO, if set, notes that tests are expected to fail.  Output will include
 # a flag indicating the tests are TODO for test harness bookkeeping.
 # Surrounding a group of tests in TAP_TODO=... / TAP_TODO= makes for a
 # practical TODO list; as each TODO test is done, move it outside the TAP_TODO
 # lines.
-TAP_TODO=$TAP_TODO
+TAP_TODO=${TAP_TODO:-""}
 
 # TAP_NOTRAP, if set to a non-empty string, causes tap_done_testing to not
 # be the EXIT trap.  This is handy for scripts which already use the EXIT trap
 # or for using shmore in functions inside a script.
-TAP_NOTRAP=$TAP_NOTRAP
+TAP_NOTRAP=${TAP_NOTRAP:-""}
 
 # Return values.
 TAP_RETURN_MAX_FAIL=240
@@ -266,26 +275,38 @@ TAP_RETURN_INVALID_OPERATOR=241
 TAP_RETURN_NOT_ENOUGH_ARGUMENTS=242
 TAP_RETURN_PLAN_ALREADY_PRINTED=243
 TAP_RETURN_WRONG_TEST_COUNT=244
+TAP_RETURN_NO_SUBTESTS_RUN=245
+TAP_RETURN_SKIPPED_ALL=246
 TAP_RETURN_BAILED_OUT=255
 
 # This all works until we run multi-threaded.
 _tap_bailo=
 _tap_doner=
+_tap_final=
 _tap_nfail=0
 _tap_nplan=0
 _tap_ntest=0
+_tap_skipa=
 _tap_space=
+
+# These are only used by _tap_ok but are set here for set -u.
+_TAP_OK_NONOTOKDIAG=
+_TAP_OK_SEPARATOR=
 
 # tap_reset resets shmore's internal state to the same state as before any
 # tests are run.  It doesn't touch the EXIT trap, though.  This is useful for
 # running tests in functions, and not in a standalone script.
 tap_reset() {
         TAP_TODO=
+        _TAP_OK_NONOTOKDIAG=
+        _TAP_OK_SEPARATOR=
         _tap_bailo=
         _tap_doner=
+        _tap_final=
         _tap_nfail=0
         _tap_nplan=0
         _tap_ntest=0
+        _tap_skipa=
         _tap_space=
 }
 
@@ -305,6 +326,11 @@ tap_reset() {
 #
 # No arguments.
 tap_done_testing() {
+        # Grab the original exit status.  If this isn't 0, we'll return it
+        # if we would have otherwise had a successful exit for in case
+        # we trapped a syntax error or something along those lines.
+        _tap_oret=$?
+
         # Nothing to do here if we bailed.
         if [ -n "${_tap_bailo}" ]; then
                 return $TAP_RETURN_BAILED_OUT
@@ -320,33 +346,91 @@ tap_done_testing() {
         if [ "$TAP_RETURN_MAX_FAIL" -lt "${_tap_doner}" ]; then
                 _tap_doner=$TAP_RETURN_MAX_FAIL
         fi
-        # If we didn't make a plan, assume we ran as many tests as we
-        # should have.
-        if [ 0 -eq ${_tap_nplan} ] && [ 0 -ne ${_tap_ntest} ]; then
-                tap_plan ${_tap_ntest}
-        fi
         # Make sure we ran the right amount of tests.
-        if [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
-                tap_is "${_tap_ntest}" "${_tap_nplan}" \
-                        "planned to run ${_tap_nplan} but \
-actually ran ${_tap_ntest}"
+        if [ 0 -ne ${_tap_nplan} ] && [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
+                tap_ok 1 "planned to run ${_tap_nplan} but \
+done_testing() expects ${_tap_ntest}" "$0" ${LINENO:-""}
                 _tap_doner=${_tap_nfail}
         fi
-        # Note if we failed tests.
-        if [ 0 -ne ${_tap_nfail} ]; then
-                tap_diag "Looks like you failed ${_tap_nfail} tests \
-of ${_tap_ntest}." >&2
+
+        # Print a couple more messages, if need be.
+        _tap_finalize
+
+        # If all went well in TAP-land, we'll use the shell's exit status in
+        # case there was a syntax error or something equally unhappy and the
+        # shell told us about it.
+        if [ 0 -eq ${_tap_doner} ]; then
+                _tap_doner=${_tap_oret}
         fi
+
+        # If we're still all happy, don't specify a return value.  Some shells
+        # use this to preserve the EXIT trap's return code, especially when
+        # $? wasn't set at the top of the function.
+        if [ 0 -eq ${_tap_doner} ]; then
+                return
+        fi
+
         return ${_tap_doner}
 }
 if [ -z "$TAP_NOTRAP" ]; then
-        trap tap_done_testing EXIT
+        # Apparently zsh doesn't use the last exit status as its exit status
+        # like EVERY OTHER SHELL.  Turns out ksh93 is just as bad.
+        trap 'tap_done_testing || exit $?' EXIT
 fi
 
-# tap_plan prints the number of tests we expect
+# _tap_finalize does a few checks to make sure we've run everything we said
+# we would.  It returns nonzero if we failed a test or got the wrong number
+# of tests.
+_tap_finalize() {
+        # Idempotency
+        if [ -n "${_tap_final}" ]; then
+                return "${_tap_final}"
+        fi
+
+        # If we didn't make a plan, assume we ran as many tests as we
+        # should have.
+        if [ -z "${_tap_skipa}" ] &&
+                [ 0 -eq ${_tap_nplan} ] && [ 0 -ne ${_tap_ntest} ]; then
+                tap_plan ${_tap_ntest}
+        fi
+        # Note if we didn't run enough tests.
+        _tap_qualifier=
+        if [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
+                _tap_qualifier=" run"
+                _tap_s=
+                if [ 1 -ne ${_tap_nplan} ]; then
+                        _tap_s=s
+                fi
+                tap_diag "Looks like you planned ${_tap_nplan} test${_tap_s} \
+but ran ${_tap_ntest}."
+        fi
+        # Note if we failed tests.
+        if [ 0 -ne ${_tap_nfail} ]; then
+                _tap_s=
+                if [ 1 -ne ${_tap_nfail} ]; then
+                        _tap_s=s
+                fi
+                tap_diag "Looks like you failed ${_tap_nfail} test${_tap_s} \
+of ${_tap_ntest}${_tap_qualifier}." >&2
+        fi
+
+        # Return indicates if all tests passed.
+        _tap_final=0
+        if [ 0 -ne ${_tap_nfail} ]; then
+                _tap_final=${_tap_nfail}
+        elif [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
+                _tap_final=1
+        fi
+        return ${_tap_final}
+}
+
+# tap_plan prints the number of tests we expect.  Specifying 0 subtests lets a
+# test harness know the script or subtest will be skipped, similar to
+# tap_skip or Test::More's skip_all, but does not exit the script or function.
 #
 # Arguments:
-# $1 - The number of tests which should be run
+# $1 - The number of tests which should be run, or 0 to skip testing
+# $2 - If $1 is 0, the reason for skipping testing
 tap_plan() {
         # Don't do anything if we've bailed.
         if [ -n "${_tap_bailo}" ]; then
@@ -365,11 +449,16 @@ tap_plan() {
         fi
         # Work out how many tests we're signing ourselves up for
         _tap_nplan=$(($1))
-        _tap_echo "1..${_tap_nplan}"
+        _tap_plan_msg="1..${_tap_nplan}"
+        if [ 0 -eq ${_tap_nplan} ]; then
+                _tap_skipa=${2:-"???"}
+                _tap_plan_msg="${_tap_plan_msg} # SKIP ${_tap_skipa}"
+        fi
+        _tap_echo "${_tap_plan_msg}"
 }
 
-# tap_subtest runs a subtest, which should noramlly be its own function
-# wrapping i.e. mysubtest() {( tap_... )}; tap_subtest "foo" mysubtest.
+# tap_subtest runs a subtest, which should normally be its own function
+# i.e. mysubtest() { tap_... }; tap_subtest "foo" mysubtest.
 # The subtest function should return 0 on success.
 # See examples/subtest.sh for an example.
 #
@@ -393,26 +482,56 @@ tap_subtest() {
         tap_note "Subtest: $1"
 
         # Run the subtest with extra spaces
-        _tap_ret=0
+        _tap_subtest_ret=0
         (
-                trap tap_done_testing EXIT
                 _tap_save_space=${_tap_space}
+                _tap_save_ntest=${_tap_ntest}
                 tap_reset
                 _tap_space="    ${_tap_save_space}"
                 _tap_save_space=
-                "$2"
-                tap_done_testing
-        ) || _tap_ret=$?
+                eval "$2" || :
+                # Nothing to do after bailing
+                if [ -n "${_tap_bailo}" ]; then
+                        exit $TAP_RETURN_BAILED_OUT
+                # We log the skip_all pass/fail here because communicating
+                # out of the subshell is more trouble than its worth
+                elif [ -n "${_tap_skipa}" ]; then
+                        _tap_space="${_tap_save_space}"
+                        _tap_ntest="${_tap_save_ntest}"
+                        tap_skip "${_tap_skipa}" 1
+                        return $TAP_RETURN_SKIPPED_ALL
+                # If we didn't run any tests at all let someone know.
+                elif [ 0 -eq ${_tap_ntest} ]; then
+                        _tap_echo "1..0"
+                        tap_diag "No tests run!"
+                        exit $TAP_RETURN_NO_SUBTESTS_RUN
+                fi
+                set +e
+                _tap_finalize
+                [ 0 -eq $? ]
+        ) || _tap_subtest_ret=$?
 
         # If we've bailed, note it for the rest of testing.  There's no really
         # good way to pass things back from subshells.
-        if [ $TAP_RETURN_BAILED_OUT -eq ${_tap_ret} ]; then
+        if [ -z "$_tap_bailo" ] && \
+                [ $TAP_RETURN_BAILED_OUT -eq ${_tap_subtest_ret} ]; then
+
                 _tap_bailo="Bailed in subtest $2"
+                return
+        # A skipped_all subtest already logged its own success or failure; we
+        # just need to note that another test was run.
+        elif [ $TAP_RETURN_SKIPPED_ALL -eq ${_tap_subtest_ret} ]; then
+                : $((_tap_ntest+=1))
+                return
+        # If we didn't get any subtests, note it as an error.
+        elif [ $TAP_RETURN_NO_SUBTESTS_RUN -eq ${_tap_subtest_ret} ]; then
+                tap_ok 1 "No tests run for subtest "'"'"$1"'"' \
+                        "${3:-""}" "${4:-""}"
                 return
         fi
 
         # Emit the ok/not ok message and note success/fail.
-        tap_ok "${_tap_ret}" "$1" "$3" "$4"
+        tap_ok "${_tap_subtest_ret}" "$1" "${3:-""}" "${4:-""}"
 }
 
 # tap_ok notes whether a test succeeded or failed.
@@ -422,7 +541,7 @@ tap_subtest() {
 # $2 - Test name (optional)
 # $3 - Test file (optional)
 # $4 - Test line (optional)
-tap_ok() { _tap_ok "$1" "$2" "$3" "$4"; }
+tap_ok() { _tap_ok "$1" "${2:-""}" "${3:-""}" "${4:-""}"; }
 
 # tap_pass is a wrapper around tap_ok 0.  The file and line are unused, but
 # left for symmetry with tap_fail.
@@ -431,7 +550,7 @@ tap_ok() { _tap_ok "$1" "$2" "$3" "$4"; }
 # $1 - Test name (optional)
 # $2 - Test file (optional)
 # $3 - Test line (optional)
-tap_pass() { tap_ok 0 "$@"; }
+tap_pass() { tap_ok 0 "${@:-""}"; }
 
 # tap_fail is a wrapper around tap_ok 0
 #
@@ -439,7 +558,7 @@ tap_pass() { tap_ok 0 "$@"; }
 # $1 - Test name (optional)
 # $2 - Test file (optional)
 # $3 - Test line (optional)
-tap_fail() { tap_ok 1 "$@"; }
+tap_fail() { tap_ok 1 "${@:-""}"; }
 
 # _tap_ok does what tap_ok says it does, but takes an additional argument to
 # specify the separator character.  This is for skips and testing and such.
@@ -461,7 +580,7 @@ _tap_ok() {
         fi
 
         # Need at least an ok or not.
-        if [ 1 -gt $# ]; then
+        if [ 1 -gt $# ] || [ -z "$1" ] ; then
                 echo "Not enough arguments" >&2
                 return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
         fi
@@ -483,7 +602,7 @@ _tap_ok() {
                 else
                         _tap_msg="${_tap_msg} ${_TAP_OK_SEPARATOR}"
                 fi
-                _tap_msg="${_tap_msg} $2"
+                _tap_msg="${_tap_msg} ${2:-""}"
         fi
         if [ -n "$TAP_TODO" ]; then
                 _tap_msg="${_tap_msg} # TODO $TAP_TODO"
@@ -500,12 +619,21 @@ _tap_ok() {
         if [ -n "$TAP_TODO" ]; then
                 _tap_msg=" (TODO)"
                 _tap_pf=tap_note
+        elif [ -n "${HARNESS_ACTIVE:-""}" ]; then
+                # If we're in a harness and not TODOing, we put a blank line
+                # above fails, apparently.
+                echo >&2 # Just a newline
         fi
+
+        # Whether we use one line or two depends on whether or not we have a
+        # test name.
+        _tap_l1="Failed${_tap_msg} test"
+        _tap_l2="at ${3:-"???"} line ${4:-"???"}."
         if [ -n "$2" ]; then
-                ${_tap_pf} "  Failed${_tap_msg} test '$2'"
-        fi
-        if [ -n "$3" ]; then
-                ${_tap_pf} "  at $3 line ${4:-"???"}."
+                ${_tap_pf} "  ${_tap_l1} '${2:-""}'"
+                ${_tap_pf} "  ${_tap_l2}"
+        else
+                ${_tap_pf} "  ${_tap_l1} ${_tap_l2}"
         fi
 }
 
