@@ -2,14 +2,14 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20250311
+# Last Modified 20250430
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
 
 # _tap_echo is like echo, but prepends ${_tap_space} to the message, for
 # easier subtests.
-_tap_echo() { echo "${_tap_space}${*:-""}"; }
+_tap_echo() { /bin/echo "${_tap_space}${*:-""}"; }
 
 # tap_diag prints a diagnostic message similar to echo but will not interfere
 # with test output.  Similar to echo, arguments are joined with spaces.  Output
@@ -28,7 +28,7 @@ tap_note() {(
         set -f # This is silly, but prevents wildcard expansion
         export IFS='
 '
-        for line in $(echo "${@:-""}"); do
+        for line in $(/bin/echo "${@:-""}"); do
                 _tap_echo "# $line"
         done
         )

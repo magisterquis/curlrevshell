@@ -34,13 +34,13 @@ Example
 It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@bettertemplates
-go: downloading golang.org/x/net v0.33.0
-go: downloading golang.org/x/sync v0.10.0
-go: downloading golang.org/x/text v0.21.0
-go: downloading golang.org/x/tools v0.28.0
-go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2
-go: downloading golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
-go: downloading golang.org/x/sys v0.28.0
+go: downloading golang.org/x/sync v0.12.0
+go: downloading golang.org/x/text v0.23.0
+go: downloading golang.org/x/net v0.37.0
+go: downloading golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
+go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2.0.20250216160731-e965007e5db9
+go: downloading golang.org/x/tools v0.31.0
+go: downloading golang.org/x/sys v0.31.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630
 01:04:42.760 Listening on 0.0.0.0:4444
