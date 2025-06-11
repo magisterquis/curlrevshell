@@ -5,7 +5,7 @@ package hsrv
  * io.Writer which sends pink messages to opshell.Shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250303
+ * Last Modified 20250611
  */
 
 import (
@@ -76,7 +76,8 @@ func remoteHost(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// pinkSender is an io.Writer which sends pink opshell.CLines.
+// pinkSender is an io.Writer which used to send pink opshell.CLines, but now
+// sends red opshell.CLines.
 type pinkSender struct{ och chan<- opshell.CLine }
 
 // Write implements io.Writer.  It always returns len(p), nil.

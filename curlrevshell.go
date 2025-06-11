@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250112
+ * Last Modified 20250611
  */
 
 import (
@@ -110,6 +110,11 @@ func rmain() int {
 			"print-ctrl-i",
 			false,
 			"Print what would be sent with Tab/Ctrl+I and exit",
+		)
+		printDebug = flag.Bool(
+			"debug",
+			false,
+			"Print debugging messages",
 		)
 	)
 	flag.StringVar(
@@ -332,6 +337,7 @@ Options:
 		cbAddrs,
 		*printIPv6,
 		*oneShell,
+		*printDebug,
 	)
 	if nil != err {
 		shell.Logf(

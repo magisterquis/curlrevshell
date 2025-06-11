@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@dev
+   go install github.com/magisterquis/curlrevshell@debug-flag
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,7 +33,7 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@dev
+$ go install github.com/magisterquis/curlrevshell@debug-flag
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2.0.20241203122007-0b5affac8356
 go: downloading golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476
 go: downloading golang.org/x/net v0.41.0
@@ -80,6 +80,8 @@ Options:
     	Optional callback template file, used if it exists
   -ctrl-i source
     	Tab/Ctrl+I's insertion source file or directory
+  -debug
+    	Print debugging messages
   -icanhazip
     	Query icanhazip.com for a callback address
   -ipv6-one-liners

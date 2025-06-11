@@ -146,6 +146,12 @@ recon     - Figure out what this box is doing
 tab_list  - This function list
 ```
 
+`-debug`
+--------
+Prints TLS and other usually not-very-interesting errors.
+
+Handy for when you can't work out why callbacks aren't.
+
 `-icanhazip`
 ------------
 Adds whatever address [icanhazip.com](https://icanhazip.com) gives back to the

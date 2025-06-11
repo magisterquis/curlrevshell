@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240926
+ * Last Modified 20250611
  */
 
 import (
@@ -15,12 +15,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/chanlog"
@@ -83,6 +85,7 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		cbAddrs,
 		true,
 		false,
+		true, /* printDebug */
 	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
@@ -101,8 +104,8 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		err := eg.Wait()
 		if nil != err &&
 			!errors.Is(err, ErrOneShellClosed) &&
-			!errors.Is(err, net.ErrClosed) &&
-			!errors.Is(err, context.Canceled) {
+			!errors.Is(err, net.ErrClosed) { //&&
+			//	!errors.Is(err, context.Canceled) {
 			t.Fatalf("Unexpected server error: %s", err)
 		}
 		close(cl)
@@ -452,4 +455,127 @@ func TestServer_OneShell(t *testing.T) {
 		{Msg: iobroker.LMDisconnected, Direction: "output"}: 1,
 	})
 	cl.ExpectEmpty(t)
+}
+
+// Can we switch on and off debug messages?
+func TestServer_NoDebug(t *testing.T) {
+	/* bannerServer starts a server going, banners it, and returns its
+	output channel as well the address from which it was bannered.  The
+	server will be closed when the test finishes. */
+	bannerServer := func(
+		t *testing.T,
+		printDebug bool,
+	) (<-chan opshell.CLine, string) {
+		/* Assemble bits. */
+		var (
+			ich = make(chan string, 1024)
+			och = make(chan opshell.CLine, 1024)
+		)
+		iob, err := iobroker.New(ich, och)
+		if nil != err {
+			t.Fatalf("Error setting up IO Broker: %s", err)
+		}
+
+		/* Roll a server. */
+		svr, err := New(
+			slog.New(slog.DiscardHandler),
+			"127.0.0.1:0",
+			"",
+			"",
+			ich,
+			och,
+			iob,
+			"",
+			nil,
+			false,
+			false,
+			printDebug,
+		)
+		if nil != err {
+			t.Fatalf(
+				"Error making server with printDebug:%t: %s",
+				printDebug,
+				err,
+			)
+		}
+
+		/* Start it going and make sure it ends eventually. */
+		var (
+			ctx, cancel = context.WithCancel(t.Context())
+			ech         = make(chan error, 1)
+			wg          sync.WaitGroup
+		)
+		wg.Add(1)
+		t.Cleanup(func() {
+			cancel()
+			if err := <-ech; nil != err {
+				t.Errorf("Server exited with error: %s", err)
+			}
+			close(ich)
+			close(och)
+			for l := range och {
+				t.Errorf("Leftover output line: %v", l)
+			}
+		})
+		go func() { defer wg.Done(); ech <- svr.Do(ctx) }()
+
+		/* Remove normal startup things from the output channel.  These
+		have been checked elsewhere. */
+		for range 3 {
+			<-och
+		}
+
+		/* Banner-grab it. */
+		sa := svr.l.Addr().String()
+		c, err := net.DialTimeout("tcp", sa, time.Second)
+		if nil != err {
+			t.Fatalf(
+				"Error connecting to server at %s: %s",
+				sa,
+				err,
+			)
+		}
+		ba := c.LocalAddr().String()
+		if err := c.Close(); nil != err {
+			t.Fatalf("Error closing connection to server: %s", err)
+		}
+
+		return och, ba
+	}
+
+	/* Server which should get debug output. */
+	t.Run("with_debug", func(t *testing.T) {
+		/* See if we got an EOF. */
+		och, addr := bannerServer(t, true)
+		gotL, ok := <-och
+		if !ok {
+			t.Fatalf("Did not get output line")
+		}
+		if got, want := gotL.Color, ErrorColor; got != want {
+			t.Errorf(
+				"Incorrect output line color\n"+
+					" got: %s\n"+
+					"want: %s",
+				got,
+				want,
+			)
+		}
+		if got, want := gotL.Line, fmt.Sprintf(
+			"Server error: http: "+
+				"TLS handshake error from %s: EOF\n",
+			addr,
+		); got != want {
+			t.Errorf(
+				"Incorrect banner message\n"+
+					" got: %q\n"+
+					"want: %q",
+				got,
+				want,
+			)
+		}
+	})
+
+	/* Without debug output, shouldn't be anything to check.  The lack of
+	output will be checked by bannerServer. */
+	t.Run("no_debug", func(t *testing.T) { bannerServer(t, false) })
 }

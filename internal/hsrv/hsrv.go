@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240925
+ * Last Modified 20250611
  */
 
 import (
@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -24,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
@@ -43,6 +45,10 @@ const (
 	// ShellSuffix is added to CurlFormat when telling the user haw to get
 	// a shell.
 	ShellSuffix = "/c | /bin/sh"
+
+	// ShutdownWait is how long we wait for cilents to disconnect on
+	// shutdown.
+	ShutdownWait = 4 * time.Second
 )
 
 // Log messages and keys.
@@ -66,8 +72,8 @@ type Server struct {
 	och      chan<- opshell.CLine
 	iob      *iobroker.Broker
 	l        sstls.Listener
-	ps       pinkSender
-	oneShell bool /* Close listener after getting a shell. */
+	dw       io.Writer /* Debug writer. */
+	oneShell bool      /* Close listener after getting a shell. */
 
 	/* Template generation. */
 	tmplf   string             /* Template file. */
@@ -97,6 +103,7 @@ func New(
 	cbAddrs []string, /* Callback addresses, for one-liners. */
 	printIPv6 bool,
 	oneShell bool, /* Shut down listener after first shell. */
+	printDebug bool, /* Send the user debug (red) messages. */
 ) (*Server, error) {
 	var l sstls.Listener
 
@@ -113,6 +120,12 @@ func New(
 	}
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())
 
+	/* Work out where to send debug messages. */
+	dw := io.Discard
+	if printDebug {
+		dw = pinkSender{och}
+	}
+
 	/* Server to return. */
 	s := &Server{
 		sl:        sl,
@@ -121,7 +134,7 @@ func New(
 		och:       och,
 		iob:       iob,
 		l:         l,
-		ps:        pinkSender{och},
+		dw:        dw,
 		tmplf:     tmplf,
 		defTmpl:   parsedDefaultTemplate,
 		cbAddrs:   cbAddrs,
@@ -203,9 +216,11 @@ func (s *Server) Do(ctx context.Context) error {
 
 	/* Serve clients and watch events. */
 	eg, ectx := ctxerrgroup.WithContext(ctx)
-	eg.GoContext(ectx, s.serveHTTP) /* Handle HTTP. */
-	eg.Go(func() error {            /* Process IOB events. */
-		s.watchIOBEvents(ectx, evCh)
+	eg.GoTag(ectx, "http_server", s.serveHTTP) /* Handle HTTP. */
+	eg.GoTag(ectx, "iowatch", func(            /* Process IOB events. */
+		ctx context.Context,
+	) error {
+		s.watchIOBEvents(ctx, evCh)
 		return nil
 	})
 	return eg.Wait()
@@ -355,7 +370,7 @@ func (s *Server) serveHTTP(ctx context.Context) error {
 	/* Set up a server. */
 	hsvr := http.Server{
 		Handler:  s.newMux(),
-		ErrorLog: log.New(s.ps, "Server error: ", log.Lmsgprefix),
+		ErrorLog: log.New(s.dw, "Server error: ", log.Lmsgprefix),
 		BaseContext: func(_ net.Listener) context.Context {
 			return ctx
 		},
@@ -379,7 +394,12 @@ func (s *Server) serveHTTP(ctx context.Context) error {
 	}
 
 	/* Shutdown the server. */
-	serr := hsvr.Shutdown(ctx)
+	toctx, cancel := context.WithTimeout(
+		context.Background(),
+		ShutdownWait,
+	)
+	defer cancel()
+	serr := hsvr.Shutdown(toctx)
 
 	/* Return the first non-nil error. */
 	return cmp.Or(err, serr)
