@@ -5,7 +5,7 @@ package crstemplate
  * Turn a request into a Request.
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250214
+ * Last Modified 20250612
  */
 
 import (
@@ -64,7 +64,7 @@ func AddRequest(p Params, r *http.Request) (Params, error) {
 	if !(testing.Testing() && "" != ret.ID) {
 		ret.ID = strconv.FormatUint(rand.Uint64(), 36)
 	}
-	ret.C2Addr = a
+	ret.C2Addr = EnsurePort(DefaultPort, a)
 	ret.Request = r
 	ret.BasicAuth = ba
 	ret.LocalAddress = la.String()
@@ -82,24 +82,17 @@ func localAddrFromRequest(r *http.Request) *net.TCPAddr {
 // address' port will be, in order of precedence, what's sent from the client,
 // or the port on which the connection arrived.
 func c2Addr(r *http.Request, localAddress *net.TCPAddr) (string, error) {
-	/* Get the port on which the connection arrived. */
-	/* withPort makes adds the port from the request to a, if a doesn't
-	already have a port. */
-	withPort := func(a string) string {
-		return EnsurePort(strconv.Itoa(localAddress.Port), a)
-	}
-
 	/* Parse the query and form and try to get it from there. */
 	if err := r.ParseForm(); nil != err {
 		return "", fmt.Errorf("parsing request: %w", err)
 	}
 	if p := r.Form.Get(C2Param); "" != p {
-		return withPort(p), nil
+		return p, nil
 	}
 
 	/* If it's not there, try to get it as a header. */
 	if p := r.Header.Get(C2Param); "" != p {
-		return withPort(p), nil
+		return p, nil
 	}
 
 	/* Failing that, try the Host: header. */
@@ -107,12 +100,17 @@ func c2Addr(r *http.Request, localAddress *net.TCPAddr) (string, error) {
 		return "", fmt.Errorf("punycoding %s: %w", r.Host, err)
 	} else if "" != p &&
 		!(testing.Testing() && testingIgnoreHostHeader == p) {
-		return withPort(p), nil
+		return p, nil
 	}
 
-	/* No Host: header.  Probably HTTP/1.0.  Try the SNI. */
+	/* No Host: header.  Probably HTTP/1.0.  Try the SNI.  We add a port
+	here because SNI will never have one.  Nuts to us if we're
+	port-forwarding and have an HTTPS/1.0 connection. */
 	if nil != r.TLS && "" != r.TLS.ServerName {
-		return withPort(r.TLS.ServerName), nil
+		return EnsurePort(
+			strconv.Itoa(localAddress.Port),
+			r.TLS.ServerName,
+		), nil
 	}
 
 	/* Out of ideas at this point. */

