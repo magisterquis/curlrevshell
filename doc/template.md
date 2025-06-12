@@ -107,3 +107,10 @@ Dot
 Subtemplates will be executed with
 [`dot`](https://pkg.go.dev/text/template#pkg-overview)
 set to an instance of [Params](../lib/crstemplate/params.go).
+
+Functions
+---------
+A small number of extra functions are made available to templates.  These
+aren't very well-documented at the moment, but have a look at
+[tmplfuncs/godoc.txt](../lib/crstemplate/tmplfuncs/godoc.txt) for what little
+there is.

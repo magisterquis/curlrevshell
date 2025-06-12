@@ -1,11 +1,11 @@
-package crstemplate
+package tmplfuncs
 
 /*
- * template_funcs_test.go
- * Tests for template_funcs.go
+ * tmplfuncs_test.go
+ * Tests for tmplfuncs.go
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20250205
+ * Last Modified 20250613
  */
 
 import (

@@ -5,7 +5,7 @@ package crstemplate
  * Turn a request into a Request.
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250612
+ * Last Modified 20250613
  */
 
 import (
@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/magisterquis/curlrevshell/lib/crstemplate/tmplfuncs"
 	"golang.org/x/net/idna"
 )
 
@@ -64,7 +65,7 @@ func AddRequest(p Params, r *http.Request) (Params, error) {
 	if !(testing.Testing() && "" != ret.ID) {
 		ret.ID = strconv.FormatUint(rand.Uint64(), 36)
 	}
-	ret.C2Addr = EnsurePort(DefaultPort, a)
+	ret.C2Addr = tmplfuncs.EnsurePort("", a)
 	ret.Request = r
 	ret.BasicAuth = ba
 	ret.LocalAddress = la.String()
@@ -107,7 +108,7 @@ func c2Addr(r *http.Request, localAddress *net.TCPAddr) (string, error) {
 	here because SNI will never have one.  Nuts to us if we're
 	port-forwarding and have an HTTPS/1.0 connection. */
 	if nil != r.TLS && "" != r.TLS.ServerName {
-		return EnsurePort(
+		return tmplfuncs.EnsurePort(
 			strconv.Itoa(localAddress.Port),
 			r.TLS.ServerName,
 		), nil

@@ -37,6 +37,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
   files work just fine.
 - [`-template`](./flags.md#-template): One-liners now configurable, plus way
   more available in [Params](../lib/crstemplate/params.go).
+- [`-template`](./flags.md#-template): Function available in templates now
+  (kinda) [documented](../lib/crstemplate/tmplfuncs/godoc.txt)
 - Updated dependencies.
 
 `dev`

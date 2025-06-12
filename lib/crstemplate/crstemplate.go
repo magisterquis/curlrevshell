@@ -7,7 +7,7 @@ package crstemplate
  * Curlrevshell template things
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20250217
+ * Last Modified 20250613
  */
 
 import (
@@ -18,6 +18,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/magisterquis/curlrevshell/lib/crstemplate/tmplfuncs"
 )
 
 // Default URL paths for comms with shells.
@@ -141,5 +143,5 @@ func mergeTemplateFrom(fn string) (*template.Template, error) {
 // newTemplate returns a new template from s with the main template name
 // baseName.
 func newTemplate(s string) (*template.Template, error) {
-	return template.New(baseName).Funcs(TemplateFuncs).Parse(s)
+	return template.New(baseName).Funcs(tmplfuncs.TemplateFuncs).Parse(s)
 }

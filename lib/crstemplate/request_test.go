@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250612
+ * Last Modified 20250613
  */
 
 import (
@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/lib/crstemplate/tmplfuncs"
 )
 
 var (
@@ -410,7 +412,7 @@ func TestC2Addr(t *testing.T) {
 			if "" == c.want {
 				c.want = svrAddr
 			} else if c.wantAddPort {
-				c.want = EnsurePort(u.Port(), c.want)
+				c.want = tmplfuncs.EnsurePort(u.Port(), c.want)
 			}
 			/* Make the request. */
 			req, err := c.req(svr)

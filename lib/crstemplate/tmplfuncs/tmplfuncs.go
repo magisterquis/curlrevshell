@@ -1,11 +1,14 @@
-package crstemplate
+// Package tmplfuncs contains the functions available to -template templates.
+//
+// Template -> Go function name mappings are in [TemplateFuncs].
+package tmplfuncs
 
 /*
- * template_funcs.go
+ * tmplfuncs.go
  * Functions available to templates
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20250205
+ * Last Modified 20250613
  */
 
 import (
