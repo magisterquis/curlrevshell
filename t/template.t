@@ -4,7 +4,7 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20250302
+# Last Modified 20250615
 
 set -e
 
@@ -42,7 +42,7 @@ tap_like \
 # Make sure we get a warning if our template doesn't exist.
 gorun -template ./doesnotexist |&
 GOT=$(awk '3 == NR {print $0; exit}' <&p | cut -f 2- -d ' ')
-exec 9>&p; exec 3>&-
+exec 9>&p; exec 9>&-
 tap_like \
         "$GOT" \
         'Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: reading template: open ./doesnotexist: no such file or directory' \
