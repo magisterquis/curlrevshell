@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250215
+ * Last Modified 20250615
  */
 
 import (
@@ -92,7 +92,7 @@ func (s *Server) printCallbackHelp() {
 // get static files.
 func (s *Server) printStaticFileHelp() {
 	/* Get lines to print. */
-	ls, err := s.lAddrLines(crstemplate.SubtemplateCallback)
+	ls, err := s.lAddrLines(crstemplate.SubtemplateFiles)
 	if nil != err {
 		s.ErrorLogf(
 			"Error generating static files one-liners: %s",
