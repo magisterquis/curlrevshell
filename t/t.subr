@@ -2,9 +2,9 @@
 # Handy test subroutines and other things
 # By J. Stuart McMurray
 # Created 20250216
-# Last Modified 20250312
+# Last Modified 20250615
 
-set -u
+set -euo pipefail
 
 # GORUN runs with a safe(ish) listen address and no cert file
 function gorun {
