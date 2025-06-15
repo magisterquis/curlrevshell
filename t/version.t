@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/ksh
 #
 # version.t
 # Make sure docs are consistent with this version of curlrevshell
@@ -6,24 +6,30 @@
 # Created 20241203
 # Last Modified 20250112
 
-set -e
+set -euo pipefail
 
 . t/shmore.subr
+. t/t.subr
 
-tap_plan 7
+tap_plan 8
 
 # Tag we expect to use for installing
 TAG="$(git branch --show-current)"
-if [ "master" == "$WANT" ]; then
+if [ "master" == "$TAG" ]; then
         # On the master branch, we should line up with the latest tag
         TAG="$(git describe --tags)"
 
 fi
 tap_isnt "$TAG" "" "Worked out our install tag" "$0" $LINENO
 
-# Unfortunately, we'll just get (devel) here.  Better than nothing?
+# Unfortunately, we'll just get (devel) plus maybe a branch here.  Better than
+# nothing?
 WANT="Welcome to curlrevshell version (devel)"
-GOT="$(echo -n | go run . -no-timestamps 2>&1 | fgrep -o "$WANT")"
+if [[ "master" != $(current_git_branch) ]]; then
+        WANT="$WANT ($(current_git_branch) branch)"
+fi
+GOT="$(echo -n | go run . -no-timestamps 2>&1 |
+        egrep '^Welcome to curlrevshell version' | tr -d '\r\n')"
 tap_is "$GOT" "$WANT" "Version looks ok" "$0" $LINENO
 
 # Make sure that all of the go install URLs are for this branch.
@@ -98,5 +104,17 @@ tap_is \
         "Packages up-to-date" \
         "$0" $LINENO
 # Idea stolen from https://github.com/fogfish/go-check-updates
+
+# Make sure the welome message in the README at least has the right branch.
+GOT=$(grep 'Welcome to curlrevshell version' README.md | cut -f 7- -d ' ')
+WANT=$(current_git_branch)
+case "$WANT" in
+        master) WANT= ;;                   # Won't be displayed
+        *)      WANT="($WANT branch)" ;; # Bit fancier
+esac
+tap_is \
+        "$GOT" "$WANT" \
+        "Branch name in welcome message in README correct" \
+        "$0" $LINENO
 
 # vim: ft=sh

@@ -1,0 +1,14 @@
+# t.subr
+# Handy test subroutines and other things
+# By J. Stuart McMurray
+# Created 20250615
+# Last Modified 20250615
+
+
+# current_git_branch prints the name of the current git branch to stdout.
+function current_git_branch {
+        set -e
+        git rev-parse --abbrev-ref HEAD
+}
+
+# vim: ft=sh

@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250611
+ * Last Modified 20250615
  */
 
 import (
@@ -19,8 +19,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 
+	"github.com/magisterquis/curlrevshell/internal/currentversion"
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
@@ -267,15 +267,11 @@ Options:
 	defer cleanup()
 
 	/* Print a welcome message with our version. */
-	version := "(unknown)"
-	if bi, ok := debug.ReadBuildInfo(); ok {
-		version = bi.Main.Version
-	}
 	shell.Logf(
 		opshell.ColorNone,
 		false,
 		"Welcome to curlrevshell version %s",
-		version,
+		currentversion.VersionAndBranch(),
 	)
 
 	/* Warn the user if the insertion file isn't there or looks empty. */

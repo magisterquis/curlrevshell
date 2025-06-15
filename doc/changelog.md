@@ -33,6 +33,8 @@ go install github.com/magisterquis/curlrevshell@dev
   prevents directory listings.
 - [`-debug`](./flags.md#-debug): No more pesky TLS EOF messages (by default),
   but `-debug` brings them back.
+- Welcome message now lists the branch as well to avoid the version
+  number-related strabismus.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

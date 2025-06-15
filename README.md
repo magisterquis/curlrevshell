@@ -42,7 +42,7 @@ go: downloading golang.org/x/sys v0.33.0
 go: downloading golang.org/x/text v0.26.0
 go: downloading golang.org/x/tools v0.34.0
 $ curlrevshell
-01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630 (dev branch)
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
