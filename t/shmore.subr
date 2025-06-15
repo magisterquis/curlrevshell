@@ -2,7 +2,7 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20250613
+# Last Modified 20250615
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
@@ -355,7 +355,7 @@ tap_done_testing() {
         # Make sure we ran the right amount of tests.
         if [ 0 -ne ${_tap_nplan} ] && [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
                 tap_ok 1 "planned to run ${_tap_nplan} but \
-done_testing() expects ${_tap_ntest}" "$0" ${LINENO:-""}
+done_testing() expects ${_tap_ntest}" "$0"
                 _tap_doner=${_tap_nfail}
         fi
 
