@@ -2,7 +2,7 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20250430
+# Last Modified 20250613
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
@@ -25,12 +25,18 @@ tap_note() {(
         fi
         # Print each line.
         (
-        set -f # This is silly, but prevents wildcard expansion
-        export IFS='
-'
-        for line in $(/bin/echo "${@:-""}"); do
-                _tap_echo "# $line"
-        done
+                _tap_lines="$*"
+                while ! [ -z "$_tap_lines" ]; do
+                        # Hokey, but it works
+                        _tap_echo "# ${_tap_lines%%
+*}"
+                        _tap_lines_prev=${_tap_lines}
+                        _tap_lines="${_tap_lines#*
+}"
+                        if [ "${_tap_lines_prev}" = "${_tap_lines}" ]; then
+                                break
+                        fi
+                done
         )
 )}
 
