@@ -35,6 +35,8 @@ go install github.com/magisterquis/curlrevshell@dev
   but `-debug` brings them back.
 - Welcome message now lists the branch as well to avoid the version
   number-related strabismus.
+- Tests are less jealous and no longer fail when something else is listening
+  on port 4444.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
