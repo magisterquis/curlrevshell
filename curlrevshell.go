@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250615
+ * Last Modified 20250621
  */
 
 import (
@@ -155,8 +155,9 @@ Options:
 
 	/* Warn that -callback-template is going to change quite a bit.
 	Added 20250112.  The + is there because t/version.t :| */
-	fmt.Print(
-		` ___________________________________________________________________________________
+	if !*printDefaultTemplate {
+		fmt.Print(
+			` ___________________________________________________________________________________
 /           -callback-template templates are going to change quite a bit            \
 |                                                                                   |
 |             Have a look at the bettertemplates branch for more info:              |
@@ -171,7 +172,8 @@ Options:
                 ||----w |
                 ||     ||
 `,
-	)
+		)
+	}
 
 	/* If we're just printing the default template, life's also easy. */
 	if *printDefaultTemplate {
