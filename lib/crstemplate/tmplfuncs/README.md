@@ -27,6 +27,7 @@ var TemplateFuncs = template.FuncMap{
 	"ensureport":    EnsurePort,
 	"host":          Host,
 	"map":           Map,
+	"matchre":       MatchRE,
 	"nodefaultport": NoDefaultPort,
 	"port":          Port,
 }
@@ -48,6 +49,9 @@ func Map(kvs ...any) (map[string]any, error)
     Map assembles its arguments, which must be key/value pairs into a map,
     for easier passing multiple values to subtemplates. Totally not a knockoff
     of Sprig's dict...
+
+func MatchRE(re, s string) (bool, error)
+    MatchRE returns true if the regular expression re matches the string s.
 
 func NoDefaultPort(addr string) string
     NoDefaultPort takes a host:port or IP:port and returns it without the port

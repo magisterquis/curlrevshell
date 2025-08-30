@@ -1,30 +1,42 @@
 #!/bin/ksh
 #
-# tmplfuncs_docs.t
-# Make sure tmplfuncs' docs are correct
+# tmplfuncs.t
+# Test template functions themselves
 # By J. Stuart McMurray
-# Created 20250613
-# Last Modified 20250613
+# Created 20250830
+# Last Modified 20250830
 
 set -euo pipefail
 
 . t/shmore.subr
 
-TAP_PLAN=2
+tap_plan 1
 
-TFDIR=./lib/crstemplate/tmplfuncs
-TFDOC="$TFDIR/godoc.txt"
-READM="$TFDIR/README.md"
-GODOC=$(go doc -all "$TFDIR")
+TMPD=$(mktemp -d)
+TMPL="$TMPD/crs.tmpl"
+trap 'rm -rf "$TMPD"; tap_done_testing' EXIT
 
-# Is the godoc.txt file current?
-GOT=$(<"$TFDOC")
-WANT=$GODOC
-tap_is "$GOT" "$WANT" "$TFDOC correct" "$0" $LINENO
+# Does MatchRE work?
+cat >"$TMPL" <<'_eof'
+{{- define "callback" -}}
+TEST: {{ if matchre `\d+` `abc1def` }}MatchRE Worked{{ end -}}
+{{- if matchre `\d+` `abcdef` }}MatchRE Failed{{ end }}
+{{- end -}}
+_eof
+go run . \
+        -no-timestamps \
+        -listen-address 127.0.0.1:0 \
+        -template "$TMPL" |&
+while read -pr; do
+        if [[ "$REPLY" == TEST:* ]]; then
+                break
+        fi
+done
+WANT="TEST: MatchRE Worked"
+tap_is "$REPLY" "$WANT" "MatchRE worked" "$0" $LINENO
 
-# Is the godoc in the readme correct?
-GOT=$(awk '/^```text$/,/^```$/{if ($0 !~ /^```/) {print}}' $READM)
-WANT=$GODOC
-tap_is "$GOT" "$WANT" "Godoc in $READM correct" "$0" $LINENO
+# Don't need curlrevshell anymore.
+exec 3>&p; exec 3>&-
+wait
 
 # vim: ft=sh

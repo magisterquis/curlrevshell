@@ -39,6 +39,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
   more available in [Params](../lib/crstemplate/params.go).
 - [`-template`](./flags.md#-template): Function available in templates now
   (kinda) [documented](../lib/crstemplate/tmplfuncs/godoc.txt)
+- [`-template`](./flags.md#-template): Added `matchre`, to check if a string
+  might `match`[`re`](https://github.com/google/re2/wiki/Syntax).
 - Updated dependencies.
 
 `dev`

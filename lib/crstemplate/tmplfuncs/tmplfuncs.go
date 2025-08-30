@@ -8,7 +8,7 @@ package tmplfuncs
  * Functions available to templates
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20250613
+ * Last Modified 20250830
  */
 
 import (
@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
 	"text/template"
 )
 
@@ -27,6 +28,7 @@ var TemplateFuncs = template.FuncMap{
 	"ensureport":    EnsurePort,
 	"host":          Host,
 	"map":           Map,
+	"matchre":       MatchRE,
 	"nodefaultport": NoDefaultPort,
 	"port":          Port,
 }
@@ -110,4 +112,17 @@ func Map(kvs ...any) (map[string]any, error) {
 	}
 
 	return ret, nil
+}
+
+// MatchRE returns true if the regular expression re matches the string s.
+func MatchRE(re, s string) (bool, error) {
+	cre, err := regexp.Compile(re)
+	if nil != err {
+		return false, fmt.Errorf(
+			"compiling regular expression %q: %w",
+			re,
+			err,
+		)
+	}
+	return cre.MatchString(s), nil
 }

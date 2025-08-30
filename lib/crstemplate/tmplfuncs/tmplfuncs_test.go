@@ -5,7 +5,7 @@ package tmplfuncs
  * Tests for tmplfuncs.go
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20250613
+ * Last Modified 20250830
  */
 
 import (
@@ -157,5 +157,48 @@ func TestMap(t *testing.T) {
 			got,
 			want,
 		)
+	}
+}
+
+func TestMatchRE(t *testing.T) {
+	for n, c := range map[string]struct {
+		re      string
+		s       string
+		want    bool
+		wantErr string
+	}{"simple_match": {
+		re:   "kittens",
+		s:    "moose kittens zoomies!",
+		want: true,
+	}, "bad_regex": {
+		re: "bad[regex",
+		s:  "dummy",
+		wantErr: "compiling regular expression \"bad[regex\": " +
+			"error parsing regexp: missing closing ]: `[regex`",
+	}, "no_match": {
+		re: "kittens",
+		s:  "moose k_i_t_t_e_n_s zoomies!",
+	}} {
+		t.Run(n, func(t *testing.T) {
+			var gotErr string
+			m, err := MatchRE(c.re, c.s)
+			if nil != err {
+				gotErr = err.Error()
+			}
+			if got, want := gotErr, c.wantErr; got != want {
+				t.Errorf(
+					"Incorrect error\n got: %s\nwant: %s",
+					got,
+					want,
+				)
+			}
+			if got, want := m, c.want; got != want {
+				t.Errorf(
+					"Incorrect return\n got: %t\nwant: %t",
+					got,
+					want,
+				)
+			}
+		})
 	}
 }
