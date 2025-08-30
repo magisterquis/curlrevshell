@@ -44,6 +44,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - Added [staticcheck](https://staticcheck.dev) as a fancy new [Go tool
   dependency](https://go.dev/doc/modules/managing-dependencies#tools) which
   should save several seconds of copy/pasting a `go install` line.
+- Better checks for stray `DEBUG`/`TODO`/`TAP_TODO` comments and outdated
+  package versions.
 - Updated dependencies.
 
 `dev`
