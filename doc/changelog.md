@@ -38,9 +38,12 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - [`-template`](./flags.md#-template): One-liners now configurable, plus way
   more available in [Params](../lib/crstemplate/params.go).
 - [`-template`](./flags.md#-template): Function available in templates now
-  (kinda) [documented](../lib/crstemplate/tmplfuncs/godoc.txt)
+  (kinda) [documented](../lib/crstemplate/tmplfuncs/godoc.txt).
 - [`-template`](./flags.md#-template): Added `matchre`, to check if a string
   might `match`[`re`](https://github.com/google/re2/wiki/Syntax).
+- Added [staticcheck](https://staticcheck.dev) as a fancy new [Go tool
+  dependency](https://go.dev/doc/modules/managing-dependencies#tools) which
+  should save several seconds of copy/pasting a `go install` line.
 - Updated dependencies.
 
 `dev`
