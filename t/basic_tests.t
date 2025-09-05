@@ -4,13 +4,13 @@
 # Make sure our code is up-to-date and doesn't have debug things.
 # By J. Stuart McMurray
 # Created 20250818
-# Last Modified 20250818
+# Last Modified 20250905
 
 set -euo pipefail
 
 . t/shmore.subr
 
-NTEST=8
+NTEST=9
 tap_plan "$NTEST"
 
 # OK_DEBUG and OK_TODO, if exant, contain grep output lines to be ignored
@@ -46,6 +46,11 @@ if [[ -f ./go.mod ]]; then
         GOT="$(go run . -h </dev/null 2>&1 |
                 grep -E 'MQD DEBUG PACKAGE LOADED$' ||:)"
         tap_is "$GOT" "" "Not using github.com/magisterquis/mqd" "$0" $LINENO
+        GOT="$(grep github.com/magisterquis/mqd go.mod ||:)"
+        tap_is \
+                "$GOT" "" \
+                "Not requiring github.com/magisterquis/mqd in go.mod" \
+                "$0" $LINENO
 
         # Should get happy help output.  We can't use go run here because it
         # doesn't properly propagate the exit status.
