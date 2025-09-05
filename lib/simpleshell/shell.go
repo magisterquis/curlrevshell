@@ -5,7 +5,7 @@ package simpleshell
  * Shell (or similar) subprocess
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20241013
+ * Last Modified 20250905
  */
 
 import (
@@ -20,18 +20,19 @@ import (
 // Shell is connected to Curlrevshell by [Go].  It need not actually be a
 // "real" shell (e.g. /bin/sh).
 type Shell interface {
-	// SetInput sets the io.Reader on which data from Curlrevshell will be
-	// sent.
-	SetInput(in io.Reader)
+	// SetInput sets the io.ReadCloser on which data from Curlrevshell will
+	// be sent.  Shells may close in before returning from Go.
+	SetInput(in io.ReadCloser)
 
-	// Output returns an io.Reader from which data to send to Curlrevshell
-	// will be read.  Shells must close the returned io.Reader when no more
-	// will be read, e.g. when an underlying subprocess terminates.
+	// Output returns an io.ReadCloser from which data to send to Curlrevshell
+	// will be read.  Shells must close the returned io.ReadCloser when no
+	// more will be read, e.g. when an underlying subprocess terminates.
 	// Output will always be called by Go.
 	Output() io.ReadCloser
 
 	// Go runs the underlying shell.  The io.ReadCloser returned by Output
-	// should be closed before Go returns.
+	// should be closed before Go returns.  The io.ReadCloser set by
+	// SetInput may be closed by Go before returning.
 	// Go should not return an error if both all I/O completed successfully
 	// and the underlying shell completed successfully, e.g. a subprocess
 	// returned 0 on Unix.
@@ -72,14 +73,14 @@ func NewCmdShell(cmd *exec.Cmd) (*CmdShell, error) {
 	return &c, nil
 }
 
-// SetInput sets the [io.Reader] from which c reads input.
-func (c *CmdShell) SetInput(in io.Reader) { c.cmd.Stdin = in }
+// SetInput sets the [io.ReadCloser] from which c reads input.
+func (c *CmdShell) SetInput(in io.ReadCloser) { c.cmd.Stdin = in }
 
-// Output returns an [io.Reader] on which c sends output.
+// Output returns an [io.ReadCloser] on which c sends output.
 func (c *CmdShell) Output() io.ReadCloser { return c.outr }
 
 // Go runs c's [exec.Cmd].  ctx is not used; use [exec.CommandContext] or cause
-// an EOF on the [io.Reader] set via c.SetInPipe to stop Go.
+// an EOF on the [io.ReadCloser] set via c.SetInPipe to stop Go.
 func (c *CmdShell) Go(ctx context.Context) error {
 	/* Start proxying output. */
 	var peg errgroup.Group
@@ -101,7 +102,7 @@ func (c *CmdShell) String() string { return c.cmd.String() }
 // EchoShell is a [Shell] which just echos its input to its output, useful
 // for testing.
 type EchoShell struct {
-	in   io.Reader
+	in   io.ReadCloser
 	out  *io.PipeWriter
 	outr *io.PipeReader
 }
@@ -114,16 +115,27 @@ func NewEchoShell() (in *io.PipeWriter, out *io.PipeReader, shell *EchoShell) {
 }
 
 // SetInput sets e's input; this is normally unnecessary.
-func (e *EchoShell) SetInput(in io.Reader) { e.in = in }
+func (e *EchoShell) SetInput(in io.ReadCloser) { e.in = in }
 
 // Output returns o's output.  This is the same *[io.PipeReader] returned by
 // NewEchoShell.
 func (e *EchoShell) Output() io.ReadCloser { return e.outr }
 
-// Go copies between the returned i/o pipes.  ctx is ignored; close the input
-// to stop Go.
+// Go copies between the returned i/o pipes.
 func (e *EchoShell) Go(ctx context.Context) error {
 	defer e.out.Close()
-	_, err := io.Copy(e.out, e.in)
-	return err
+	defer e.in.Close()
+
+	ech := make(chan error, 1)
+
+	/* Start the copy. */
+	go func() { _, err := io.Copy(e.out, e.in); ech <- err }()
+
+	/* Go until the copy's done or we're told to stop. */
+	select {
+	case err := <-ech:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
 }

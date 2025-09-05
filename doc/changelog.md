@@ -46,6 +46,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
   should save several seconds of copy/pasting a `go install` line.
 - Better checks for stray `DEBUG`/`TODO`/`TAP_TODO` comments and outdated
   package versions.
+- Added [`crsdialer`](./lib/crsdialer) to somewhat simplify
+  curlrevshell-dialing.
 - Updated dependencies.
 
 `dev`

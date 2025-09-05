@@ -5,7 +5,7 @@ package simpleshell
  * Tests for shell.go
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20241013
+ * Last Modified 20250905
  */
 
 import (
@@ -22,7 +22,7 @@ import (
 
 func testShell(t *testing.T, ctx context.Context, s Shell, have, want string) {
 	/* Hook up i/o. */
-	s.SetInput(strings.NewReader(have))
+	s.SetInput(io.NopCloser(strings.NewReader(have)))
 	o := s.Output()
 	buf := new(bytes.Buffer)
 
