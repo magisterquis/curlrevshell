@@ -5,11 +5,12 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250215
+ * Last Modified 20250905
  */
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -142,22 +143,8 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 
 // inOutHandler handles both input and output for a shell.
 func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
-	rc := http.NewResponseController(w)
-	/* Full duplex is required by real HTTP clients, but doesn't work
-	with the handler-tester. */
-	if err := rc.EnableFullDuplex(); nil != err &&
-		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
-		s.RErrorLogf(r, "Error enabling duplex comms: %s", err)
-		return
-	}
-	/* Write the header from the get-go.  Helps with clients waiting on
-	a proper go-ahead. */
-	if err := rc.Flush(); nil != err {
-		s.RErrorLogf(
-			r,
-			"Error sending initial HTTP response header: %s",
-			err,
-		)
+	if err := StartFullDuplex(w); nil != err {
+		s.RErrorLogf(r, "Starting duplex comms: %s", err)
 	}
 	s.iob.ConnectInOut(
 		r.Context(),
@@ -166,6 +153,30 @@ func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
 		w,
 		r.Body,
 	)
+}
+
+// StartFullDuplex enables full duplex mode on w, if possible.  This is
+// necessary for some clients which are waiting on a go-ahead. */
+func StartFullDuplex(w http.ResponseWriter) error {
+	rc := http.NewResponseController(w)
+
+	/* Full duplex is required by real HTTP clients, but doesn't work
+	with the handler-tester. */
+	if err := rc.EnableFullDuplex(); nil != err &&
+		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
+		return fmt.Errorf("enabling full duplex: %w", err)
+	}
+
+	/* Write the header from the get-go.  Helps with clients waiting on
+	a proper go-ahead. */
+	if err := rc.Flush(); nil != err {
+		return fmt.Errorf(
+			"sending initial HTTP response header: %w",
+			err,
+		)
+	}
+
+	return nil
 }
 
 // requestLogger returns a log.Logger which has information about r.
