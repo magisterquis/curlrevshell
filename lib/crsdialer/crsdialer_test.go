@@ -5,7 +5,7 @@ package crsdialer
  * Tests for crsdialer.go
  * By J. Stuart McMurray
  * Created 20250905
- * Last Modified 20250905
+ * Last Modified 20250924
  */
 
 import (
@@ -18,7 +18,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -74,7 +73,7 @@ func TestDial(t *testing.T) {
 
 	/* Get a connection. */
 	var (
-		c       *os.File
+		c       *net.UnixConn
 		eg, ctx = ctxerrgroup.WithContext(t.Context())
 	)
 	eg.GoContext(ctx, func(ctx context.Context) error {
@@ -210,7 +209,7 @@ func TestDial(t *testing.T) {
 			"Unexpected success reading from expected-closed " +
 				"connection",
 		)
-	} else if !errors.Is(err, os.ErrClosed) {
+	} else if !errors.Is(err, net.ErrClosed) {
 		t.Errorf(
 			"Unexpected error reading from closed connection: %s",
 			err,
