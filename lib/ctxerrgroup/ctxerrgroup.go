@@ -6,7 +6,7 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240324
+ * Last Modified 20250924
  */
 
 import (
@@ -18,9 +18,13 @@ import (
 // Group wraps golang.org/x/sync/errgroup.Group but makes it slightly easier to
 // add goroutines.  Group's undocumented methods directly wrap its embedded
 // errgroup.Group.
+// The zero value of a Group is not usable; use [New] instead.
 type Group struct {
 	eg *errgroup.Group
 }
+
+// New returns a new Group, ready for use, analogous to new(errgroup.Group).
+func New() *Group { return &Group{eg: new(errgroup.Group)} }
 
 // WithContext returns a new Group, similar to errgroup.WithContext.
 func WithContext(ctx context.Context) (*Group, context.Context) {
