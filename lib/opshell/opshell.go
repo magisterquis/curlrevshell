@@ -6,7 +6,7 @@ package opshell
  * Operator's interactive shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250109
+ * Last Modified 20250929
  */
 
 import (
@@ -31,6 +31,13 @@ const (
 	timeFormat = "15:04:05.000 "
 )
 
+// TestingTTY may be set to an empty string to always treat Shell's i/o as a
+// TTY but also disable colors.
+// It is intended to be used in tests via
+//
+//	go build -ldflags '-X github.com/magisterquis/curlrevshell/lib/opshell.TestingTTY="yes"'
+var TestingTTY string
+
 const (
 	// PlainWritePause is the amount of time a terminal must have no
 	// plain writes (i.e. [CLine]'s with Plain set to true) after a user
@@ -53,9 +60,6 @@ const (
 	SecondCtrlCWarning = "Caught second Ctrl+C."
 )
 
-// fder is anything which will give us a file descriptor, more or less.
-type fder interface{ Fd() uintptr }
-
 // ErrOutputClosed is returned by Shell.Do when it returns because someone
 // closed the output channel.
 var ErrOutputClosed = errors.New("output channel closed")
@@ -76,7 +80,7 @@ type Shell struct {
 	t            *goxterm.Terminal
 	ich          chan<- string
 	och          <-chan CLine
-	ttyF         fder
+	isTTY        bool
 	noTimestamps bool
 	insertGen    func() ([]byte, error) /* Bytes-generator for ^I. */
 	insertName   string                 /* Loggable name for insertGen. */
@@ -127,6 +131,32 @@ func NewWrapping(
 	stdin io.Reader,
 	stdout io.Writer,
 ) (*Shell, func(), error) {
+	return newWrapping(
+		ich,
+		och,
+		prompt,
+		noTimestamps,
+		insertGen,
+		insertName,
+		stdin,
+		stdout,
+		false, /* assumeTTY */
+	)
+}
+
+// newWrapping does what NewWrapping says it does, but with more config, for
+// testing.
+func newWrapping(
+	ich chan<- string,
+	och <-chan CLine,
+	prompt string,
+	noTimestamps bool,
+	insertGen func() ([]byte, error),
+	insertName string,
+	stdin io.Reader,
+	stdout io.Writer,
+	assumeTTY bool, /* Assume stdio is a TTY, even if it's not. */
+) (*Shell, func(), error) {
 	/* Shell to return. */
 	s := Shell{
 		t: goxterm.NewTerminal(goxterm.ReadWriter{
@@ -139,6 +169,18 @@ func NewWrapping(
 		insertGen:    insertGen,
 		insertName:   insertName,
 	}
+	/* Work out the underlying terminal, which will be a lot simpler if
+	we're not using a TTY. */
+	s.isTTY = goxterm.IsTerminal(int(os.Stdin.Fd())) &&
+		goxterm.IsTerminal(int(os.Stdout.Fd()))
+	if !s.isTTY && "" == TestingTTY && !assumeTTY {
+		s.t.Cooked()
+	}
+	/* If we're using a testing TTY, also disable colors. */
+	if "" != TestingTTY {
+		s.t.Escape = goxterm.CookedEscapeCodes()
+	}
+
 	/* Set up a timer to unsilence the shell after there's been a lull. */
 	s.silenceTimer = time.AfterFunc(0, func() {
 		s.wL.Lock()
@@ -180,18 +222,18 @@ func NewWrapping(
 				PlainWritePause,
 			)
 		case 0x09: /* ^I, paste from file. */
-			go s.insert()
-		case 0x0a: /* ^J, like ^I but just locally. */
+			go s.Insert()
+		case 0x13: /* ^S, like ^I but just locally. */
 			go s.pretendInsert()
 			/* This is left here but commented out to make it that
 			much easier to add another Ctrl+Key. */
-			//default:
-			//	go s.Logf(
-			//		ColorGreen,
-			//		false,
-			//		"Got key: ^%c 0x%02x %q",
-			//		key+'@', key, key,
-			//	)
+			// default:
+			// 	go s.Logf(
+			// 		ColorGreen,
+			// 		false,
+			// 		"Got key: ^%c 0x%02x %q",
+			// 		key+'@', key, key,
+			// 	)
 		}
 	}
 
@@ -199,22 +241,20 @@ func NewWrapping(
 	var oldState *goxterm.State
 	cleanup := sync.OnceFunc(func() {
 		/* Don't bother if we can't restore the state. */
-		if nil == oldState || nil == s.ttyF {
+		if nil == oldState {
 			return
 		}
+
 		/* Restore the terminal state. */
-		goxterm.Restore(int(s.ttyF.Fd()), oldState)
+		goxterm.Restore(int(os.Stdin.Fd()), oldState)
 	})
 
-	/* Use stdin's tty, if it is one. */
-	if infder, ok := stdin.(interface{ Fd() uintptr }); ok &&
-		goxterm.IsTerminal(int(infder.Fd())) {
-		/* Save stdin as our tty. */
-		s.ttyF = infder
+	/* Put terminal in raw mode, if we're using a real TTY. */
+	if s.isTTY {
 		/* Put tty in raw mode. */
 		var err error
 		if oldState, err = goxterm.MakeRaw(
-			int(s.ttyF.Fd()),
+			int(os.Stdin.Fd()),
 		); nil != err {
 			cleanup()
 			return nil, nil, fmt.Errorf(
@@ -296,7 +336,7 @@ func (s *Shell) Do(ctx context.Context) error {
 // resize resizes t to the size of its underlying TTY, if we have one. */
 func (s *Shell) resize() error {
 	/* Nothing to do here if we don't have a TTY. */
-	if nil == s.ttyF {
+	if !s.isTTY {
 		return nil
 	}
 
@@ -390,7 +430,8 @@ func (s *Shell) writePlain(line string) error {
 
 // Logf logs a line to the shell.  It is similar to log.Printf but includes
 // a color and only logs the time, not the date.  Logf may be called from
-// multiple goroutines simultaneously.
+// multiple goroutines simultaneously.  noTS can be used to suppress logging
+// the timestamp, even if s would normally log timestamps.
 func (s *Shell) Logf(
 	color Color,
 	noTS bool, /* No timestamp. */
@@ -407,6 +448,12 @@ func (s *Shell) Logf(
 		format,
 		v...,
 	)
+}
+
+// RedLogf is a wrapper around Logf which always uses the color red and doesn't
+// suppress timestamps.  This is handy for logging errors.
+func (s *Shell) RedLogf(format string, v ...any) (int, error) {
+	return s.Logf(ColorRed, false, format, v...)
 }
 
 // logf does what Shell.Logf says it does, but without assuming a shell.

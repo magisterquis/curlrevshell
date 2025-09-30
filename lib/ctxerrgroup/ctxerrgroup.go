@@ -6,7 +6,7 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250109
+ * Last Modified 20250924
  */
 
 import (
@@ -18,9 +18,10 @@ import (
 )
 
 // Group wraps golang.org/x/sync/errgroup.Group but makes it slightly easier to
-// add goroutines.  Group's undocumented methods directly wrap its internal
-// [errgroup.Group].  All of Group's methods are safe to be simultaneously
-// called from multiple goroutines.
+// add goroutines.
+// Group's undocumented methods directly wrap its internal [errgroup.Group].
+// All of Group's methods are safe to be simultaneously called from multiple
+// goroutines.
 type Group struct {
 	p  *errgroup.Group
 	mu sync.Mutex

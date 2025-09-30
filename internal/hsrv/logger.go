@@ -5,7 +5,7 @@ package hsrv
  * io.Writer which sends pink messages to opshell.Shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250611
+ * Last Modified 20250924
  */
 
 import (

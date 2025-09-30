@@ -6,7 +6,7 @@ package iobroker
  * Turn stream I/O into shell-friendly I/O
  * By J. Stuart McMurray
  * Created 20240919
- * Last Modified 20241003
+ * Last Modified 20250314
  */
 
 import (
@@ -18,6 +18,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/magisterquis/curlrevshell/lib/opshell"
@@ -341,9 +342,12 @@ func (b *Broker) proxyIn(
 	for {
 		select {
 		case l, ok := <-b.ich:
-			l += "\n" /* Add back newline. */
-			if !ok {  /* Input channel closed. */
+			if !ok { /* Input channel closed. */
 				return nil
+			}
+			/* Add back a missing newline. */
+			if !strings.HasSuffix(l, "\n") {
+				l += "\n"
 			}
 			if _, err := io.WriteString(w, l); nil != err {
 				return fmt.Errorf("sending line: %w", err)

@@ -1,0 +1,7 @@
+# TABDOC: foo A foo
+foo() {
+        foo
+}
+
+# TABDOC: bar A bar
+bar() { bar; }

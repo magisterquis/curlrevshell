@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20250112
+# Last Modified 20250930
 
 set -euo pipefail
 
@@ -85,36 +85,40 @@ GOT="$(awk '
 tap_is "$GOT" "$WANT" "Correct -h output in README" "$0" $LINENO
 
 # Make sure the package versions in the readme are correct
-GOT=$(grep 'go: downloading' README.md | cut -f 3- -d ' ' | sort -u)
-WANT=$(cut -f 1-2 -d ' ' go.sum | grep -v go.mod  | sort -u)
+# Credit to https://stackoverflow.com/questions/64371466/with-go-list-how-to-list-only-go-modules-used-in-the-binary#64390523
+GOT=$(grep 'go: downloading' README.md | cut -f 3-4 | sort -u)
+WANT=$(go list -deps -f '
+        {{- define "M"}}go: downloading {{.Path}} {{.Version}}{{end -}}
+        {{- with .Module -}}
+                {{- if not .Main -}}
+                        {{- if .Replace -}}
+                                {{template "M" .Replace}}
+                        {{- else -}}
+                                {{template "M" .}}
+                        {{- end -}}
+                {{- end -}}
+        {{- end -}}
+' | sort -u)
 tap_is "$GOT" "$WANT" "Correct downloaded modules in README" "$0" $LINENO
 
 # Make sure the top of the changelog has the right version
 GOT="$(awk '5==NR' doc/changelog.md | cut -f 2 -d '`')"
 tap_is "$GOT" "$TAG" "Changelog has correct tag" "$0" $LINENO
 
-# Make sure we don't need to update anything.
-tap_is \
-        "$(go list -u \
-                -f '{{if (and (not (or .Main .Indirect)) .Update)}}
-                        {{- .Path}}: {{.Version}} -> {{.Update.Version -}}
-                {{end}}' \
-                -m all)" \
-        "" \
-        "Packages up-to-date" \
-        "$0" $LINENO
-# Idea stolen from https://github.com/fogfish/go-check-updates
-
 # Make sure the welome message in the README at least has the right branch.
 GOT=$(grep 'Welcome to curlrevshell version' README.md | cut -f 7- -d ' ')
 WANT=$(current_git_branch)
 case "$WANT" in
-        master) WANT= ;;                   # Won't be displayed
+        master) WANT= ;;                 # Won't be displayed
         *)      WANT="($WANT branch)" ;; # Bit fancier
 esac
 tap_is \
         "$GOT" "$WANT" \
         "Branch name in welcome message in README correct" \
         "$0" $LINENO
+
+# Make sure there's no replace directives in go.mod.
+GOT=$(egrep ^replace go.mod ||:)
+tap_is "$GOT" "" "No replace directives in go.mod" "$0" $LINENO
 
 # vim: ft=sh

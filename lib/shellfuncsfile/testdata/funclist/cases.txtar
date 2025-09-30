@@ -24,3 +24,6 @@ foo# TABDOC:NOTABLISTbar
 tridge
 # TABDOC: kittens moose
 -- nolist.want --
+-- nolist_oneline.have --
+# TABDOC:NOTABLIST
+-- nolist_oneline.want --

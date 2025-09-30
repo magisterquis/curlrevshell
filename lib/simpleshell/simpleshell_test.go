@@ -5,123 +5,25 @@ package simpleshell
  * Tests for simpleshell.go
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20241013
+ * Last Modified 20250905
  */
 
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 	"golang.org/x/sync/errgroup"
 )
-
-func TestTLSCertificateVerifier(t *testing.T) {
-	/* TLS listener with known fingerprint. */
-	l, err := sstls.Listen("tcp", "127.0.0.1:0", "", time.Hour, "")
-	if nil != err {
-		t.Fatalf("Error starting listener: %s", err)
-	}
-	defer l.Close()
-
-	/* txrx sends and receives a byte on c, to make sure the handshake
-	happens.  c is then closed. */
-	txrx := func(c net.Conn) error {
-		ech := make(chan error, 2)
-		defer c.Close()
-		go func() { _, err := c.Write(make([]byte, 1)); ech <- err }()
-		go func() { _, err := c.Read(make([]byte, 1)); ech <- err }()
-		for range 2 {
-			if err := <-ech; nil != err {
-				return err
-			}
-		}
-		return nil
-	}
-
-	/* try makes a connection to t expecting the fingerprint fp.  It
-	returns the errors from t.Accept and tls.Dial, in that order. */
-	try := func(fp string) (lerr, derr error) {
-		var wg sync.WaitGroup
-		wg.Add(2)
-		/* Make the connection. */
-		go func() {
-			defer wg.Done()
-			tv, err := TLSFingerprintVerifier(fp)
-			if nil != err {
-				derr = fmt.Errorf(
-					"generating verifier: %w",
-					err,
-				)
-				return
-			}
-			tc := &tls.Config{
-				InsecureSkipVerify: true,
-				VerifyConnection:   tv,
-			}
-			var c net.Conn
-			if c, derr = tls.Dial(
-				"tcp",
-				l.Addr().String(),
-				tc,
-			); nil != derr {
-				return
-			}
-			derr = txrx(c)
-		}()
-		/* Accept the connection. */
-		go func() {
-			defer wg.Done()
-			var c net.Conn
-			if c, lerr = l.Accept(); nil != lerr {
-				return
-			}
-			lerr = txrx(c)
-		}()
-		/* Wait for it all to happen. */
-		wg.Wait()
-
-		return lerr, derr
-	}
-
-	t.Run("correct_fingerprint", func(t *testing.T) {
-		lerr, derr := try(l.Fingerprint)
-		if nil != lerr {
-			t.Errorf("Error from listener: %s", lerr)
-		}
-		if nil != derr {
-			t.Errorf("Error from tls.Dial: %s", derr)
-		}
-	})
-
-	t.Run("incorrect_fingerprint", func(t *testing.T) {
-		lerr, derr := try(base64.StdEncoding.EncodeToString(
-			make([]byte, 32),
-		))
-		if nil == lerr {
-			t.Errorf("Accept succeeded unexpectedly")
-		} else if "remote error: tls: bad certificate" != lerr.Error() {
-			t.Errorf("Accept error: %s", lerr)
-		}
-		if nil == derr {
-			t.Errorf("tls.Dial succeeded unexpectedly")
-		} else if !errors.Is(derr, ErrNoMatchingCertificate) {
-			t.Errorf("Unexpected error from tls.Dial : %s", derr)
-		}
-	})
-}
 
 func TestSplitArgs(t *testing.T) {
 	for have, want := range map[string][]string{
@@ -169,21 +71,17 @@ func TestGo(t *testing.T) {
 			return
 		}
 		defer cancel()
-		rc := http.NewResponseController(w)
-		if err := rc.EnableFullDuplex(); nil != err {
-			handleErr = fmt.Errorf("enabling duplex: %w", err)
-			return
-		}
-		if err := rc.Flush(); nil != err {
-			handleErr = fmt.Errorf("initial flush: %w", err)
-			return
+		if err := hsrv.StartFullDuplex(w); nil != err {
+			handleErr = fmt.Errorf("starting duplex: %w", err)
 		}
 		var eg errgroup.Group
 		eg.Go(func() error {
 			if _, err := fmt.Fprintf(w, "%s", input); nil != err {
 				return fmt.Errorf("sending input: %s", err)
 			}
-			if err := rc.Flush(); nil != err {
+			if err := http.NewResponseController(
+				w,
+			).Flush(); nil != err {
 				return fmt.Errorf("flushing: %w", err)
 			}
 			return nil
@@ -198,7 +96,6 @@ func TestGo(t *testing.T) {
 			return nil
 		})
 		handleErr = eg.Wait()
-
 	})
 	l, err := sstls.Listen("tcp", "127.0.0.1:0", "", time.Hour, "")
 	if nil != err {

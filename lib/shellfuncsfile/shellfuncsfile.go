@@ -16,7 +16,7 @@ package shellfuncsfile
  * Turn a file or directory into shell functions
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20240731
+ * Last Modified 20250314
  */
 
 import (
@@ -300,7 +300,9 @@ func (c *Converter) From(sources ...string) ([]byte, error) {
 				err,
 			)
 		}
-		buf.WriteRune('\n')
+		if 0 != buf.Len() && 0 != len(lf) {
+			buf.WriteRune('\n')
+		}
 		buf.Write(lf)
 	}
 

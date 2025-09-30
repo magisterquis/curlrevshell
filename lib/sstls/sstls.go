@@ -6,7 +6,7 @@ package sstls
  * TLS listener with a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20241003
+ * Last Modified 20250905
  */
 
 import (
@@ -73,8 +73,9 @@ func Listen(
 	return l, nil
 }
 
-// PubkeyFingerprint returns the SHA256 hash of the public key fingerprint
-// for the cert.  This is used for curl's --pinnedpubkey.
+// PubkeyFingerprint returns the base64-encoded SHA256 hash of the public key
+// fingerprint for the cert, usable for curl's --pinnedpubkey.  The returned
+// fingerprint does not start with sha256//.
 func PubkeyFingerprint(cert *x509.Certificate) (string, error) {
 	/* Marshal to nicely-hashable DER. */
 	b, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
