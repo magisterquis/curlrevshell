@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250924
+ * Last Modified 20251008
  */
 
 import (
@@ -39,8 +39,9 @@ const (
 	LMOneShellClosingListener = "Got one shell, closing listener"
 	LMURLPaths                = "Non-Default URL Paths"
 
-	LKError      = "error"
-	LKListenAddr = "address"
+	LKError       = "error"
+	LKFingerprint = "fingerprint"
+	LKListenAddr  = "address"
 )
 
 // ShutdownWait is how long we wait for cilents to disconnect on shutdown.
@@ -107,7 +108,11 @@ func New(
 	}
 	params.ListenAddress = l.Addr().String()
 	params.PubkeyFP = l.Fingerprint
-	sl.Info(LMListening, LKListenAddr, l.Addr().String())
+	sl.Info(
+		LMListening,
+		LKListenAddr, l.Addr().String(),
+		LKFingerprint, l.Fingerprint,
+	)
 
 	/* Work out where to send debug messages. */
 	dw := io.Discard

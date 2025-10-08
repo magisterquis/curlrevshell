@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250924
+ * Last Modified 20251009
  */
 
 import (
@@ -259,7 +259,8 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 	/* Make sure we get exactly the logs we expect. */
 	cl.ExpectEmpty(t,
 		`{"time":"","level":"INFO","msg":"Listener started",`+
-			`"address":"`+s.l.Addr().String()+`"}`,
+			`"address":"`+s.l.Addr().String()+`",`+
+			`"fingerprint":"`+s.l.Fingerprint+`"}`,
 	)
 
 	/* Don't keep going if we have an error. */
