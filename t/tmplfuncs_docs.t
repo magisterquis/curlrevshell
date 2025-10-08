@@ -4,14 +4,15 @@
 # Make sure tmplfuncs' docs are correct
 # By J. Stuart McMurray
 # Created 20250613
-# Last Modified 20250830
+# Last Modified 20251008
 
 set -euo pipefail
 
 . t/shmore.subr
 
-tap_plan 6
+tap_plan 7
 
+DOCTM=./doc/template.md
 TFDIR=./lib/crstemplate/tmplfuncs
 TFDOC="$TFDIR/godoc.txt"
 READM="$TFDIR/README.md"
@@ -37,5 +38,26 @@ GOT=$(diff -u "$GDRMM" "$GODOC" ||:)
 tap_ok    $AWKEC           "Awk searched $READM for godoc happily" "$0" $LINENO
 tap_isnt "$(<"$GDRMM")" "" "Extracted godoc from $READM"           "$0" $LINENO
 tap_is   "$GOT"         "" "Godoc in $READM correct"               "$0" $LINENO
+
+# Does the table list all of the functions?
+cat "$DOCTM" |&
+while read -pr; do # Get to the table section
+        if [[ "$REPLY" = Functions ]]; then
+                break
+        fi
+done
+read -pr; read -pr; read -pr; read -pr # Skip from section header to table
+GOT=
+while read -pr; do # Get the functions
+        if [[ -z "$REPLY" ]]; then
+                break
+        fi
+        GOT="$GOT $(echo "$REPLY" | cut -f 1 -d ' ')"
+done
+while read -pr; do :; done
+wait
+WANT=$(go doc ./lib/crstemplate/tmplfuncs |
+        perl -ne '/^func ([^\(]+)/&&print " ", lc $1' | sort -u)
+tap_is "$GOT" "$WANT" "All template functions listed in $DOCTM" "$0" $LINENO
 
 # vim: ft=sh

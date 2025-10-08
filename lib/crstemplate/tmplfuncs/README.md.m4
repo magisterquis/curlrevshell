@@ -3,9 +3,8 @@ Template Functions
 ==================
 This module contains functions available in `-template` templates.
 
-Better documentation to follow...
-
-(famous last words)
+Documentation for each function is in
+[doc/template.md](../../../doc/template.md).
 
 GoDoc
 ------

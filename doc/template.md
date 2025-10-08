@@ -110,7 +110,15 @@ set to an instance of [Params](../lib/crstemplate/params.go).
 
 Functions
 ---------
-A small number of extra functions are made available to templates.  These
-aren't very well-documented at the moment, but have a look at
-[tmplfuncs/godoc.txt](../lib/crstemplate/tmplfuncs/godoc.txt) for what little
-there is.
+A small number of extra functions are made available to templates:
+Function      | Arguments                          | Example                                                                               | Description
+--------------|------------------------------------|---------------------------------------------------------------------------------------|------------
+ensureport    | `port` (default: `443`), `address` | `ensureport 123 "needsaport.com"` -> `needsaport.com:123`                             | Ensure `address` has a port
+host          | `address`                          | `address dontwantaport.com:123` -> `dontwantaport.com`                                | Returns the host (or IP address) from `address`
+map           | (`key`, `value`)...                | `map "sk" "sv" "nk" 2 "bk" true` -> `map[string]any{"sk": "sv", "nk": 2, "bk": true}` | Assembles a map from key/value pairs
+matchre       | `regex` `string`                   | `matchre "\d+$" "letters"` -> `true`                                                  | Returns true if `string` matches `regex`
+nodefaultport | `address`                          | `nodefaultport "redundant.com:443"`                                                   | Removes the port from `address` if the port is 443
+port          | `address`                          | `port "justtheport.com:123"` -> `123`                                                 | Returns the port from `address`, or 443 if there was no port
+
+Have a look at [tmplfuncs/godoc.txt](../lib/crstemplate/tmplfuncs/godoc.txt)
+for closer-to-ground-truth documentation.

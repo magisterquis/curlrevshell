@@ -2,9 +2,8 @@ Template Functions
 ==================
 This module contains functions available in `-template` templates.
 
-Better documentation to follow...
-
-(famous last words)
+Documentation for each function is in
+[doc/template.md](../../../doc/template.md).
 
 GoDoc
 ------
@@ -43,7 +42,8 @@ func EnsurePort(port, addr string) string
 
 func Host(addr string) (string, error)
     Host takes an IP:port or host:port and returns just the IP or host. It is a
-    wrapper around net.SplitHostPort.
+    wrapper around net.SplitHostPort but will return the host even if there is
+    no port.
 
 func Map(kvs ...any) (map[string]any, error)
     Map assembles its arguments, which must be key/value pairs into a map,

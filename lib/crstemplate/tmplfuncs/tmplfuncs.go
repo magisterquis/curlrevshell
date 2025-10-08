@@ -8,7 +8,7 @@ package tmplfuncs
  * Functions available to templates
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20250830
+ * Last Modified 20251008
  */
 
 import (
@@ -34,10 +34,16 @@ var TemplateFuncs = template.FuncMap{
 }
 
 // Host takes an IP:port or host:port and returns just the IP or host.  It is
-// a wrapper around net.SplitHostPort.
+// a wrapper around net.SplitHostPort but will return the host even if there
+// is no port.
 func Host(addr string) (string, error) {
-	h, _, err := net.SplitHostPort(addr)
-	return h, err
+	if h, _, err := net.SplitHostPort(addr); nil == err {
+		return h, nil
+	} else if hasNoPort(err) {
+		return addr, nil
+	} else {
+		return "", err
+	}
 }
 
 // Port takes an IP:port or host:port and returns just the port.  If there
