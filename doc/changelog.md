@@ -77,6 +77,7 @@ go install github.com/magisterquis/curlrevshell@dev
 - Tests are less jealous and no longer fail when something else is listening
   on port 4444.
 - [`-ctrl-i`](./flags.md#-ctrl-i): Switch from `Ctrl+J` to `Ctrl+S`.
+- [`-debug`](./flags.md#-debug): Debugged DEBUG messages with -debug.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

@@ -238,6 +238,7 @@ Options:
 	discard log messages.  Beats checking for nil, anyways. */
 	lh := slog.DiscardHandler
 	if "" != *logFile {
+		/* Open the logfile. */
 		f, err := os.OpenFile(
 			*logFile,
 			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
@@ -250,7 +251,12 @@ Options:
 			)
 		}
 		defer f.Close()
-		lh = slog.NewJSONHandler(f, nil)
+		/* Work out our log level. */
+		var ho slog.HandlerOptions
+		if *printDebug {
+			ho.Level = slog.LevelDebug
+		}
+		lh = slog.NewJSONHandler(f, &ho)
 	}
 	sl := slog.New(lh)
 	sl.Info(LMStarting, LKPID, os.Getpid())
