@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250929
+ * Last Modified 20251008
  */
 
 import (
@@ -236,7 +236,7 @@ Options:
 
 	/* Set up logging.  If we're not writing to a logfile, we'll just kinda
 	discard log messages.  Beats checking for nil, anyways. */
-	var lw = io.Discard
+	lh := slog.DiscardHandler
 	if "" != *logFile {
 		f, err := os.OpenFile(
 			*logFile,
@@ -250,9 +250,9 @@ Options:
 			)
 		}
 		defer f.Close()
-		lw = f
+		lh = slog.NewJSONHandler(f, nil)
 	}
-	sl := slog.New(slog.NewJSONHandler(lw, nil))
+	sl := slog.New(lh)
 	sl.Info(LMStarting, LKPID, os.Getpid())
 
 	/* Converter for Ctrl+I. */
