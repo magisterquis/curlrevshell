@@ -2,12 +2,12 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev-merge`
+`dev`
 ===========
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev-merge
+go install github.com/magisterquis/curlrevshell@dev
 ```
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
@@ -76,6 +76,7 @@ go install github.com/magisterquis/curlrevshell@dev-merge
   number-related strabismus.
 - Tests are less jealous and no longer fail when something else is listening
   on port 4444.
+- [`-ctrl-i`](./flags.md#-ctrl-i): Switch from `Ctrl+J` to `Ctrl+S`.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
@@ -88,7 +89,7 @@ go install github.com/magisterquis/curlrevshell@dev-merge
 - [`-ctrl-i`](./flags.md#-ctrl-i): In-memory, over-the-wire, on-demand module
   loading.  Or just sending the contents of a file (or directory or magically
   shellified Perl script) to the remote shell.  Trigger it with `Ctrl+I`, or
-  use `Ctrl+S` to just see what `Ctrl+I` would send.
+  use `Ctrl+J` to just see what `Ctrl+I` would send.
 - [`shellfuncsfile`](../lib/shellfuncsfile): a nifty library to roll a
   file or directory into a single gob of shell functions; does a lot of
   `-ctrl-i`'s heavy lifting.
