@@ -1,4 +1,4 @@
-CURL-Powered Reverse Shell
+cURL-Powered Reverse Shell
 ==========================
 Somewhat kooky replacement for the typical `bash >/dev/tcp...` reverse shell,
 but with the following "features":
