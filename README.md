@@ -36,10 +36,10 @@ It should look like the following, but with nicer colors:
 $ go install github.com/magisterquis/curlrevshell@dev
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.3
 go: downloading golang.org/x/exp v0.0.0-20251002181428-27f1f14c8bb9
-go: downloading golang.org/x/net v0.44.0
+go: downloading golang.org/x/net v0.45.0
 go: downloading golang.org/x/sync v0.17.0
-go: downloading golang.org/x/sys v0.36.0
-go: downloading golang.org/x/text v0.29.0
+go: downloading golang.org/x/sys v0.37.0
+go: downloading golang.org/x/text v0.30.0
 go: downloading golang.org/x/tools v0.37.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20251004180818-66c8dc187a22 (dev branch)
