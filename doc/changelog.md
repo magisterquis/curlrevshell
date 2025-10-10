@@ -79,7 +79,8 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`-ctrl-i`](./flags.md#-ctrl-i): Switch from `Ctrl+J` to `Ctrl+S`.
 - [`-debug`](./flags.md#-debug): Debugged DEBUG messages with -debug.
 - [`-log`](./flags.md#-log): Log the TLS fingerprint as well.
-
+- Long invocations and excessive horizontal scrolling finally led to
+  [compile-time defaults](./doc/config.md#linker-flags) for flags.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

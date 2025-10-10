@@ -6,10 +6,11 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251008
+ * Last Modified 20251010
  */
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -52,6 +53,15 @@ var (
 	URLPathScript = crstemplate.DefaultURLPathScript
 )
 
+// Default file paths.  ./crs/... is a reasonable choice.  They correspond to
+// flags with similar names.
+var (
+	DefaultCtrlI          string
+	DefaultLog            string
+	DefaultServeFilesFrom string
+	DefaultTemplate       string
+)
+
 // Log messages and keys.
 const (
 	LMStarting    = "Program starting"
@@ -72,13 +82,13 @@ func rmain() int {
 		)
 		fdir = flag.String(
 			"serve-files-from",
-			"",
+			DefaultServeFilesFrom,
 			"Optional `directory` from which to serve "+
 				"static files",
 		)
 		tmplf = flag.String(
 			"template",
-			"",
+			DefaultTemplate,
 			"Optional `template` file, used if it exists",
 		)
 		printDefaultTemplate = flag.Bool(
@@ -109,7 +119,7 @@ func rmain() int {
 		)
 		logFile = flag.String(
 			"log",
-			os.Getenv(LogEnvVar),
+			cmp.Or(os.Getenv(LogEnvVar), DefaultLog),
 			"Optional `file` to which to write JSON logs",
 		)
 		oneShell = flag.Bool(
@@ -119,7 +129,7 @@ func rmain() int {
 		)
 		insertFile = flag.String(
 			"ctrl-i",
-			"",
+			DefaultCtrlI,
 			"Tab/Ctrl+I's insertion `source` file or directory",
 		)
 		printCtrlI = flag.Bool(

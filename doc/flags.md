@@ -91,6 +91,9 @@ whole thing to stdout.
 Handy for libraries of shell functions and telling people you load modules
 in memory over the network.
 
+A default can be set at compile-time with
+`-ldflags '-X main.DefaultCtrlI=./crs/ctrl-i'`
+
 ### Example
 Send a shell function library from `./sneaky.subr`.
 ```
@@ -238,6 +241,9 @@ CURLREVSHELL_LOG=log.json curlrevshell
 CURLREVSHELL_LOG=log.json curlrevshell -log special.json
 ```
 
+A default can be set at compile-time with
+`-ldflags '-X main.DefaultLog=./crs/log.json'`
+
 `-no-timestamps`
 ----------------
 Don't print timestamps.
@@ -327,6 +333,10 @@ Serve files from `./d`, but prevent listing the contents of `./d/sneaky`:
 $ mkdir -p ./d/sneaky
 $ touch ./d/sneaky/index.html
 $ ./curlrevshell -serve-files-from ./d
+```
+
+A default can be set at compile-time with
+`-ldflags '-X main.DefaultServeFilesFrom=./crs/files'`
 
 `-template`
 -----------
@@ -353,6 +363,9 @@ vi ./crs.tmpl
 # Use it!
 curlrevshell -template ./crs.tmpl
 ```
+
+A default can be set at compile-time with
+`-ldflags '-X main.DefaultTemplate=./crs/crs.tmpl'`
 
 `-tls-certificate-cache`
 ------------------------
