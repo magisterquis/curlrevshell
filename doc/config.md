@@ -35,12 +35,17 @@ Setting                      | Default | Description
 `main.URLPathOut`            | `o`     | URL path for shell output connection
 `main.URLPathScript`         | `c`     | URL path for callback script generation
 
-Something like the following is reasonably ok:
+Something like the following is a reasonably ok way to get set up quickly:
 ```sh
-go build -ldflags "
+mkdir -p $HOME/crs/{ctrl-i,files}                        # Directories in which store curlrevshell things
+go install -v -trimpath -ldflags "
+    -w -s
     -X main.DefaultCtrlI=$HOME/crs/ctrl-i
     -X main.DefaultLog=$HOME/crs/log.json
-    -X main.ServeFilesFrom=$HOME/crs/files
+    -X main.DefaultServeFilesFrom=$HOME/crs/files
     -X main.DefaultTemplate=$HOME/crs/crs.tmpl
-"
+" github.com/magisterquis/curlrevshell@dev               # Install, setting defaults to $HOME/crs
+curlrevshell -print-default-template >$HOME/crs/crs.tmpl # Default template, for easier editing
+curlrevshell -h                                          # For just in case
+curlrevshell                                             # Ready to go :)
 ```
