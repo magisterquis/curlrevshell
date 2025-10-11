@@ -2,13 +2,16 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-===========
+`betterctrli`
+============
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev
+go install github.com/magisterquis/curlrevshell@betterctrli
 ```
+
+`dev`
+=====
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.
