@@ -16,7 +16,7 @@ package shellfuncsfile
  * Turn a file or directory into shell functions
  * By J. Stuart McMurray
  * Created 20240706
- * Last Modified 20250314
+ * Last Modified 20251011
  */
 
 import (
@@ -73,7 +73,7 @@ type Converter struct {
 
 // NewDefaultConverter returns a new converter with the default set of filters,
 // which are the package-level From* functions.  The default filters and
-// corresponding file name extensions are:
+// corresponding file glob patterns are:
 //   - FromPerl:  *.pl
 //   - FromShell: *.sh *.subr
 func NewDefaultConverter() *Converter {
