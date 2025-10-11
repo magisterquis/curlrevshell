@@ -35,6 +35,7 @@ Setting                      | Default | Description
 `main.URLPathOut`            | `o`     | URL path for shell output connection
 `main.URLPathScript`         | `c`     | URL path for callback script generation
 
+### Reasonably Ok Setup
 Something like the following is a reasonably ok way to get set up quickly:
 ```sh
 mkdir -p $HOME/crs/{ctrl-i,files}                        # Directories in which store curlrevshell things
