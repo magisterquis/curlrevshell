@@ -3,12 +3,51 @@ Changelog
 This lists the feature creep present in each tagged version.
 
 `dev`
-=====
-The following changes are available on this branch and will (probably) be
-in the next tagged version.  Get them with
+===========
+The following changes are available on this branch and will (probably) be in
+the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
+- [`-template`](./flags.md#-template): Template (nearly) ALL the things!
+- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
+  roll fancypants `-template` templates.
+- Added compile-time i/o/io/c-changey variables.
+- Added the aptly-named [`config.md`](./config.md) and
+  [`template.md`](./template.md).
+- Minor tweaks to the callback script.
+- Asked an excitable cow to give a warning that `-callback-template` is
+  deprecated in favor of `-callback`.
+- [`opshell`](../lib/opshell): Added `Shell.RedLogf` which does what it says on
+  the tin.
+- Renamed `{{.URL}}` to `{{.Host}}` and added `{{.Path}`, for overengineered
+  templates to serve different `{{.script}}` sections based on URL.
+- [`README.md`](../README.md): No more out-of-date references to `funcgen`.
+- [`-ctrl-i`](./flags.md#-ctrl-i): Fewer stray newlines and send with `SIGUSR1`
+  as well as `Ctrl+I`.
+- [`-ctrl-i`](./flags.md#-ctrl-i): A friendly log message is now printed on
+  startup with the PID, to make it easier to use
+  [fwa](https://github.com/PeterHajdu/fwa) and `kill(1)` to send
+  hot-off-the-press `-ctrl-i` functions to a connected shell.
+- [`Makefile`](./Makefile): Make `make help` make help.  Make `make update`
+  make updates.
+- Somewhat less fragile tests in [`t/`](../t/).
+- If [`-template`](./flags.md#-template) names a missing template file, the
+  previously footgunful `/c` script will now not be generated.  Empty template
+  files work just fine.
+- [`-template`](./flags.md#-template): One-liners now configurable, plus way
+  more available in [Params](../lib/crstemplate/params.go).
+- [`-template`](./flags.md#-template): Function available in templates now
+  (kinda) [documented](../lib/crstemplate/tmplfuncs/godoc.txt).
+- [`-template`](./flags.md#-template): Added `matchre`, to check if a string
+  might `match`[`re`](https://github.com/google/re2/wiki/Syntax).
+- Added [staticcheck](https://staticcheck.dev) as a fancy new [Go tool
+  dependency](https://go.dev/doc/modules/managing-dependencies#tools) which
+  should save several seconds of copy/pasting a `go install` line.
+- Better checks for stray `DEBUG`/`TODO`/`TAP_TODO` comments and outdated
+  package versions.
+- Added [`crsdialer`](./lib/crsdialer) to somewhat simplify
+  curlrevshell-dialing.
 - `-h`: Invisible changes to print help a bit more nicely in strange
   conditions.
 - New and improved tests which now actually run curlrevshell.
@@ -35,6 +74,14 @@ go install github.com/magisterquis/curlrevshell@dev
   but `-debug` brings them back.
 - Welcome message now lists the branch as well to avoid the version
   number-related strabismus.
+- Tests are less jealous and no longer fail when something else is listening
+  on port 4444.
+- [`-ctrl-i`](./flags.md#-ctrl-i): Switch from `Ctrl+J` to `Ctrl+S`.
+- [`-debug`](./flags.md#-debug): Debugged DEBUG messages with -debug.
+- [`-log`](./flags.md#-log): Log the TLS fingerprint as well.
+- Long invocations and excessive horizontal scrolling finally led to
+  [compile-time defaults](./doc/config.md#linker-flags) for flags.
+- [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Go -> Perl, less test panic
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

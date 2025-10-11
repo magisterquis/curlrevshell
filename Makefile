@@ -2,29 +2,30 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20250109
+# Last Modified 20250924
 
 BINNAME     != basename $$(pwd)
 BUILDFLAGS   = -trimpath -ldflags "-w -s"
+SHMOREURL    = https://raw.githubusercontent.com/magisterquis/shmore/refs/heads/master/shmore.subr
+SUBMAKES    != find . -mindepth 2 -name Makefile -type f
 TESTFLAGS   += -timeout 3s
-VETFLAGS     = -printf.funcs 'debugf,errorf,erorrlogf,logf,printf,rerrorlogf,rlogf'
 TOOLSDIR     = tools
-TOOLSRCDIRS != find ./lib/*/cmd -type d -maxdepth 1 -mindepth 1
-
+TOOLSRCDIRS != find ./lib/*/cmd -maxdepth 1 -mindepth 1 -type d
 
 .PHONY: all build test tools help install clean
 
-all: test tools build ## Build ALL the things (default)
+all: test tools build ## Build ALL the things! (and test them, default)
 
-${BINNAME}!
+${BINNAME}! subdirs
 	go build ${BUILDFLAGS} -o ${BINNAME}
 
-build: ${BINNAME} ## Build just curlrevshell
+build: ${BINNAME} ## Build curlrevshell
+.PHONY: build
 
-test: ## Just run tests
+test: subdirs ## Run tests
 	go test ${BUILDFLAGS} ${TESTFLAGS} ./...
-	go vet  ${BUILDFLAGS} ${VETFLAGS} ./...
-	staticcheck ./...
+	go vet  ${BUILDFLAGS} ./...
+	go tool staticcheck ./...
 	go run ${BUILDFLAGS} . -h 2>&1 |\
 	awk '\
 		/^Options:$$|MQD DEBUG PACKAGE LOADED$$/\
@@ -36,19 +37,35 @@ test: ## Just run tests
 	'
 	prove -It --directives
 
-tools: ${TOOLSRCDIRS:T:S,^,${TOOLSDIR}/,} ## Build additional tools
+subdirs:
+	@echo "Making in subdirectories..."
+.for SUBDIR in ${SUBMAKES:H}
+	+${.MAKE} -C ${SUBDIR}
+.endfor
+	@echo "Finished making in subdirectories"
+.PHONY: subdirs
+
+tools: ${TOOLSRCDIRS:T:S,^,${TOOLSDIR}/,} ## Build supporting tools
+.PHONY: tools
 
 .for TOOLSRCDIR in ${TOOLSRCDIRS}
-${TOOLSDIR}/${TOOLSRCDIR:T}! ${TOOLSRCDIR}
+${TOOLSDIR}/${TOOLSRCDIR:T}! subdirs ${TOOLSRCDIR}
 	go build ${BUILDFLAGS} -o $@ $>
 .endfor
 
-help: .NOTMAIN ## This help
-	@perl -ne '/^(\S+):.*?##\s*(.*)/&&print"$$1\t-\t$$2\n"' ${MAKEFILE_LIST}\
-		| column -ts "$$(printf "\t")" | sort
+update: ## Fetch the latest Shmore and up-to-date Go things
+	curl --fail --no-progress-meter --output t/shmore.subr ${SHMOREURL}
+	go get go
+	go get -t -u
+	go get -t -u tool
+	go mod tidy
 
-install: ## Install to GOBIN ($GOPATH/bin or $HOME/go/bin)
+install: ## Install curlrevshell with go install
 	go install ${BUILDFLAGS}
 
 clean: ## Remove built things
 	rm -rf ${BINNAME} ${TOOLSDIR}
+
+help: .NOTMAIN ## This help
+	@perl -ne '/^(\S+?):+.*?##\s*(.*)/&&print"$$1\t-\t$$2\n"' \
+		${MAKEFILE_LIST} | column -ts "$$(printf "\t")"

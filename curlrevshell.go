@@ -6,10 +6,11 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250615
+ * Last Modified 20251010
  */
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -18,16 +19,20 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/magisterquis/curlrevshell/internal/currentversion"
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/shellfuncsfile"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
+	"github.com/magisterquis/goxterm"
 )
 
 var (
@@ -39,9 +44,30 @@ var (
 	LogEnvVar = "CURLREVSHELL_LOG"
 )
 
+// URL Paths, which may be set at compile-time to change from /i and /o and
+// so on.
+var (
+	URLPathIn     = crstemplate.DefaultURLPathIn
+	URLPathInOut  = crstemplate.DefaultURLPathInOut
+	URLPathOut    = crstemplate.DefaultURLPathOut
+	URLPathScript = crstemplate.DefaultURLPathScript
+)
+
+// Default file paths.  ./crs/... is a reasonable choice.  They correspond to
+// flags with similar names.
+var (
+	DefaultCtrlI          string
+	DefaultLog            string
+	DefaultServeFilesFrom string
+	DefaultTemplate       string
+)
+
 // Log messages and keys.
 const (
-	LKTerminating = "Program terminating"
+	LMStarting    = "Program starting"
+	LMTerminating = "Program terminating"
+
+	LKPID = "PID"
 )
 
 func main() { os.Exit(rmain()) }
@@ -56,14 +82,14 @@ func rmain() int {
 		)
 		fdir = flag.String(
 			"serve-files-from",
-			"",
+			DefaultServeFilesFrom,
 			"Optional `directory` from which to serve "+
 				"static files",
 		)
 		tmplf = flag.String(
-			"callback-template",
-			"",
-			"Optional callback `template` file, used if it exists",
+			"template",
+			DefaultTemplate,
+			"Optional `template` file, used if it exists",
 		)
 		printDefaultTemplate = flag.Bool(
 			"print-default-template",
@@ -93,7 +119,7 @@ func rmain() int {
 		)
 		logFile = flag.String(
 			"log",
-			os.Getenv(LogEnvVar),
+			cmp.Or(os.Getenv(LogEnvVar), DefaultLog),
 			"Optional `file` to which to write JSON logs",
 		)
 		oneShell = flag.Bool(
@@ -103,7 +129,7 @@ func rmain() int {
 		)
 		insertFile = flag.String(
 			"ctrl-i",
-			"",
+			DefaultCtrlI,
 			"Tab/Ctrl+I's insertion `source` file or directory",
 		)
 		printCtrlI = flag.Bool(
@@ -132,6 +158,26 @@ func rmain() int {
 			return nil
 		},
 	)
+	flag.Func( /* Added 20241222. */
+		"callback-template",
+		"Optional `template` file, used if it exists (deprecated)",
+		func(s string) error {
+			fmt.Printf(` _______________________
+/ -callback-template is \
+| going away eventually |
+|                       |
+\ Use -template instead /
+ -----------------------
+        \   ^__^
+         \  (!!)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+`)
+			*tmplf = s
+			return nil
+		},
+	)
 	flag.Usage = func() {
 		fmt.Fprintf(
 			flag.CommandLine.Output(),
@@ -141,8 +187,8 @@ Even worse reverse shell, powered by cURL.
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
-Ctrl+J - Print locally what Ctrl+I would send
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
+Ctrl+S - Print locally what Ctrl+I would send
 Tab    - Same as Ctrl+I
 
 Options:
@@ -155,29 +201,29 @@ Options:
 
 	/* Warn that -callback-template is going to change quite a bit.
 	Added 20250112.  The + is there because t/version.t :| */
-	fmt.Print(
-		` ___________________________________________________________________________________
-/           -callback-template templates are going to change quite a bit            \
-|                                                                                   |
-|             Have a look at the bettertemplates branch for more info:              |
-| https://github.com/magisterquis/curlrevshell/blob/bettertemplates/doc/template.md |
-|                                                                                   |
-|                                Or just try it out:                                |
-\          go install github.com/magisterquis/curlrevshell` + `@bettertemplates          /
- -----------------------------------------------------------------------------------
+	if !*printDefaultTemplate && goxterm.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Print(` ________________________________________________________________________________
+/                                 Hotkey Change!                                 \
+|                                 --------------                                 |
+|                                                                                |
+|                              Ctrl+J is now Ctrl+S                              |
+|                                                                                |
+|                              For more details see                              |
+\ https://github.com/golang/term/commit/4f53e0cd3924d70667107169374a480bfd208348 /
+ --------------------------------------------------------------------------------
         \   ^__^
          \  (!!)\_______
             (__)\       )\/\
                 ||----w |
                 ||     ||
-`,
-	)
+`)
+	}
 
 	/* If we're just printing the default template, life's also easy. */
 	if *printDefaultTemplate {
 		if _, err := io.WriteString(
 			os.Stdout,
-			hsrv.DefaultTemplate,
+			crstemplate.DefaultTemplate,
 		); nil != err {
 			log.Printf("Error printing template: %s", err)
 			return 1
@@ -200,8 +246,9 @@ Options:
 
 	/* Set up logging.  If we're not writing to a logfile, we'll just kinda
 	discard log messages.  Beats checking for nil, anyways. */
-	var lw = io.Discard
+	lh := slog.DiscardHandler
 	if "" != *logFile {
+		/* Open the logfile. */
 		f, err := os.OpenFile(
 			*logFile,
 			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
@@ -214,9 +261,15 @@ Options:
 			)
 		}
 		defer f.Close()
-		lw = f
+		/* Work out our log level. */
+		var ho slog.HandlerOptions
+		if *printDebug {
+			ho.Level = slog.LevelDebug
+		}
+		lh = slog.NewJSONHandler(f, &ho)
 	}
-	sl := slog.New(slog.NewJSONHandler(lw, nil))
+	sl := slog.New(lh)
+	sl.Info(LMStarting, LKPID, os.Getpid())
 
 	/* Converter for Ctrl+I. */
 	ctrlIConv := shellfuncsfile.NewDefaultConverter()
@@ -257,13 +310,13 @@ Options:
 		insertGen,
 		*insertFile,
 	)
+	if nil != err {
+		log.Fatalf("Error setting up shell: %s", err)
+	}
 	och <- opshell.CLine{Prompt: shell.WrapInColor(
 		Prompt,
 		opshell.ColorCyan,
 	)}
-	if nil != err {
-		log.Fatalf("Error setting up shell: %s", err)
-	}
 	defer cleanup()
 
 	/* Print a welcome message with our version. */
@@ -324,7 +377,6 @@ Options:
 	svr, err := hsrv.New(
 		sl,
 		*addr,
-		*fdir,
 		*tmplf,
 		ich,
 		och,
@@ -334,6 +386,15 @@ Options:
 		*printIPv6,
 		*oneShell,
 		*printDebug,
+		crstemplate.Params{
+			StaticFilesDir: *fdir,
+			URLPaths: crstemplate.URLPaths{
+				In:     URLPathIn,
+				InOut:  URLPathInOut,
+				Out:    URLPathOut,
+				Script: URLPathScript,
+			},
+		},
 	)
 	if nil != err {
 		shell.Logf(
@@ -351,6 +412,21 @@ Options:
 	eg.GoTag(ectx, "server", svr.Do)
 	eg.GoTag(ectx, "i/o broker", iob.Do)
 
+	/* SIGUSR1 is equivalent to Ctrl+I. */
+	eg.GoContext(ectx, func(ctx context.Context) error {
+		sch := make(chan os.Signal, 1)
+		signal.Notify(sch, syscall.SIGUSR1)
+		defer signal.Stop(sch)
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sch:
+				shell.Insert()
+			}
+		}
+	})
+
 	/* Wait for something to go wrong. */
 	err = eg.Wait()
 	shell.SetPrompt("")
@@ -358,11 +434,11 @@ Options:
 		!errors.Is(err, io.EOF) &&
 		!errors.Is(err, hsrv.ErrOneShellClosed) {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
-		sl.Info(LKTerminating, hsrv.LKError, err)
+		sl.Info(LMTerminating, hsrv.LKError, err)
 		return 1
 	}
 	shell.Logf(opshell.ColorGreen, false, "Goodbye.")
-	sl.Info(LKTerminating)
+	sl.Info(LMTerminating)
 
 	return 0
 }

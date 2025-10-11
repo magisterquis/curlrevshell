@@ -5,7 +5,7 @@ package sstls
  * Generate a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20240408
+ * Last Modified 20251008
  */
 
 import (
@@ -86,7 +86,11 @@ func GetCertificate(
 
 	/* Save it for next time. */
 	if "" != certFile {
-		if err := SaveCertificate(certFile, certPEM, keyPEM); nil != err {
+		if err := SaveCertificate(
+			certFile,
+			certPEM,
+			keyPEM,
+		); nil != err {
 			return tls.Certificate{}, fmt.Errorf(
 				"saving certificate to %s: %w",
 				certFile,
@@ -137,7 +141,10 @@ func generateSelfSignedCert(
 	/* Generate our private key. */
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if nil != err {
-		return nil, nil, tls.Certificate{}, fmt.Errorf("generating key: %w", err)
+		return nil, nil, tls.Certificate{}, fmt.Errorf(
+			"generating key: %w",
+			err,
+		)
 	}
 
 	/* Gather all the important data for the cert. */
@@ -209,7 +216,10 @@ func generateSelfSignedCert(
 	/* Make sure Leaf is set. */
 	leaf, err := x509.ParseCertificate(cert.Certificate[0])
 	if nil != err {
-		return nil, nil, tls.Certificate{}, fmt.Errorf("parsing leaf: %w", err)
+		return nil, nil, tls.Certificate{}, fmt.Errorf(
+			"parsing leaf: %w",
+			err,
+		)
 	}
 	cert.Leaf = leaf
 

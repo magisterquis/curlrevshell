@@ -5,7 +5,7 @@ package opshell
  * Tests for opshell.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241203
+ * Last Modified 20250926
  */
 
 import (
@@ -42,17 +42,18 @@ var testEscapeCodes = &goxterm.EscapeCodes{
 
 // newTestShell returns a new Shell, ready for use.  The net.Conn plays the
 // role of stdio.
-func newTestShell(t *testing.T) (
+func newTestShell(t *testing.T, assumeTTY bool) (
 	net.Conn,
-	chan<- string,
-	<-chan CLine,
+	chan<- string, /* ich */
+	<-chan CLine, /* och */
 	*Shell,
 ) {
+	t.Helper()
 	var (
 		rw, sc              = net.Pipe()
 		ich                 = make(chan<- string, 1024)
 		och                 = make(<-chan CLine, 1024)
-		shell, cleanup, err = NewWrapping(
+		shell, cleanup, err = newWrapping(
 			ich,
 			och,
 			"",
@@ -61,12 +62,13 @@ func newTestShell(t *testing.T) (
 			"",
 			sc,
 			sc,
+			assumeTTY,
 		)
 	)
-	t.Cleanup(cleanup)
 	if nil != err {
 		t.Fatalf("Could not make test shell: %s", err)
 	}
+	t.Cleanup(cleanup)
 	return rw, ich, och, shell
 }
 
@@ -247,18 +249,22 @@ func TestRemoveTimestamp(t *testing.T) {
 	}
 }
 
-func TestShell_Smoketest(t *testing.T) { newTestShell(t) }
+func TestShell_Smoketest(t *testing.T) {
+	t.Run("no_assume_tty", func(t *testing.T) { newTestShell(t, false) })
+	t.Run("assume_tty", func(t *testing.T) { newTestShell(t, true) })
+}
 
+// Make sure one Ctrl+C warns us and two kill the shell.
 func TestShell_CtrlC(t *testing.T) {
 	/* Make a shell and work out the message we expect. */
-	rw, _, _, shell := newTestShell(t)
+	rw, _, _, shell := newTestShell(t, true)
 
 	/* Start the shell going. */
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	eg, ectx := ctxerrgroup.WithContext(ctx)
-	eg.Go(func() error {
-		if err := shell.Do(ectx); nil != err &&
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	eg, ctx := ctxerrgroup.WithContext(ctx)
+	eg.GoContext(ctx, func(ctx context.Context) error {
+		if err := shell.Do(ctx); nil != err &&
 			!errors.Is(err, io.EOF) {
 			return err
 		}
@@ -279,8 +285,8 @@ func TestShell_CtrlC(t *testing.T) {
 		return nil
 	})
 	/* Close our terminal pipe when the shell dies. */
-	eg.Go(func() error {
-		<-ectx.Done()
+	eg.GoContext(ctx, func(ctx context.Context) error {
+		<-ctx.Done()
 		return rw.Close()
 	})
 

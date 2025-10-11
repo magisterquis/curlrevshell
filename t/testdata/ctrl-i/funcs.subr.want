@@ -1,0 +1,13 @@
+# TABDOC: foo A foo
+foo() {
+        foo
+}
+
+# TABDOC: bar A bar
+bar() { bar; }
+
+tab_list() {
+        echo 'bar       - A bar'
+        echo 'foo       - A foo'
+        echo 'tab_list  - This function list'
+}

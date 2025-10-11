@@ -5,7 +5,7 @@ package sstls
  * Tests for gencert.go
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20240327
+ * Last Modified 20251008
  */
 
 import (
@@ -30,7 +30,7 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 		subject: "",
 	}, {
 		subject:  "kittens.com",
-		dnsNames: []string{"kittens.com", "*.moose.com", ".", "*"},
+		dnsNames: []string{"kittens.com", "*.moose.com", "*"},
 		ipAddresses: []net.IP{
 			net.IPv4(1, 2, 3, 4),
 			net.IPv4(0, 0, 0, 0),

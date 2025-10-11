@@ -5,11 +5,12 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20241013
+ * Last Modified 20250905
  */
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -42,15 +43,25 @@ const (
 func (s *Server) newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	/* Shellish handlers. */
-	mux.HandleFunc("/i/{"+idParam+"}", s.inputHandler)  /* Shell input. */
-	mux.HandleFunc("/o/{"+idParam+"}", s.outputHandler) /* Shell output. */
-	mux.HandleFunc("/io", s.inOutHandler)               /* Shell I/O. */
-	mux.HandleFunc("/io/", s.inOutHandler)              /* Shell I//O. */
-	mux.HandleFunc("/c", s.scriptHandler)               /* Callback script. */
+	/* Shell I/O handler. */
+	mux.HandleFunc("/"+s.params.URLPaths.InOut, s.inOutHandler)
+	mux.HandleFunc("/"+s.params.URLPaths.InOut+"/", s.inOutHandler)
+	/* Shell input handler. */
+	mux.HandleFunc(
+		"/"+s.params.URLPaths.In+"/{"+idParam+"}",
+		s.inputHandler,
+	)
+	/* Shell output handler. */
+	mux.HandleFunc(
+		"/"+s.params.URLPaths.Out+"/{"+idParam+"}",
+		s.outputHandler,
+	)
+	/* Callback script handler. */
+	mux.HandleFunc("/"+s.params.URLPaths.Script, s.scriptHandler)
+	mux.HandleFunc("/"+s.params.URLPaths.Script+"/", s.scriptHandler)
 
 	/* If we're serving static files, do that. */
-	if "" != s.fdir {
+	if "" != s.params.StaticFilesDir {
 		mux.HandleFunc("/", s.fileHandler)
 	}
 
@@ -59,20 +70,33 @@ func (s *Server) newMux() *http.ServeMux {
 
 // fileHandler logs and serves files.
 func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
-	sl := s.requestLogger(r).With(LKStaticFilesDir, s.fdir)
+	sl := s.requestLogger(r).With(
+		LKStaticFilesDir,
+		s.params.StaticFilesDir,
+	)
 
 	/* Work out what to send back. */
 	s.RLogf(FileColor, r, "File requested: %s", r.URL)
-	f, err := os.Open(s.fdir)
+	f, err := os.Open(s.params.StaticFilesDir)
 	if nil != err {
-		s.RErrorLogf(r, "Could not open %s: %s", s.fdir, err)
+		s.RErrorLogf(
+			r,
+			"Could not open %s: %s",
+			s.params.StaticFilesDir,
+			err,
+		)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
 	defer f.Close()
 	fi, err := f.Stat()
 	if nil != err {
-		s.RErrorLogf(r, "Could not get info about %s: %s", s.fdir, err)
+		s.RErrorLogf(
+			r,
+			"Could not get info about %s: %s",
+			s.params.StaticFilesDir,
+			err,
+		)
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
@@ -81,12 +105,18 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 	/* If we've just been given one file, send it for all requests. */
 	if fi.Mode().IsRegular() {
-		http.ServeContent(w, r, s.fdir, fi.ModTime(), f)
+		http.ServeContent(
+			w,
+			r,
+			s.params.StaticFilesDir,
+			fi.ModTime(),
+			f,
+		)
 		return
 	}
 
 	/* For everything else, let the http library do the work. */
-	http.FileServer(http.Dir(s.fdir)).ServeHTTP(w, r)
+	http.FileServer(http.Dir(s.params.StaticFilesDir)).ServeHTTP(w, r)
 }
 
 // inputHandler sends input to a shell.
@@ -113,22 +143,8 @@ func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
 
 // inOutHandler handles both input and output for a shell.
 func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
-	rc := http.NewResponseController(w)
-	/* Full duplex is required by real HTTP clients, but doesn't work
-	with the handler-tester. */
-	if err := rc.EnableFullDuplex(); nil != err &&
-		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
-		s.RErrorLogf(r, "Error enabling duplex comms: %s", err)
-		return
-	}
-	/* Write the header from the get-go.  Helps with clients waiting on
-	a proper go-ahead. */
-	if err := rc.Flush(); nil != err {
-		s.RErrorLogf(
-			r,
-			"Error sending initial HTTP response header: %s",
-			err,
-		)
+	if err := StartFullDuplex(w); nil != err {
+		s.RErrorLogf(r, "Starting duplex comms: %s", err)
 	}
 	s.iob.ConnectInOut(
 		r.Context(),
@@ -137,6 +153,30 @@ func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
 		w,
 		r.Body,
 	)
+}
+
+// StartFullDuplex enables full duplex mode on w, if possible.  This is
+// necessary for some clients which are waiting on a go-ahead. */
+func StartFullDuplex(w http.ResponseWriter) error {
+	rc := http.NewResponseController(w)
+
+	/* Full duplex is required by real HTTP clients, but doesn't work
+	with the handler-tester. */
+	if err := rc.EnableFullDuplex(); nil != err &&
+		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
+		return fmt.Errorf("enabling full duplex: %w", err)
+	}
+
+	/* Write the header from the get-go.  Helps with clients waiting on
+	a proper go-ahead. */
+	if err := rc.Flush(); nil != err {
+		return fmt.Errorf(
+			"sending initial HTTP response header: %w",
+			err,
+		)
+	}
+
+	return nil
 }
 
 // requestLogger returns a log.Logger which has information about r.

