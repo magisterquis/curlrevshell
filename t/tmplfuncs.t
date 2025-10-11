@@ -4,11 +4,12 @@
 # Test template functions themselves
 # By J. Stuart McMurray
 # Created 20250830
-# Last Modified 20250830
+# Last Modified 20251011
 
 set -euo pipefail
 
 . t/shmore.subr
+. t/t.subr
 
 tap_plan 1
 
@@ -23,9 +24,8 @@ TEST: {{ if matchre `\d+` `abc1def` }}MatchRE Worked{{ end -}}
 {{- if matchre `\d+` `abcdef` }}MatchRE Failed{{ end }}
 {{- end -}}
 _eof
-go run . \
+gorun \
         -no-timestamps \
-        -listen-address 127.0.0.1:0 \
         -template "$TMPL" |&
 while read -pr; do
         if [[ "$REPLY" == TEST:* ]]; then

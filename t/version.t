@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20250930
+# Last Modified 20251011
 
 set -euo pipefail
 
@@ -28,8 +28,8 @@ WANT="Welcome to curlrevshell version (devel)"
 if [[ "master" != $(current_git_branch) ]]; then
         WANT="$WANT ($(current_git_branch) branch)"
 fi
-GOT="$(echo -n | go run . -no-timestamps 2>&1 |
-        egrep '^Welcome to curlrevshell version' | tr -d '\r\n')"
+GOT=$(gorun -no-timestamps </dev/null 2>&1 |
+        egrep '^Welcome to curlrevshell version' ||:)
 tap_is "$GOT" "$WANT" "Version looks ok" "$0" $LINENO
 
 # Make sure that all of the go install URLs are for this branch.
