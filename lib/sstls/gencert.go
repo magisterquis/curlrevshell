@@ -5,7 +5,7 @@ package sstls
  * Generate a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20251008
+ * Last Modified 20251011
  */
 
 import (
@@ -62,7 +62,8 @@ func GetCertificate(
 		if nil == err {
 			return cert, nil
 		}
-		if !errors.Is(err, fs.ErrNotExist) {
+		if !errors.Is(err, fs.ErrNotExist) &&
+			!errors.Is(err, ErrCacheFileEmpty) {
 			return tls.Certificate{}, fmt.Errorf(
 				"loading cached certificate: %w",
 				err,

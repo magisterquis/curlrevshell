@@ -2,13 +2,22 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-===========
+`pledgeunveil`
+==============
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev
+go install github.com/magisterquis/curlrevshell@pledgeunveil
 ```
+- [`pledgeunveil`](../lib/pledgeunveil): Thin wrapper around OpenBSD's
+  [`pledge(2)`](https://man.openbsd.org/pledge.2) and
+  [`unveil(2)`](https://man.openbsd.org/unveil.2) which, aside from adding a
+  fancy `pU` in [`ps awwwfux`](https://man.openbsd.org/ps.1) output, should
+  mean quite a bit less can go sideways.  On OpenBSD, though.  No-op on other
+  OSs.
+
+`dev`
+=====
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.

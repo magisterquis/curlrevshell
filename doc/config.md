@@ -19,7 +19,7 @@ Linker Flags
 Compile-time config is done with Go's `-X` linker flag.  This usually look a
 bit like
 ```sh
-go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@dev
+go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@pledgeunveil
 ```
 
 The available settings are as follows:

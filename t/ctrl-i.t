@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20250924
+# Last Modified 20251011
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ set -euo pipefail
 # One test per Ctrl+I file.
 FS=$(find ./t/testdata/ctrl-i -name '*.subr')
 NFS=$(($(echo "$FS" | egrep -v '^$' | wc -l)))
-tap_plan $((4+$NFS))
+tap_plan $((5+$NFS))
 
 # Make sure we actually have test files
 tap_isnt "$NFS" 0 "Have test files" "$0" $LINENO
@@ -189,5 +189,18 @@ for FN in $FS; do
         function subtest { check_ctrl_i "$FN"; }
         tap_subtest "Check $FN" subtest "$0" $LINENO
 done
+
+# Make sure we can just print what would be inserted.
+subtest() {
+        tap_plan 2
+        WANT=$(<./t/testdata/ctrl-i/funcs.subr.want)
+        set +e
+        GOT=$(gorun -ctrl-i ./t/testdata/ctrl-i/funcs.subr -print-ctrl-i 2>&1)
+        RET=$?
+        set -e
+        tap_is "$RET"  0      "Exited happily" "$0" $LINENO
+        tap_is "$GOT" "$WANT" "Output correct" "$0" $LINENO
+}
+tap_subtest "-print-ctrl-i" subtest "$0" $LINENO
 
 # vim: ft=sh
