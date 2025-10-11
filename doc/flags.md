@@ -55,7 +55,7 @@ restart curlrevshell if you change it.
 Files ending in `.pl` will be turned into shell function which call perl under
 the hood.  Stdio and argv and so on (should) work more or less like normal.
 
-Files ending in `.sh` and `.subr` are sent as-is.
+Files ending in `.ctrl-i`, `.sh`, and `.subr` are sent as-is.
 
 Everything else is ignored.  Makes it easy to stick a Makefile in there just in
 case you want to do something like embed a Java `.class` in a shell script.  Or

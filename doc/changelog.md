@@ -9,6 +9,9 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterctrli
 ```
+- [`-ctrl-i`](./flags.md#-ctrl-i): Use `*.ctrl-i` as a pattern for a generic
+  (read not-vim-default-syntax-highlighted) file, along with `*.subr` and
+  `*.sh`.
 
 `dev`
 =====

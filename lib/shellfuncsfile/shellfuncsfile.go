@@ -41,9 +41,10 @@ type Filter func(filename string, r io.Reader) ([]byte, error)
 // NewDefaultConverter.  Don't forget to update NewDefaultConverter's comment
 // when one is added here.
 var defaultFilters = map[string]Filter{
-	"*.pl":   FromPerl,
-	"*.sh":   FromShell,
-	"*.subr": FromShell,
+	"*.pl":     FromPerl,
+	"*.sh":     FromShell,
+	"*.subr":   FromShell,
+	"*.ctrl-i": FromShell, /* For non-shell things. */
 }
 
 // errNoConverter is returned by Converter.fromReader if the given filename
@@ -75,7 +76,7 @@ type Converter struct {
 // which are the package-level From* functions.  The default filters and
 // corresponding file glob patterns are:
 //   - FromPerl:  *.pl
-//   - FromShell: *.sh *.subr
+//   - FromShell: *.ctrl-i *.sh *.subr
 func NewDefaultConverter() *Converter {
 	return &Converter{filters: maps.Clone(defaultFilters)}
 }

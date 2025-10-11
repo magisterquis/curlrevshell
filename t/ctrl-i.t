@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20250924
+# Last Modified 20251011
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ set -euo pipefail
 . t/t.subr
 
 # One test per Ctrl+I file.
-FS=$(find ./t/testdata/ctrl-i -name '*.subr')
+FS=$(find ./t/testdata/ctrl-i -maxdepth 1 -name '*.subr')
 NFS=$(($(echo "$FS" | egrep -v '^$' | wc -l)))
 tap_plan $((4+$NFS))
 
