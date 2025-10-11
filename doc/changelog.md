@@ -81,6 +81,7 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`-log`](./flags.md#-log): Log the TLS fingerprint as well.
 - Long invocations and excessive horizontal scrolling finally led to
   [compile-time defaults](./doc/config.md#linker-flags) for flags.
+- [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Go -> Perl, less test panic
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
