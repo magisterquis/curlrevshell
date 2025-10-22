@@ -15,6 +15,7 @@ go install github.com/magisterquis/curlrevshell@pledgeunveil
   fancy `pU` in [`ps awwwfux`](https://man.openbsd.org/ps.1) output, should
   mean quite a bit less can go sideways.  On OpenBSD, though.  No-op on other
   OSs.
+- Updated dependencies.
 
 `dev`
 =====
