@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20250924
+# Last Modified 20251025
 
 BINNAME     != basename $$(pwd)
 BUILDFLAGS   = -trimpath -ldflags "-w -s"
@@ -50,7 +50,7 @@ tools: ${TOOLSRCDIRS:T:S,^,${TOOLSDIR}/,} ## Build supporting tools
 
 .for TOOLSRCDIR in ${TOOLSRCDIRS}
 ${TOOLSDIR}/${TOOLSRCDIR:T}! subdirs ${TOOLSRCDIR}
-	go build ${BUILDFLAGS} -o $@ $>
+	go build ${BUILDFLAGS} -o $@ ${>:Nsubdirs}
 .endfor
 
 update: ## Fetch the latest Shmore and up-to-date Go things
