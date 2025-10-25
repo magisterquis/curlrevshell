@@ -2,18 +2,13 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`fixtemplatetests`
-==================
+`dev`
+=====
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@fixtemplatetests
+go install github.com/magisterquis/curlrevshell@dev
 ```
-- [`t/template.t`](./t/template.t): Quite a bit less flakey in slow (read:
-  OpenBSD in a VM) situations.
-
-`dev`
-=====
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.
@@ -87,6 +82,8 @@ go install github.com/magisterquis/curlrevshell@fixtemplatetests
 - Long invocations and excessive horizontal scrolling finally led to
   [compile-time defaults](./doc/config.md#linker-flags) for flags.
 - [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Go -> Perl, less test panic
+- [`t/template.t`](./t/template.t): Quite a bit less flakey in slow (read:
+  OpenBSD in a VM) situations.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

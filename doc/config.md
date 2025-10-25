@@ -19,7 +19,7 @@ Linker Flags
 Compile-time config is done with Go's `-X` linker flag.  This usually look a
 bit like
 ```sh
-go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@fixtemplatetests
+go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@dev
 ```
 
 The available settings are as follows:
@@ -45,7 +45,7 @@ go install -v -trimpath -ldflags "
     -X main.DefaultLog=$HOME/crs/log.json
     -X main.DefaultServeFilesFrom=$HOME/crs/files
     -X main.DefaultTemplate=$HOME/crs/crs.tmpl
-" github.com/magisterquis/curlrevshell@fixtemplatetests  # Install, setting defaults to $HOME/crs
+" github.com/magisterquis/curlrevshell@dev               # Install, setting defaults to $HOME/crs
 curlrevshell -print-default-template >$HOME/crs/crs.tmpl # Default template, for easier editing
 curlrevshell -h                                          # For just in case
 curlrevshell                                             # Ready to go :)
