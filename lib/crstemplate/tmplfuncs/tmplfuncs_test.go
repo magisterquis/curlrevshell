@@ -5,22 +5,15 @@ package tmplfuncs
  * Tests for tmplfuncs.go
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20251008
+ * Last Modified 20251011
  */
 
 import (
 	"bytes"
-	"go/types"
 	"net"
 	"reflect"
-	"regexp"
-	"runtime"
-	"slices"
-	"strings"
 	"testing"
 	"text/template"
-
-	"golang.org/x/tools/go/packages"
 )
 
 func TestPort(t *testing.T) {
@@ -209,101 +202,6 @@ func TestMatchRE(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-// Are all of the exported functions in TemplateFuncs?
-func Test_AllFuncsAvailable(t *testing.T) {
-	/* Regex to get the last dot-separated bit. */
-	re := regexp.MustCompile(`.*\.`)
-	t.Run("regex", func(t *testing.T) {
-		have := "foo.bar/tridge/baaz.quux"
-		if got, want := re.ReplaceAllString(
-			have,
-			"",
-		), "quux"; got != want {
-			t.Fatalf(
-				"Regex failed\n"+
-					"regex: %s\n"+
-					" have: %s\n"+
-					"  got: %s\n"+
-					" want: %s",
-				re,
-				have,
-				got,
-				want,
-			)
-		}
-	})
-
-	/* Get the functions in TemplateFuncs. */
-	var mapFuncs []string
-	for k, v := range reflect.ValueOf(TemplateFuncs).Seq2() {
-		fn := re.ReplaceAllString(runtime.FuncForPC(
-			uintptr(v.Elem().UnsafePointer()),
-		).Name(), "")
-		/* Is the key the same as the function name? */
-		if got, want := k.String(), strings.ToLower(fn); got != want {
-			t.Errorf(
-				"Map key incorrect\n"+
-					" got: %s\n"+
-					"want: %s",
-				got,
-				want,
-			)
-		}
-		mapFuncs = append(mapFuncs, fn)
-	}
-	slices.Sort(mapFuncs)
-
-	/* Get hold of the current package. */
-	pkgs, err := packages.Load(&packages.Config{
-		Mode: packages.NeedTypes,
-	}, ".")
-	if nil != err {
-		t.Fatalf("Error loading current package: %s", err)
-	} else if got, want := len(pkgs), 1; got != want {
-		t.Fatalf(
-			"Found %d packages in current directory, expected %d",
-			got,
-			want,
-		)
-	} else if nil == pkgs[0].Types {
-		t.Fatalf("Package type information isn't available")
-	}
-
-	/* Work out the package's exported functions. */
-	var exportedFuncs []string
-	scope := pkgs[0].Types.Scope()
-	if nil == scope {
-		t.Fatalf("Failed to get package's scope")
-	}
-	for _, n := range scope.Names() {
-		/* Only care about exported functions. */
-		obj := scope.Lookup(n)
-		if nil == obj {
-			t.Errorf("Failed to look up info about %q", n)
-			continue
-		}
-		if _, ok := obj.(*types.Func); !ok || !obj.Exported() {
-			continue
-		}
-		exportedFuncs = append(exportedFuncs, n)
-	}
-	if 0 == len(exportedFuncs) {
-		t.Fatalf("Did not find any exported functions")
-	}
-	slices.Sort(exportedFuncs)
-
-	/* Did we get the right functions? */
-	if got, want := mapFuncs, exportedFuncs; !slices.Equal(got, want) {
-		t.Errorf(
-			"TemplateFuncs contains incorrect functions\n"+
-				" got: %q\n"+
-				"want: %q",
-			got,
-			want,
-		)
 	}
 }
 

@@ -4,7 +4,7 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20250615
+# Last Modified 20251025
 
 set -e
 
@@ -39,13 +39,34 @@ tap_like \
         "Deprecation warning for -callback-template" \
         "$0" $LINENO
 
+# get_error gets the first line starting with Error from the coroutine, prints
+# it to stdout, then closes the coroutine's input and drains its pipe.
+function get_error {
+        # Get the error line.
+        while read -pr; do
+                if [[ "$REPLY" == Error* ]]; then
+                        echo "$REPLY"
+                        break
+                fi
+        done
+}
+
+# close_coroutine closes the coroutine's input file descriptor drains its pipe,
+# and waits for it to finish.
+function close_coroutine {
+        # Close and drain the coroutine.
+        exec 9>&p; exec 9>&-
+        while read -pr; do :; done
+        wait
+}
+
 # Make sure we get a warning if our template doesn't exist.
 gorun -template ./doesnotexist |&
-GOT=$(awk '3 == NR {print $0; exit}' <&p | cut -f 2- -d ' ')
-exec 9>&p; exec 9>&-
+GOT=$(get_error)
+close_coroutine
 tap_like \
         "$GOT" \
-        'Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: reading template: open ./doesnotexist: no such file or directory' \
+        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: reading template: open ./doesnotexist: no such file or directory' \
         "Warning for missing template file" \
         "$0" $LINENO
 
@@ -54,19 +75,19 @@ cat >$TMPLF <<_eof
 No subtemplates at all :(
 _eof
 gorun -template "$TMPLF" |&
-for i in `jot 3`; do read -p; done
+GOT=$(get_error)
 tap_like \
-        "$REPLY" \
-        '^[0-9:.]+ Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: no subtemplates' \
+        "$GOT" \
+        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: no subtemplates' \
         "Warning for old-style template file" \
         "$0" $LINENO
-read -p
+read -p; GOT=$REPLY
+close_coroutine
 tap_like \
-        "$REPLY" \
-        '^[0-9:.]+ \tYou probably need {{define "callback"}} \.\.\. {{end}} around your template\.' \
+        "$GOT" \
+        '^You probably need {{define "callback"}} \.\.\. {{end}} around your template\.' \
         "Helpful message after old-style template file" \
         "$0" $LINENO
-exec 9>&p; exec 9>&-; wait
 
 # Make sure we get a warning if we're using a non-subtemplate template.
 cat >$TMPLF <<_eof
@@ -74,19 +95,19 @@ cat >$TMPLF <<_eof
 Extra data
 _eof
 gorun -template "$TMPLF" |&
-for i in `jot 3`; do read -p; done
+GOT=$(get_error)
 tap_like \
-        "$REPLY" \
-        '^[0-9:.]+ Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: non-subtemplate template data found' \
+        "$GOT" \
+        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: non-subtemplate template data found' \
         "Warning for template with outside-subtemplate data" \
         "$0" $LINENO
-read -p
+read -p; GOT=$REPLY
+close_coroutine
 tap_like \
-        "$REPLY" \
-        '^[0-9:.]+ \tYou probably need {{define "callback"}} \.\.\. {{end}} around your template\.' \
+        "$GOT" \
+        '^You probably need {{define "callback"}} \.\.\. {{end}} around your template\.' \
         "Helpful message after template with outside-subtemplate data" \
         "$0" $LINENO
-exec 9>&p; exec 9>&-; wait
 
 # template_ok makes sure a template doesn't cause curlrevshell to print an
 # error on startup.
@@ -97,9 +118,9 @@ exec 9>&p; exec 9>&-; wait
 # $3 - Lineno
 function template_ok {
         gorun -template "$1" |&
-        for i in `jot 3`; do read -p; done
-        tap_like "$REPLY" "^[0-9:.]+ To get a shell:" "$2" "$0" "$3"
-        exec 9>&p; exec 9>&-; wait
+        for i in `jot 3`; do read -pr; done
+        tap_like "$REPLY" "^To get a shell:" "$2" "$0" "$3"
+        exec 9>&p; exec 9>&-; while read -pr; do :; done; wait
 }
 
 # Make sure we don't get a warning if we're not using a template.

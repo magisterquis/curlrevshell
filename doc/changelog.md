@@ -15,6 +15,8 @@ go install github.com/magisterquis/curlrevshell@pledgeunveil
   fancy `pU` in [`ps awwwfux`](https://man.openbsd.org/ps.1) output, should
   mean quite a bit less can go sideways.  On OpenBSD, though.  No-op on other
   OSs.
+- [`t/template.t`](./t/template.t): Quite a bit less flakey in slow (read:
+  OpenBSD in a VM) situations.
 - Updated dependencies.
 
 `dev`
@@ -91,6 +93,7 @@ go install github.com/magisterquis/curlrevshell@pledgeunveil
 - [`-log`](./flags.md#-log): Log the TLS fingerprint as well.
 - Long invocations and excessive horizontal scrolling finally led to
   [compile-time defaults](./doc/config.md#linker-flags) for flags.
+- [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Go -> Perl, less test panic
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
