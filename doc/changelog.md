@@ -9,6 +9,8 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@fixtemplatetests
 ```
+- [`t/template.t`](./t/template.t): Quite a bit less flakey in slow (read:
+  OpenBSD in a VM) situations.
 
 `dev`
 =====

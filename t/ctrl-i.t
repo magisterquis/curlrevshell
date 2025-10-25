@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20250924
+# Last Modified 20251025
 
 set -euo pipefail
 
@@ -147,13 +147,13 @@ function check_ctrl_i {
         # Start curlrevshell going.
         gorun -ctrl-i "$1" -log "$LOGF" |&
         # Skip past the welcome messages.
-        while read -p; do if [[ -z "$REPLY" ]]; then break; fi; done
+        while read -pr; do if [[ -z "$REPLY" ]]; then break; fi; done
 
         # Connect up curl to get the Ctrl+I output after a SIGUSR1.
-        read -p CURL; 
+        read -pr CURL;
         CURL=${CURL%/c*}/io
         <&p $CURL -T. --no-progress-meter --output $GOTF 2>&1 &
-        while read -p; do
+        while read -pr; do
                 if [[ "$REPLY" == *"Shell is ready to go"* ]]; then
                         break
                 fi
@@ -168,8 +168,8 @@ function check_ctrl_i {
         WANTSIZE=$(($(wc -c <$WANTF)))
 
         # Work out how much we think we sent.
-        for i in `jot 2`; do read -p; done
-        CRSSIZE=$(($(echo "$REPLY" | cut -f 3 -d ' ')))
+        for i in `jot 2`; do read -pr; done
+        CRSSIZE=$(($(echo "$REPLY" | cut -f 2 -d ' ')))
         tap_is "$CRSSIZE" "$WANTSIZE" "Reported size correct" "$0" $LINENO
 
         # Kill curlrevshell and wait for curl to finish writing.
