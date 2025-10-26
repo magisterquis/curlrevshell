@@ -4,7 +4,7 @@
 # Make sure we unveil as expected
 # By J. Stuart McMurray
 # Created 20251010
-# Last Modified 20251011
+# Last Modified 20251026
 
 set -euo pipefail
 
@@ -26,11 +26,12 @@ get_run_errors() {
         # Run it.
         set +e
         GOT=$(go run . \
-                -ctrl-i                /dev/null \
-                -log                   "$_log"   \
-                -serve-files-from      /dev/null \
-                -template              /dev/null \
-                -tls-certificate-cache "$_cache" \
+                -ctrl-i                /dev/null     \
+                -log                   "$_log"       \
+                -serve-files-from      /dev/null     \
+                -template              /dev/null     \
+                -tls-certificate-cache "$_cache"     \
+                -listen-address        "127.0.0.1:0" \
                 </dev/null 2>&1)
         RET=$?
         # Extract errors
