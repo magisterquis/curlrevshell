@@ -46,7 +46,7 @@ go install -v -trimpath -ldflags "
     -X main.DefaultServeFilesFrom=$HOME/crs/files
     -X main.DefaultTemplate=$HOME/crs/crs.tmpl
 " github.com/magisterquis/curlrevshell@dev               # Install, setting defaults to $HOME/crs
-curlrevshell -print-default-template >$HOME/crs/crs.tmpl # Default template, for easier editing
+touch $HOME/crs/crs.tmpl                                 # Default template, to prevent whining
 curlrevshell -h                                          # For just in case
 curlrevshell                                             # Ready to go :)
 ```

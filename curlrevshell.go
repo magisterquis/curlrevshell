@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251010
+ * Last Modified 20251011
  */
 
 import (
@@ -30,6 +30,7 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/pledgeunveil"
 	"github.com/magisterquis/curlrevshell/lib/shellfuncsfile"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 	"github.com/magisterquis/goxterm"
@@ -72,6 +73,7 @@ const (
 
 func main() { os.Exit(rmain()) }
 func rmain() int {
+	pledgeunveil.MustPledge("cpath inet rpath stdio tty unveil wpath")
 	/* Command-line flags. */
 	var cbAddrs []string
 	var (
@@ -219,8 +221,9 @@ Options:
 `)
 	}
 
-	/* If we're just printing the default template, life's also easy. */
+	/* If we're just printing the default template, life's easy. */
 	if *printDefaultTemplate {
+		pledgeunveil.MustPledge("stdio")
 		if _, err := io.WriteString(
 			os.Stdout,
 			crstemplate.DefaultTemplate,
@@ -230,6 +233,84 @@ Options:
 		}
 		return 0
 	}
+
+	/* Converter for Ctrl+I. */
+	ctrlIConv := shellfuncsfile.NewDefaultConverter()
+	ctrlIConv.AddListFunction = true
+	insertGen := func() ([]byte, error) {
+		/* Make sure we have something to insert. */
+		if "" == *insertFile {
+			return nil, errors.New("no source configured")
+		}
+		/* Send it for inserting. */
+		b, err := ctrlIConv.From(*insertFile)
+		if nil != err {
+			return nil, fmt.Errorf(
+				"preparing %s: %w",
+				*insertFile,
+				err,
+			)
+		}
+		return b, nil
+	}
+
+	/* If we're just printing it, life's easy. */
+	if *printCtrlI {
+		if err := pledgeunveil.MultiUnveil(
+			[][2]string{{*insertFile, "r"}},
+		); nil != err {
+			log.Printf(
+				"Error unveiling %s: %s",
+				*insertFile,
+				err,
+			)
+			return 6
+		}
+		pledgeunveil.MustPledge("rpath stdio")
+		b, err := insertGen()
+		if nil != err {
+			log.Fatalf("Error generating Ctrl+I file: %s", err)
+		}
+		os.Stdout.Write(b)
+		return 0
+	}
+
+	/* Restrict what files we can see, but make the certificate cache
+	directory first, so we can unveil down to just the file. */
+	/* Restrict what files we can see, but make the directories for files
+	we may create first so we can unveil down to just the file. */
+	for _, v := range [][2]string{
+		{"certificate cache", *certFile},
+		{"logfile", *logFile},
+	} {
+		/* Don't bother if we're not actually using one. */
+		if "" == v[1] {
+			continue
+		}
+		dn := filepath.Dir(v[1])
+		if err := os.MkdirAll(dn, 0700); nil != err {
+			log.Printf(
+				"Error making %s directory %s: %s",
+				v[0],
+				dn,
+				err,
+			)
+			return 5
+		}
+	}
+	if err := pledgeunveil.MultiUnveil([][2]string{
+		{*certFile, "crw"},
+		{*fdir, "r"},
+		{*insertFile, "r"},
+		{*logFile, "cw"},
+		{*tmplf, "r"},
+	}); errors.Is(err, syscall.ENOENT) {
+		log.Printf("Unveil error: %s", err)
+		return 4
+	} else if nil != err {
+		panic("unveil: " + err.Error())
+	}
+	pledgeunveil.MustPledge("cpath inet rpath stdio tty wpath")
 
 	/* Channels for comms between subsystems. */
 	var (
@@ -270,36 +351,6 @@ Options:
 	}
 	sl := slog.New(lh)
 	sl.Info(LMStarting, LKPID, os.Getpid())
-
-	/* Converter for Ctrl+I. */
-	ctrlIConv := shellfuncsfile.NewDefaultConverter()
-	ctrlIConv.AddListFunction = true
-	insertGen := func() ([]byte, error) {
-		/* Make sure we have something to insert. */
-		if "" == *insertFile {
-			return nil, errors.New("no source configured")
-		}
-		/* Send it for inserting. */
-		b, err := ctrlIConv.From(*insertFile)
-		if nil != err {
-			return nil, fmt.Errorf(
-				"preparing %s: %w",
-				*insertFile,
-				err,
-			)
-		}
-		return b, nil
-	}
-
-	/* If we're just printing it, life's easy. */
-	if *printCtrlI {
-		b, err := insertGen()
-		if nil != err {
-			log.Fatalf("Error generating Ctrl+I file: %s", err)
-		}
-		os.Stdout.Write(b)
-		return 0
-	}
 
 	/* Fancypants shell. */
 	shell, cleanup, err := opshell.New(

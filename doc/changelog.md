@@ -84,6 +84,12 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Go -> Perl, less test panic
 - [`t/template.t`](./t/template.t): Quite a bit less flakey in slow (read:
   OpenBSD in a VM) situations.
+- [`pledgeunveil`](../lib/pledgeunveil): Thin wrapper around OpenBSD's
+  [`pledge(2)`](https://man.openbsd.org/pledge.2) and
+  [`unveil(2)`](https://man.openbsd.org/unveil.2) which, aside from adding a
+  fancy `pU` in [`ps awwwfux`](https://man.openbsd.org/ps.1) output, should
+  mean quite a bit less can go sideways.  On OpenBSD, though.  No-op on other
+  OSs.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)
