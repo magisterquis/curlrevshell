@@ -1,0 +1,21 @@
+This is free-form text
+# TABDOC: pl Get all encodey
+pl() {(
+(exit $((0 != $#))) || set -- -e "" -- "$@";
+PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
+7"G!R:6YT(")4:&ES(&ES(s!E<FPA(@H`
+}=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
+# TABDOC: a A sample A
+a() { echo "A sample a function"; }
+# TABDOC: b A sample B
+b() {
+        echo "A b sample"
+}
+# vim: ft=sh
+
+tab_list() {
+        echo 'a         - A sample A'
+        echo 'b         - A sample B'
+        echo 'pl        - Get all encodey'
+        echo 'tab_list  - This function list'
+}

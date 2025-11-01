@@ -9,6 +9,9 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
+
+`dev`
+=====
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.
@@ -90,6 +93,9 @@ go install github.com/magisterquis/curlrevshell@dev
   fancy `pU` in [`ps awwwfux`](https://man.openbsd.org/ps.1) output, should
   mean quite a bit less can go sideways.  On OpenBSD, though.  No-op on other
   OSs.
+- [`-ctrl-i`](./flags.md#-ctrl-i): Use `*.ctrl-i` as a pattern for a generic
+  (read not-vim-default-syntax-highlighted) file, along with `*.subr` and
+  `*.sh`.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

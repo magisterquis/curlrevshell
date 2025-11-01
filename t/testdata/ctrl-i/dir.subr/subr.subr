@@ -1,0 +1,5 @@
+# TABDOC: b A sample B
+b() {
+        echo "A b sample"
+}
+# vim: ft=sh
