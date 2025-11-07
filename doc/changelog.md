@@ -2,16 +2,14 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
-The following changes are available on this branch and will (probably) be in
-the next tagged version.  Get them with
+Bleeding-edge code can be found in the
+[`dev` branch](https://github.com/magisterquis/curlrevshell/tree/dev):
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
 
-`dev`
-=====
+`v0.0.1-beta.8` (2025-11-07)
+============================
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
   roll fancypants `-template` templates.

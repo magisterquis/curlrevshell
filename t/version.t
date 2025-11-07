@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20251011
+# Last Modified 20251207
 
 set -euo pipefail
 
@@ -34,30 +34,44 @@ tap_is "$GOT" "$WANT" "Version looks ok" "$0" $LINENO
 
 # Make sure that all of the go install URLs are for this branch.
 subtest() {
+        # These should all be using "latest" if we're on the master branch.
+        local _want=$TAG
+        if [[ "master" = $(current_git_branch) ]]; then
+                _want=latest
+        fi
+
+        PATTERN='github.com/magisterquis/curlrevshell@[^[:space:]]+'
         # Look for what looks like go install URLs
-        MATCHES="$(find . -type f \
+        LINES="$(find . -type f \
                 \! -name '*.swp' \
                 \! -path './t/*' \
                 -exec egrep \
-                        -no \
-                        'github.com/magisterquis/curlrevshell@[^[:space:]]+' \
+                        -n \
+                        "$PATTERN" \
                         {} + |
                 sort -u)"
 
         # Number of files is the number of subtest tests we'll run, plus a
         # check we got files at all
-        tap_plan "$(( $(echo -n "$MATCHES" | egrep -v '^$' | wc -l) + 1 ))"
+        tap_plan "$(( $(echo -n "$LINES" | egrep -v '^$' | wc -l) + 1 ))"
 
         # Make sure we got at least one file
-        tap_isnt "$MATCHES" "" "Got files with the install path" "$0" $LINENO
+        tap_isnt "$LINES" "" "Got files with the install path" "$0" $LINENO
 
         # Make sure each file is correct
         IFS='
 '
-        for MATCH in $MATCHES; do
-                GOT="$(echo "$MATCH" | cut -f 2 -d @)"
-                FILE="$(echo "$MATCH" | cut -f 1,2 -d :)"
-                tap_is "$GOT" "$TAG" "$FILE is correct" "$0" $LINENO
+        for LINE in $LINES; do
+                FILE="$(print -r "$LINE" | cut -f 1,2 -d :)"
+                GOT="$( print -r "$LINE" | egrep -o "$PATTERN" |
+                        cut -f 2 -d @)"
+                # The changelog is special.  On the master branch, the go get
+                # should actually be dev.
+                local _linewant=$_want
+                if [[ "$FILE" = ./doc/changelog.md:* ]]; then
+                        _linewant=dev
+                fi
+                tap_is "$GOT" "$_linewant" "$FILE is correct" "$0" $LINENO
         done
 }
 tap_subtest "Correct go install paths in docs" subtest "$0" $LINENO
@@ -102,20 +116,31 @@ WANT=$(go list -deps -f '
 tap_is "$GOT" "$WANT" "Correct downloaded modules in README" "$0" $LINENO
 
 # Make sure the top of the changelog has the right version
-GOT="$(awk '5==NR' doc/changelog.md | cut -f 2 -d '`')"
+GOT="$(egrep -B1 '^=+$' doc/changelog.md |
+        egrep '^`' |
+        cut -f 2 -d '`' |
+        head -n 1)"
 tap_is "$GOT" "$TAG" "Changelog has correct tag" "$0" $LINENO
 
-# Make sure the welome message in the README at least has the right branch.
-GOT=$(grep 'Welcome to curlrevshell version' README.md | cut -f 7- -d ' ')
-WANT=$(current_git_branch)
-case "$WANT" in
-        master) WANT= ;;                 # Won't be displayed
-        *)      WANT="($WANT branch)" ;; # Bit fancier
-esac
-tap_is \
-        "$GOT" "$WANT" \
-        "Branch name in welcome message in README correct" \
-        "$0" $LINENO
+# Make sure the welome message in the README at least has the right branch for
+# branches, or right tag for master.
+WELCOME=$(grep 'Welcome to curlrevshell version' README.md)
+BRANCH=$(current_git_branch)
+if [[ "$BRANCH" = master ]]; then
+        GOT=$(print -r "$WELCOME" | cut -f 6 -d ' ')
+        WANT="$TAG"
+        tap_is \
+                "$GOT" "$WANT" \
+                "Version in welcome message in README correct" \
+                "$0" $LINENO
+else
+        GOT=$(print -r "$WELCOME" | cut -f 7- -d ' ')
+        WANT=$BRANCH
+        tap_is \
+                "$GOT" "$WANT" \
+                "Branch name in welcome message in README correct" \
+                "$0" $LINENO
+fi
 
 # Make sure there's no replace directives in go.mod.
 GOT=$(egrep ^replace go.mod ||:)

@@ -4,7 +4,7 @@
 # Make sure the welcome message is correct
 # By J. Stuart McMurray
 # Created 20250615
-# Last Modified 20250615
+# Last Modified 20251107
 
 set -euo pipefail
 
@@ -35,7 +35,13 @@ gorun -serve-files-from ./t -no-timestamps |&
 CURLRESTART='^curl -sk '\
 '--pinnedpubkey sha256//[a-z0-9A-Z+/]{43}= '\
 'https://127.0.0.1:\d+$' 
-plike "^Welcome to curlrevshell version \(devel\) \($BRANCH branch\)$" $LINENO
+WANT="^Welcome to curlrevshell version \(devel\)"
+if [[ "master" != "$BRANCH" ]]; then
+        WANT="$WANT \($BRANCH branch\)"
+fi
+WANT="$WANT\$"
+#plike "^Welcome to curlrevshell version \(devel\) \($BRANCH branch\)$" $LINENO
+plike "$WANT" $LINENO
 plike '^Listening on 127.0.0.1:\d+$'                                 $LINENO
 plike '^To get files from ./t:$'                                     $LINENO
 plike '^$'                                                           $LINENO
