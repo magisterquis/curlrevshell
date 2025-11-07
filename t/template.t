@@ -4,14 +4,14 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20251025
+# Last Modified 20251107
 
 set -e
 
 . t/shmore.subr
 . t/t.subr
 
-tap_plan 13
+tap_plan 12
 
 # We'll need a temporary template and a directory for the templates from
 # doc/template.md
@@ -28,16 +28,6 @@ GOT="$(find . -type f \
 )"
 
 tap_is "$GOT" "" "Not using html/template" "$0" $LINENO
-
-# Make sure we get a warning if we use -callback-template.
-GOT="$(gorun -callback-template ./doesnotexist </dev/null | cat)"
-tap_like \
-        "$GOT" \
-        '(?s:-callback-template is.*'\
-'going away eventually.*'\
-'Use -template instead)' \
-        "Deprecation warning for -callback-template" \
-        "$0" $LINENO
 
 # get_error gets the first line starting with Error from the coroutine, prints
 # it to stdout, then closes the coroutine's input and drains its pipe.

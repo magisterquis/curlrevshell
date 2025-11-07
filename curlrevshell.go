@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251011
+ * Last Modified 20251107
  */
 
 import (
@@ -33,7 +33,6 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/pledgeunveil"
 	"github.com/magisterquis/curlrevshell/lib/shellfuncsfile"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
-	"github.com/magisterquis/goxterm"
 )
 
 var (
@@ -160,26 +159,6 @@ func rmain() int {
 			return nil
 		},
 	)
-	flag.Func( /* Added 20241222. */
-		"callback-template",
-		"Optional `template` file, used if it exists (deprecated)",
-		func(s string) error {
-			fmt.Printf(` _______________________
-/ -callback-template is \
-| going away eventually |
-|                       |
-\ Use -template instead /
- -----------------------
-        \   ^__^
-         \  (!!)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||
-`)
-			*tmplf = s
-			return nil
-		},
-	)
 	flag.Usage = func() {
 		fmt.Fprintf(
 			flag.CommandLine.Output(),
@@ -200,26 +179,6 @@ Options:
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-
-	/* Warn that -callback-template is going to change quite a bit.
-	Added 20250112.  The + is there because t/version.t :| */
-	if !*printDefaultTemplate && goxterm.IsTerminal(int(os.Stdout.Fd())) {
-		fmt.Print(` ________________________________________________________________________________
-/                                 Hotkey Change!                                 \
-|                                 --------------                                 |
-|                                                                                |
-|                              Ctrl+J is now Ctrl+S                              |
-|                                                                                |
-|                              For more details see                              |
-\ https://github.com/golang/term/commit/4f53e0cd3924d70667107169374a480bfd208348 /
- --------------------------------------------------------------------------------
-        \   ^__^
-         \  (!!)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||
-`)
-	}
 
 	/* If we're just printing the default template, life's easy. */
 	if *printDefaultTemplate {

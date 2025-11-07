@@ -19,8 +19,8 @@ go install github.com/magisterquis/curlrevshell@dev
 - Added the aptly-named [`config.md`](./config.md) and
   [`template.md`](./template.md).
 - Minor tweaks to the callback script.
-- Asked an excitable cow to give a warning that `-callback-template` is
-  deprecated in favor of `-callback`.
+- ~Asked an excitable cow to give a warning that `-callback-template` is
+  deprecated in favor of `-callback`.~
 - [`opshell`](../lib/opshell): Added `Shell.RedLogf` which does what it says on
   the tin.
 - Renamed `{{.URL}}` to `{{.Host}}` and added `{{.Path}`, for overengineered
@@ -96,6 +96,7 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`-ctrl-i`](./flags.md#-ctrl-i): Use `*.ctrl-i` as a pattern for a generic
   (read not-vim-default-syntax-highlighted) file, along with `*.subr` and
   `*.sh`.
+- Finally removed `-callback-template`.
 - Updated dependencies.
 
 `v0.0.1-beta.7` (2024-10-22)

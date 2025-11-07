@@ -76,8 +76,6 @@ Tab    - Same as Ctrl+I
 Options:
   -callback-address address
     	Additional callback address or domain, for one-liner printing (may be repeated)
-  -callback-template template
-    	Optional template file, used if it exists (deprecated)
   -ctrl-i source
     	Tab/Ctrl+I's insertion source file or directory
   -debug
