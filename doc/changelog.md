@@ -2,11 +2,14 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-Bleeding-edge code can be found in the
-[`dev` branch](https://github.com/magisterquis/curlrevshell/tree/dev):
+`dev`
+=====
+The following changes are available on this branch and will (probably) be in
+the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@dev
 ```
+Nothing yet...
 
 `v0.0.1-beta.8` (2025-11-07)
 ============================

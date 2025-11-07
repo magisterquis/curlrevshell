@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20251207
+# Last Modified 20251107
 
 set -euo pipefail
 
@@ -135,7 +135,7 @@ if [[ "$BRANCH" = master ]]; then
                 "$0" $LINENO
 else
         GOT=$(print -r "$WELCOME" | cut -f 7- -d ' ')
-        WANT=$BRANCH
+        WANT="($BRANCH branch)"
         tap_is \
                 "$GOT" "$WANT" \
                 "Branch name in welcome message in README correct" \
