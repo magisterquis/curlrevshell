@@ -10,7 +10,7 @@ set -euo pipefail
 
 . t/shmore.subr
 
-NTEST=9
+NTEST=8
 tap_plan "$NTEST"
 
 # OK_DEBUG and OK_TODO, if exant, contain grep output lines to be ignored
@@ -67,15 +67,6 @@ if [[ -f ./go.mod ]]; then
                 -m all)"
         tap_is "$GOT" "" "Packages up-to-date" "$0" $LINENO
         # Idea stolen from https://github.com/fogfish/go-check-updates
-
-        # Check for newer versions of tools
-        GOT="$(go list \
-                -u \
-                -f '{{if .Update}}
-                        {{- .Path}}: {{.Version}} -> {{.Update.Version -}}
-                {{end}}' \
-                -m $(go list -f '{{.Module.Path}}' tool))"
-        tap_is "$GOT" "" "Tools up-to-date" "$0" $LINENO
 
         # Make sure we're using the latest Go as well.
         GOT="$(go list \

@@ -25,7 +25,7 @@ build: ${BINNAME} ## Build curlrevshell
 test: subdirs ## Run tests
 	go test ${BUILDFLAGS} ${TESTFLAGS} ./...
 	go vet  ${BUILDFLAGS} ./...
-	go tool staticcheck ./...
+	! which staticcheck >/dev/null || staticcheck ./...
 	go run ${BUILDFLAGS} . -h 2>&1 |\
 	awk '\
 		/^Options:$$|MQD DEBUG PACKAGE LOADED$$/\
@@ -57,7 +57,6 @@ update: ## Fetch the latest Shmore and up-to-date Go things
 	curl --fail --no-progress-meter --output t/shmore.subr ${SHMOREURL}
 	go get go
 	go get -t -u
-	go get -t -u tool
 	go mod tidy
 
 install: ## Install curlrevshell with go install

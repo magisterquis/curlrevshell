@@ -35,12 +35,12 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@dev
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
-go: downloading golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546
-go: downloading golang.org/x/net v0.46.0
-go: downloading golang.org/x/sync v0.17.0
-go: downloading golang.org/x/sys v0.37.0
-go: downloading golang.org/x/text v0.30.0
-go: downloading golang.org/x/tools v0.38.0
+go: downloading golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39
+go: downloading golang.org/x/net v0.47.0
+go: downloading golang.org/x/sync v0.19.0
+go: downloading golang.org/x/sys v0.39.0
+go: downloading golang.org/x/text v0.31.0
+go: downloading golang.org/x/tools v0.39.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (dev branch)
 01:04:42.760 Listening on 0.0.0.0:4444
