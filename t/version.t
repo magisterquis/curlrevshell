@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20251107
+# Last Modified 20251209
 
 set -euo pipefail
 
@@ -43,6 +43,7 @@ subtest() {
         PATTERN='github.com/magisterquis/curlrevshell@[^[:space:]]+'
         # Look for what looks like go install URLs
         LINES="$(find . -type f \
+                \! -name '*.m4' \
                 \! -name '*.swp' \
                 \! -path './t/*' \
                 -exec egrep \
@@ -68,7 +69,8 @@ subtest() {
                 # The changelog is special.  On the master branch, the go get
                 # should actually be dev.
                 local _linewant=$_want
-                if [[ "$FILE" = ./doc/changelog.md:* ]]; then
+                if [[ "$FILE" = ./doc/changelog.md:* &&
+                        "master" == $(current_git_branch) ]]; then
                         _linewant=dev
                 fi
                 tap_is "$GOT" "$_linewant" "$FILE is correct" "$0" $LINENO

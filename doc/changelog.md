@@ -2,13 +2,18 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
+`betterupdates`
+===============
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev
+go install github.com/magisterquis/curlrevshell@betterupdates
 ```
+- Automate updates to [`README.md`](./README.md) and
+  [`config.md`](./doc/config.md).
+
+`dev`
+=====
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
   vulnerability.
 - Updated dependencies.

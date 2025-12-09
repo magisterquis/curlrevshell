@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20251025
+# Last Modified 20251209
 
 BINNAME     != basename $$(pwd)
 BUILDFLAGS   = -trimpath -ldflags "-w -s"
@@ -11,6 +11,7 @@ SUBMAKES    != find . -mindepth 2 -name Makefile -type f
 TESTFLAGS   += -timeout 3s
 TOOLSDIR     = tools
 TOOLSRCDIRS != find ./lib/*/cmd -maxdepth 1 -mindepth 1 -type d
+GENDOCS      = README.md doc/config.md
 
 .PHONY: all build test tools help install clean
 
@@ -19,10 +20,19 @@ all: test tools build ## Build ALL the things! (and test them, default)
 ${BINNAME}! subdirs
 	go build ${BUILDFLAGS} -o ${BINNAME}
 
-build: ${BINNAME} ## Build curlrevshell
+# Document-builders.
+.for D in ${GENDOCS}
+$D: internal/docsrc/${@F}.built
+	cp $> $@
+
+internal/docsrc/${D:T}.built!
+	make -C ${@D} ${@F}
+.endfor
+
+build: ${BINNAME} ${GENDOCS} ## Build curlrevshell and its documentation
 .PHONY: build
 
-test: subdirs ## Run tests
+test: subdirs ${GENDOCS} ## Run tests
 	go test ${BUILDFLAGS} ${TESTFLAGS} ./...
 	go vet  ${BUILDFLAGS} ./...
 	! which staticcheck >/dev/null || staticcheck ./...
@@ -63,6 +73,9 @@ install: ## Install curlrevshell with go install
 	go install ${BUILDFLAGS}
 
 clean: ## Remove built things
+.for SUBDIR in ${SUBMAKES:H}
+	+${.MAKE} -C ${SUBDIR} $@
+.endfor
 	rm -rf ${BINNAME} ${TOOLSDIR}
 
 help: .NOTMAIN ## This help

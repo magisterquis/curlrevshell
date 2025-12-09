@@ -1,4 +1,7 @@
+*.built
 .*.swp
+/internal/docsrc/downloading_deps
+/internal/docsrc/usage
 curlrevshell
 curlrevshell-*-*
 tools/

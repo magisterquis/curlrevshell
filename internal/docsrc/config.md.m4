@@ -1,3 +1,4 @@
+m4_changequote(dummy,dummy)m4_dnl
 Non-Flag Configuration
 ======================
 Aside from using [command-line flags](./flags.md) at runtime, curlrevshell can
@@ -19,7 +20,7 @@ Linker Flags
 Compile-time config is done with Go's `-X` linker flag.  This usually look a
 bit like
 ```sh
-go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@betterupdates
+go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@m4_current_branch
 ```
 
 The available settings are as follows:
@@ -45,9 +46,10 @@ go install -v -trimpath -ldflags "
     -X main.DefaultLog=$HOME/crs/log.json
     -X main.DefaultServeFilesFrom=$HOME/crs/files
     -X main.DefaultTemplate=$HOME/crs/crs.tmpl
-" github.com/magisterquis/curlrevshell@betterupdates
+" github.com/magisterquis/curlrevshell@m4_current_branch
 # ^ Install, setting defaults to $HOME/crs
 touch $HOME/crs/crs.tmpl                                 # Default template, to prevent whining
 curlrevshell -h                                          # For just in case
 curlrevshell                                             # Ready to go :)
 ```
+m4_dnl vim: ft=markdown
