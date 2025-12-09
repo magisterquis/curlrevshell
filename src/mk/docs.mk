@@ -15,5 +15,5 @@ $D: src/docs/${@F}.built .NOTMAIN
 	cp $> $@
 
 src/docs/${D:T}.built! .NOTMAIN
-	+${.MAKE} -C ${@D} ${@F}
+	+${.MAKE} -C ${@D} -q ${@F} >/dev/null || ${.MAKE} -C ${@D} ${@F}
 .endfor
