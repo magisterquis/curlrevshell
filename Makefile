@@ -44,6 +44,7 @@ update: ## Fetch the latest Shmore and up-to-date Go things
 	go get go
 	go get -t -u
 	go mod tidy
+	${.MAKE} docs
 .PHONY: update
 
 install: ## Install curlrevshell with go install
