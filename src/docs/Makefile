@@ -6,8 +6,10 @@
 
 .SUFFIXES: .m4 .built
 
+CURRENT_BRANCH_FILE=../../internal/currentversion/current_branch
+
 # Name conflict :|
-.m4.built: ../currentversion/current_branch downloading_deps usage
+.m4.built: ${CURRENT_BRANCH_FILE} downloading_deps usage
 	m4\
 		-PEE\
 		-Dm4_current_branch="$$(<${>:M*/current_branch})"\
@@ -20,7 +22,7 @@ usage: ../../go.mod ../../go.sum ../../curlrevshell.go
 	go run ../../ -h >$@.tmp 2>&1
 	mv $@.tmp $@
 
-../currentversion/current_branch:
+${CURRENT_BRANCH_FILE}:
 	make -C ${@D} ${@F}
 
 downloading_deps: ../../go.mod ../../go.sum
@@ -40,3 +42,5 @@ downloading_deps: ../../go.mod ../../go.sum
 
 clean:
 	rm -f *.built downloading_deps usage
+distclean: clean
+.PHONY: clean distclean

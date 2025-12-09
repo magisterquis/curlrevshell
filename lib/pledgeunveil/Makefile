@@ -10,6 +10,7 @@ all: pledgeunveil_other.go
 pledgeunveil_other.go: pledgeunveil_openbsd.go
 	go generate
 
-clean:
+distclean:
 	rm -f pledgeunveil_other.go
-.PHONY: clean
+clean:
+.PHONY: clean distclean

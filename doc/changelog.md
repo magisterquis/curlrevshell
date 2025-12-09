@@ -11,6 +11,7 @@ go install github.com/magisterquis/curlrevshell@betterupdates
 ```
 - Automate updates to [`README.md`](./README.md) and
   [`config.md`](./doc/config.md).
+- Split the [Makefile](./Makefile) into [smaller parts](./src/mk).
 
 `dev`
 =====

@@ -14,6 +14,7 @@ README.md: godoc.txt README.md.m4
 	m4 -PEE -Dm4_godoc=${>:M*.txt} ${>:M*.m4} >$@.tmp
 	mv $@.tmp $@
 
-clean:
+distclean:
 	rm -f godoc.txt README.md
-.PHONY: clean
+clean:
+.PHONY: clean distclean
