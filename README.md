@@ -35,7 +35,7 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@betterupdates
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
-go: downloading golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39
+go: downloading golang.org/x/exp v0.0.0-20251209150349-8475f28825e9
 go: downloading golang.org/x/net v0.48.0
 go: downloading golang.org/x/sync v0.19.0
 go: downloading golang.org/x/sys v0.39.0
