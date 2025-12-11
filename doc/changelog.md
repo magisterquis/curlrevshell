@@ -3,7 +3,7 @@ Changelog
 This lists the feature creep present in each tagged version.
 
 `dev`
-===============
+=====
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
