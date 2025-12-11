@@ -14,7 +14,7 @@ TESTFLAGS    += -timeout 3s
 .include "src/mk/tools.mk"
 .include "src/mk/gosubdirs.mk"
 
-all: test .WAIT docs build tools ## Build ALL the things! (and test them, default)
+all: docs build tools .WAIT test ## Build ALL the things! (and test them, default)
 .PHONY: all
 
 build: ${BINNAME} ## Build curlrevshell
@@ -23,7 +23,7 @@ build: ${BINNAME} ## Build curlrevshell
 ${BINNAME}! gosubdirs
 	go build ${GOBUILDFLAGS} -o ${BINNAME}
 
-test: gosubdirs docs ## Run tests
+test: docs ## Run tests
 	go test ${GOBUILDFLAGS} ${TESTFLAGS} ./...
 	go vet  ${GOBUILDFLAGS} ./...
 	! which staticcheck >/dev/null || staticcheck ./...
