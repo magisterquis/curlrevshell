@@ -2,22 +2,19 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`betterversion`
+`dev`
 ===============
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@betterversion
+go install github.com/magisterquis/curlrevshell@dev
 ```
+- `go` un-`tool`'d staticcheck, because hypothetical supply chain
+  vulnerability.
 - Automate updates to [`README.md`](./README.md) and
   [`config.md`](./doc/config.md).
 - Split the [Makefile](./Makefile) into [smaller parts](./src/mk).
 - `-h` makes it that much easier to see the current version.
-
-`dev`
-=====
-- `go` un-`tool`'d staticcheck, because hypothetical supply chain
-  vulnerability.
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)
