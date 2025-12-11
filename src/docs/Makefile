@@ -19,7 +19,7 @@ M4_ARGS += -Dm4_${F:T}="$$(<$F)"
 	m4 -PEE ${M4_ARGS} ${>:M*.m4} >$@.tmp
 	mv $@.tmp $@
 
-usage: ../../go.mod ../../go.sum ../../curlrevshell.go
+usage: ../../go.mod ../../go.sum ../../curlrevshell.go ${CURRENT_BRANCH_FILE}
 	TD=$$(mktemp -d); TF=$$TD/curlrevshell;\
 		go build -o "$$TF" ../../ &&\
 		"$$TF" -h >$@.tmp 2>&1 &&\
