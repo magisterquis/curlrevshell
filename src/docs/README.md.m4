@@ -58,47 +58,7 @@ curl -sk --pinnedpubkey sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY= htt
 Usage
 -----
 ```
-Usage: curlrevshell [options]
-
-Even worse reverse shell, powered by cURL.
-
-Keyboard Shortcuts:
-Ctrl+I - Insert the file or directory specified with -ctrl-i
-Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
-Ctrl+S - Print locally what Ctrl+I would send
-Tab    - Same as Ctrl+I
-
-Options:
-  -callback-address address
-    	Additional callback address or domain, for one-liner printing (may be repeated)
-  -ctrl-i source
-    	Tab/Ctrl+I's insertion source file or directory
-  -debug
-    	Print debugging messages
-  -icanhazip
-    	Query icanhazip.com for a callback address
-  -ipv6-one-liners
-    	Also print callback one-liners with IPv6 addresses
-  -listen-address address
-    	Listen address (default "0.0.0.0:4444")
-  -log file
-    	Optional file to which to write JSON logs
-  -no-timestamps
-    	Don't print timestamps
-  -one-shell
-    	Close listening socket when first shell connects
-  -print-ctrl-i
-    	Print what would be sent with Tab/Ctrl+I and exit
-  -print-default-template
-    	Write the default template to stdout and exit
-  -prompt string
-    	Terminal prompt; don't forget a trailing space (default "> ")
-  -serve-files-from directory
-    	Optional directory from which to serve static files
-  -template template
-    	Optional template file, used if it exists
-  -tls-certificate-cache file
-    	Optional file in which to cache generated TLS certificate (default "/home/stuart/.cache/sstls/cert.txtar")
+m4_usage
 ```
 
 Details

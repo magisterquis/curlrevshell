@@ -2,24 +2,28 @@
 # Put together a README with current help text
 # By J. Stuart McMurray
 # Created 20251209
-# Last Modified 20251209
+# Last Modified 20251211
 
 .SUFFIXES: .m4 .built
 
 CURRENT_BRANCH_FILE=../../internal/currentversion/current_branch
 
+# Make files available to m4.
+M4_PASTABLES=downloading_deps usage ${CURRENT_BRANCH_FILE}
+.for F in ${M4_PASTABLES}
+M4_ARGS += -Dm4_${F:T}="$$(<$F)"
+.endfor
+
 # Name conflict :|
-.m4.built: ${CURRENT_BRANCH_FILE} downloading_deps usage
-	m4\
-		-PEE\
-		-Dm4_current_branch="$$(<${>:M*/current_branch})"\
-		-Dm4_usage="$$(<usage)"\
-		-Dm4_downloading_deps="$$(<downloading_deps)"\
-		${>:M*.m4} >$@.tmp
+.m4.built: ${M4_PASTABLES}
+	m4 -PEE ${M4_ARGS} ${>:M*.m4} >$@.tmp
 	mv $@.tmp $@
 
 usage: ../../go.mod ../../go.sum ../../curlrevshell.go
-	go run ../../ -h >$@.tmp 2>&1
+	TD=$$(mktemp -d); TF=$$TD/curlrevshell;\
+		go build -o "$$TF" ../../ &&\
+		"$$TF" -h >$@.tmp 2>&1 &&\
+		rm "$$TF" && rmdir "$$TD"
 	mv $@.tmp $@
 
 ${CURRENT_BRANCH_FILE}:

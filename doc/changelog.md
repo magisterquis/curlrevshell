@@ -2,16 +2,17 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`betterupdates`
+`betterversion`
 ===============
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@betterupdates
+go install github.com/magisterquis/curlrevshell@betterversion
 ```
 - Automate updates to [`README.md`](./README.md) and
   [`config.md`](./doc/config.md).
 - Split the [Makefile](./Makefile) into [smaller parts](./src/mk).
+- `-h` makes it that much easier to see the current version.
 
 `dev`
 =====

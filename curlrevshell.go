@@ -166,6 +166,8 @@ func rmain() int {
 
 Even worse reverse shell, powered by cURL.
 
+Version %s
+
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
 Ctrl+O - Mute output for a couple of seconds (for if you cat a huge file)
@@ -175,6 +177,7 @@ Tab    - Same as Ctrl+I
 Options:
 `,
 			filepath.Base(os.Args[0]),
+			currentversion.VersionAndBranch(),
 		)
 		flag.PrintDefaults()
 	}
