@@ -1,4 +1,4 @@
-m4_changequote(dummy,dummy)m4_dnl
+m4_changequote(qleft,qrigt)m4_dnl
 cURL-Powered Reverse Shell
 ==========================
 Somewhat kooky replacement for the typical `bash >/dev/tcp...` reverse shell,

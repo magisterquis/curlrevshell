@@ -26,7 +26,7 @@ usage: ../../go.mod ../../go.sum ../../curlrevshell.go ${CURRENT_BRANCH_FILE}
 		rm "$$TF" && rmdir "$$TD"
 	mv $@.tmp $@
 
-${CURRENT_BRANCH_FILE}:
+${CURRENT_BRANCH_FILE}: ../../.git/HEAD
 	make -C ${@D} ${@F}
 
 downloading_deps: ../../go.mod ../../go.sum
