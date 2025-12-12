@@ -9,7 +9,8 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterlogging
 ```
-None yet...
+- Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
+  less likely.
 
 `dev`
 =====
