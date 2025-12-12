@@ -24,8 +24,8 @@ None yet...
 `v0.0.1-beta.8` (2025-11-07)
 ============================
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
-- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
-  roll fancypants `-template` templates.
+- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier
+  to roll fancypants `-template` templates.
 - Added compile-time i/o/io/c-changey variables.
 - Added the aptly-named [`config.md`](./config.md) and
   [`template.md`](./template.md).
