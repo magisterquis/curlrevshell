@@ -6,7 +6,7 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250924
+ * Last Modified 20251220
  */
 
 import (
@@ -15,6 +15,18 @@ import (
 	"sync"
 
 	"golang.org/x/sync/errgroup"
+)
+
+type (
+	// tagContextKey is used to by [Group.GoTag] to store the tag in the
+	// context passed to the function it calls.
+	// The tag may be retrieved with [ContextTag].
+	tagContextKey struct{}
+
+	// tagsContextKey is used to by [Group.GoTag] to append the tag to
+	// the list in the context passed to the function it calls.
+	// The list may be retrieved with [ContextTags].
+	tagsContextKey struct{}
 )
 
 // Group wraps golang.org/x/sync/errgroup.Group but makes it slightly easier to
@@ -53,6 +65,17 @@ func (g *Group) GoContext(ctx context.Context, f func(context.Context) error) {
 // GoTag is like GoContext, but errors returned by f will be wrapped in a
 // TaggedError..
 func (g *Group) GoTag(ctx context.Context, tag string, f func(context.Context) error) {
+	/* Set the tag in the context, so goroutines have a chance at knowing
+	their purpose in life. */
+	ctx = context.WithValue(ctx, tagContextKey{}, tag)
+	/* And save it in a list, so goroutines can know who their parents
+	are. */
+	ctx = context.WithValue(ctx, tagsContextKey{}, append(
+		ContextTags(ctx),
+		tag,
+	))
+
+	/* Run the goroutine itself, tag-wrapping errors. */
 	g.eg().Go(func() error {
 		err := f(ctx)
 		if nil != err {
@@ -81,3 +104,23 @@ func (err TaggedError) Error() string {
 
 // Unwrap return err.Err.
 func (err TaggedError) Unwrap() error { return err.Err }
+
+// contextValue extracts a value from ctx.  If the value is not present, the
+// zero value of the type is returned
+func contextValue[T any](ctx context.Context, key any) T {
+	v, _ := ctx.Value(key).(T)
+	return v
+}
+
+// ContextTag returns the tag in ctx set by [Group.GoTag], if any.
+// If no tag was set the empty string is returned.
+func ContextTag(ctx context.Context) string {
+	return contextValue[string](ctx, tagContextKey{})
+}
+
+// ContextTags returns the tags in ctx set by nested calls to [Group.GoTag],
+// if any.
+// If no tags were set nil is returned.
+func ContextTags(ctx context.Context) []string {
+	return contextValue[[]string](ctx, tagsContextKey{})
+}
