@@ -9,6 +9,8 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
+- [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
+  `</dev/null` with `2>&0` so we'll open it twice.
 - Updated dependencies.
 
 `dev`
