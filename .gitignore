@@ -1,5 +1,6 @@
 *.built
 .*.swp
+/src/docs/current_branch
 /src/docs/downloading_deps
 /src/docs/usage
 curlrevshell

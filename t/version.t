@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20251211
+# Last Modified 20260103
 
 set -euo pipefail
 
@@ -65,6 +65,7 @@ subtest() {
         # Make sure each file is correct
         IFS='
 '
+        set +o braceexpand
         for LINE in $LINES; do
                 FILE="$(print -r "$LINE" | cut -f 1,2 -d :)"
                 GOT="$( print -r "$LINE" | egrep -o "$PATTERN" |
@@ -78,6 +79,7 @@ subtest() {
                 fi
                 tap_is "$GOT" "$_linewant" "$FILE is correct" "$0" $LINENO
         done
+        set +o braceexpand
 }
 tap_subtest "Correct go install paths in docs" subtest "$0" $LINENO
 
