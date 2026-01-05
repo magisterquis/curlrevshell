@@ -51,3 +51,7 @@ touch $HOME/crs/crs.tmpl                                 # Default template, to 
 curlrevshell -h                                          # For just in case
 curlrevshell                                             # Ready to go :)
 ```
+Or, more succintly:
+```sh
+mkdir -p $HOME/crs/{ctrl-i,files} && go install -v -trimpath -ldflags "-w -s -X main.DefaultCtrlI=$HOME/crs/ctrl-i -X main.DefaultLog=$HOME/crs/log.json -X main.DefaultServeFilesFrom=$HOME/crs/files -X main.DefaultTemplate=$HOME/crs/crs.tmpl" github.com/magisterquis/curlrevshell@betterupdates && touch $HOME/crs/crs.tmpl
+```
