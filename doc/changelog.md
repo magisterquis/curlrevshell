@@ -14,6 +14,7 @@ go install github.com/magisterquis/curlrevshell@betterupdates
 - Split the [Makefile](./Makefile) into [smaller parts](./src/mk).
 - [`config.md`](./doc/config.md): Add a quick copy/paste-friendly one-liner for
   a quick setup with quick defaults.
+- Updated dependencies.
 
 `dev`
 =====
