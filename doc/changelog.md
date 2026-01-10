@@ -2,13 +2,16 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`betterlogging`
-===============
+`bettertls`
+===========
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@betterlogging
+go install github.com/magisterquis/curlrevshell@bettertls
 ```
+
+`betterlogging`
+===============
 - Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
   less likely.
 

@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@betterlogging
+   go install github.com/magisterquis/curlrevshell@bettertls
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,7 +33,7 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@betterlogging
+$ go install github.com/magisterquis/curlrevshell@bettertls
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
 go: downloading golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
 go: downloading golang.org/x/net v0.48.0
@@ -42,7 +42,7 @@ go: downloading golang.org/x/sys v0.40.0
 go: downloading golang.org/x/text v0.33.0
 go: downloading golang.org/x/tools v0.40.0
 $ curlrevshell
-01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (betterlogging branch)
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (bettertls branch)
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20251216131754-4de4066c77cf+dirty (betterlogging branch)
+Version v0.0.1-beta.8.0.20260110124421-b16a61cee87e+dirty (bettertls branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
