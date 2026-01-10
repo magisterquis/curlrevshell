@@ -38,8 +38,8 @@ go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
 go: downloading golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93
 go: downloading golang.org/x/net v0.48.0
 go: downloading golang.org/x/sync v0.19.0
-go: downloading golang.org/x/sys v0.39.0
-go: downloading golang.org/x/text v0.32.0
+go: downloading golang.org/x/sys v0.40.0
+go: downloading golang.org/x/text v0.33.0
 go: downloading golang.org/x/tools v0.40.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (dev branch)
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260105215504-992325f63ba9+dirty (dev branch)
+Version v0.0.1-beta.8.0.20260105222139-2701e896aba5+dirty (dev branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
