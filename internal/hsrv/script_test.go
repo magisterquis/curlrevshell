@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250612
+ * Last Modified 20260103
  */
 
 import (
@@ -112,7 +112,7 @@ func TestServerScriptHandler_NonDefaultPort(t *testing.T) {
 
 	/* Make sure the template came out ok, too. */
 	wantBody := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com:1234/i/IDID -N  </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com:1234/i/IDID -N  </dev/null 2>/dev/null |
 /bin/sh 2>&1 |
 curl -sk --pinnedpubkey sha256//xxx= https://example.com:1234/o/IDID -T- >/dev/null 2>&1
 `
@@ -170,7 +170,7 @@ func TestServerScriptHandler(t *testing.T) {
 
 	/* Make sure the template came out ok, too. */
 	wantBody := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/IDID -N  </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/IDID -N  </dev/null 2>/dev/null |
 /bin/sh 2>&1 |
 curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2>&1
 `
@@ -567,7 +567,7 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 func checkDefaultCallbackScript(t *testing.T, s *Server, got string) {
 	/* Make sure the template came out ok, too. */
 	want := `#!/bin/sh
-curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//xxx= https://example.com/i/zzz -N  </dev/null 2>/dev/null |
 /bin/sh 2>&1 |
 curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/zzz -T- >/dev/null 2>&1
 `

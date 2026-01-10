@@ -20,6 +20,10 @@ go install github.com/magisterquis/curlrevshell@betterlogging
   [`config.md`](./doc/config.md).
 - Split the [Makefile](./Makefile) into [smaller parts](./src/mk).
 - `-h` makes it that much easier to see the current version.
+- [`config.md`](./doc/config.md): Add a quick copy/paste-friendly one-liner for
+  a quick setup with quick defaults.
+- [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
+  `</dev/null` with `2>&0` so we'll open it twice.
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)

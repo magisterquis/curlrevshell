@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20250215
+ * Last Modified 20260103
  */
 
 import (
@@ -66,7 +66,7 @@ func TestExecute(t *testing.T) {
 		defaultScript = func(_ *testing.T, r *http.Request) string {
 			return fmt.Sprintf(
 				`#!/bin/sh
-curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://%s/testI/testID -N  </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://%s/testI/testID -N  </dev/null 2>/dev/null |
 /bin/sh 2>&1 |
 curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://%s/testO/testID -T- >/dev/null 2>&1
 `,
