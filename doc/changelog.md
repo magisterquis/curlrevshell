@@ -9,6 +9,8 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertls
 ```
+- [`sstls`](./lib/sstls) - Overwriting an archive now overwrites the whole
+  archive and leaves no survivors.
 
 `betterlogging`
 ===============

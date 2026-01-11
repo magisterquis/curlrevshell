@@ -5,11 +5,13 @@ package sstls
  * Tests for gencert.go
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20251008
+ * Last Modified 20260111
  */
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -178,5 +180,78 @@ func TestGetCertificate(t *testing.T) {
 	/* Make sure it's the same certificate. */
 	if !readC.Leaf.Equal(genC.Leaf) {
 		t.Errorf("Generated and Read leaves not equal")
+	}
+}
+
+// If the cert cache file isn't usable, can we overwrite properly?
+func TestGetCertificate_OverwriteOldCert(t *testing.T) {
+	/* Generate a valid archive file, for size. */
+	fn := filepath.Join(t.TempDir(), "c.txtar")
+	if _, err := GetCertificate(
+		SelfSignedSubject,
+		nil,
+		nil,
+		DefaultSelfSignedCertLifespan,
+		fn,
+	); nil != err {
+		t.Fatalf("Error generating new archive: %s", err)
+	}
+
+	/* Turn it into invalid data. */
+	b, err := os.ReadFile(fn)
+	if nil != err {
+		t.Fatalf("Error reading new archive: %s", err)
+	} else if 0 == len(b) {
+		t.Fatalf("New archive is empty")
+	}
+	aLen := len(b)
+	f, err := os.Create(fn)
+	if nil != err {
+		t.Fatalf("Error opening new archive for writing")
+	}
+	defer f.Close()
+	nw := 0
+	for nw < aLen*2 {
+		n, err := fmt.Fprintf(f, "%d\n", nw)
+		if nil != err {
+			t.Fatalf("Error writing to archive: %s", err)
+		}
+		nw += n
+	}
+	f.Close()
+
+	/* Did write enough? */
+	if b, err = os.ReadFile(fn); nil != err {
+		t.Fatalf("Error reading archive after write: %s", err)
+	} else if got, want := len(b), aLen*2; got < want {
+		t.Fatalf(
+			"Did not write enough junk data\n got: %d\nwant: >=%d",
+			got,
+			want,
+		)
+	}
+
+	/* Read/Update again, should overwrite with a valid archive. */
+	if _, err = GetCertificate(
+		SelfSignedSubject,
+		nil,
+		nil,
+		DefaultSelfSignedCertLifespan,
+		fn,
+	); nil != err {
+		t.Fatalf("Error getting certificate after write: %s", err)
+	}
+
+	/* Did it shrink and have a cert? */
+	if b, err := os.ReadFile(fn); nil != err {
+		t.Fatalf("Error reading archive after rewrite: %s", err)
+	} else if got, want := len(b), nw; got >= want {
+		t.Fatalf(
+			"Archive did not shrink after rewrite\n"+
+				" got: %d\n"+
+				"want: <%d",
+			got,
+			want,
+		)
 	}
 }
