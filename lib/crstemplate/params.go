@@ -5,10 +5,13 @@ package crstemplate
  * Parameters passed to -template templates
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20250205
+ * Last Modified 20260124
  */
 
-import "net/http"
+import (
+	"maps"
+	"net/http"
+)
 
 // Params are passed to subtemplates.  All hosts and addresses not in Request
 // have port numbers.
@@ -65,6 +68,11 @@ type Params struct {
 	// LocalAddress is the address on which the request was received.
 	// Only set when executing the script subtemplate (/c).
 	LocalAddress string
+
+	// M may be used to set arbitrary key/value pairs during template
+	// execution using Params' Set method.
+	// It is initially empty.
+	M map[string]any
 }
 
 // URLPaths contain the parts of the URL paths indicating what an HTTPS
@@ -81,4 +89,19 @@ type BasicAuth struct {
 	Ok       bool /* True if the request contained credentials. */
 	Username string
 	Password string
+}
+
+// NewParams returns a new Params, ready for use.
+
+// With returns a copy of p with a new map with p.M[key] set to value.
+// The new map is a shallow clone of p.M, or a new map if p.M is nil.
+func (p Params) With(key string, value any) (Params, error) {
+	ret := p
+	if nil != p.M {
+		ret.M = maps.Clone(p.M)
+	} else {
+		ret.M = make(map[string]any)
+	}
+	ret.M[key] = value
+	return ret, nil
 }

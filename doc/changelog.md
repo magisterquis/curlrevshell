@@ -2,13 +2,18 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`dev`
-=====
+`bettertemplates`
+=================
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@dev
+go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
+- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
+  for passing arbitrary key/value pairs about.
+
+`dev`
+=====
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
   vulnerability.
 - Automate updates to [`README.md`](./README.md) and
