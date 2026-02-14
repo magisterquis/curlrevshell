@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-func TestLogBuffer_Smoketest(t *testing.T) { NewLogBuffer() }
+func TestLogBufferSmoketest(t *testing.T) { NewLogBuffer() }
 
 func TestLogBufferWrite(t *testing.T) {
 	lb, _ := NewLogBuffer()
@@ -512,7 +512,7 @@ func TestLogBufferNextMessage(t *testing.T) {
 
 // Can we check for ordered messages?  It'd be nice to test for incorrect
 // messages, but then we'd fail tests.
-func TestLogBuffer_Expect(t *testing.T) {
+func TestLogBufferExpect(t *testing.T) {
 	/* Since we can't really test this without things failing, the below
 	can be switched on to manually verify things. */
 	var (
@@ -609,7 +609,7 @@ func TestLogBuffer_Expect(t *testing.T) {
 }
 
 // Can we expect a message with an empty group?
-func TestLogBuffer_Expect_EmptyGroup(t *testing.T) {
+func TestLogBufferExpect_EmptyGroup(t *testing.T) {
 	var (
 		lb, sl = NewLogBuffer()
 		group  = "g1"
@@ -624,7 +624,7 @@ func TestLogBuffer_Expect_EmptyGroup(t *testing.T) {
 
 // Can we make sure we've an empty buffer?  Kinda hard to test without failing
 // tests...
-func TestLogBuffer_Expect_ExpectEmpty(t *testing.T) {
+func TestLogBufferExpect_ExpectEmpty(t *testing.T) {
 	// We don't really have a good way to test this without causing the
 	// test to fail (or writing a large test harness).
 	// Set shouldFail to true to see Expect cause a test failure.
@@ -643,7 +643,7 @@ func TestLogBuffer_Expect_ExpectEmpty(t *testing.T) {
 
 // Can we make sure we won't wait on an empty buffer?  Kinda hard to test
 // without failing tests...
-func TestLogBuffer_Expect_NoWait(t *testing.T) {
+func TestLogBufferExpect_NoWait(t *testing.T) {
 	// We don't really have a good way to test this without causing the
 	// test to fail (or writing a large test harness).
 	// Set shouldFail to true to see Expect cause a test failure.
@@ -662,7 +662,7 @@ func TestLogBuffer_Expect_NoWait(t *testing.T) {
 
 // Can we get a list of messages sent after Close?  Kinda hard to test without
 // failing tests...
-func TestTestEmptyAfterClose(t *testing.T) {
+func TestLogBufferTestEmptyAfterClose(t *testing.T) {
 	// We don't really have a good way to test this without causing the
 	// test to fail (or writing a large test harness).
 	// Set shouldFail to true to see Expect cause a test failure.
@@ -693,7 +693,7 @@ func TestTestEmptyAfterClose(t *testing.T) {
 }
 
 // Does TestEmptyAfterClose also Close?
-func TestTestEmptyAfterClose_NoCloseFirst(t *testing.T) {
+func TestLogBufferTestEmptyAfterClose_NoCloseFirst(t *testing.T) {
 	lb, sl := NewLogBuffer()
 	/* Send a message pre-close, for just in case. */
 	msg := "kittens"
