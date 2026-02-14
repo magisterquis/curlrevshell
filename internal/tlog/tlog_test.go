@@ -758,3 +758,9 @@ func TestLogBufferIsClosed(t *testing.T) {
 		t.Errorf("IsClosed returned false after Close")
 	}
 }
+
+// Can we close and expect nothing?
+func TestLogBufferCloseExpectEmpty(t *testing.T) {
+	lb, _ := NewLogBuffer()
+	lb.CloseExpectEmpty(t.Context(), t)
+}

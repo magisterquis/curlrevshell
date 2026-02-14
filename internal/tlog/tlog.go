@@ -142,6 +142,17 @@ func (l *LogBuffer) Close() error {
 	return nil
 }
 
+// CloseExpectEmpty is a convenience method which first closes l and then
+// makes sure there are no buffered logs.
+func (l *LogBuffer) CloseExpectEmpty(ctx context.Context, t *testing.T) {
+	t.Helper()
+	if err := l.Close(); nil != err {
+		/* Unpossible. */
+		t.Errorf("Error closing LogBuffer: %s", err)
+	}
+	l.WithExpectEmpty().Expect(ctx, t)
+}
+
 // IsClosed indicates if l.Close has been called.
 func (l *LogBuffer) IsClosed() bool {
 	l.mu.Lock()
@@ -341,7 +352,7 @@ func (l *LogBuffer) WithExpectUnordered() *LogBuffer {
 // may be noted as a test failure, and messages written after
 // TestEmptyAfterClose will not be noted as a test failure unless another call
 // to TestEmptyAfterClose is made.
-// If l.Close has not been called, TestEmptyAfterClose closes l.
+// if l.Close has not been closed, TestEmptyAfterClose closes l.
 func (l *LogBuffer) TestEmptyAfterClose(t *testing.T) {
 	t.Helper()
 	if err := l.Close(); nil != err {
