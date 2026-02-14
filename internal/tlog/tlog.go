@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251215
+ * Last Modified 20260214
  */
 
 import (
@@ -41,6 +41,10 @@ type LogBuffer struct {
 	expectEmpty     bool
 	expectNoWait    bool
 	expectUnordered bool
+
+	/* NB: Logbuffer.Clone makes a shallow copy of itself, so
+	pointer fields are shared between clones but
+	non-pointer fields are not shared between clones. */
 }
 
 // NewLogBuffer returns a new Buffer and logger to write to the buffer.
@@ -330,12 +334,16 @@ func (l *LogBuffer) WithExpectUnordered() *LogBuffer {
 // may be noted as a test failure, and messages written after
 // TestEmptyAfterClose will not be noted as a test failure unless another call
 // to TestEmptyAfterClose is made.
-// If l.Close has not been called, TestEmptyAfterClose is a no-op.
+// If l.Close has not been called, TestEmptyAfterClose closes l.
 func (l *LogBuffer) TestEmptyAfterClose(t *testing.T) {
+	t.Helper()
+	if err := l.Close(); nil != err {
+		/* Unpossible. */
+		t.Fatalf("Error closng LogBuffer: %s", err)
+	}
 	for {
 		select {
 		case m := <-l.cBuf:
-			t.Helper()
 			t.Errorf("Log message sent after close: %s", m)
 		default:
 			/* No (more) messages. */

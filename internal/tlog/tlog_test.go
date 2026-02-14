@@ -5,7 +5,7 @@ package tlog
  * Tests for tlog.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251215
+ * Last Modified 20260214
  */
 
 import (
@@ -690,6 +690,59 @@ func TestTestEmptyAfterClose(t *testing.T) {
 
 	/* Shouldn't get anything after closing, unless we should. */
 	lb.TestEmptyAfterClose(t)
+}
+
+// Does TestEmptyAfterClose also Close?
+func TestTestEmptyAfterClose_NoCloseFirst(t *testing.T) {
+	lb, sl := NewLogBuffer()
+	/* Send a message pre-close, for just in case. */
+	msg := "kittens"
+	sl.Info(msg)
+	want := M.Info(msg)
+	lb.Expect(t.Context(), t, want)
+
+	/* Shouldn't get anything after closing, but should also close. */
+	lb.TestEmptyAfterClose(t)
+
+	/* Did it close? */
+	if !closed(lb) {
+		t.Errorf(
+			"LogBuffer not closed after call to " +
+				"TestEmptyAFterClose",
+		)
+	}
+
+	/* If we write another log message, does it go to the right place? */
+	msg = "moose"
+	sl.Info(msg)
+	if got, want := len(lb.cBuf), 1; got != want {
+		t.Errorf(
+			"Incorrect number of log lines buffered after close\n"+
+				" got: %d\n"+
+				"want: %d",
+			got,
+			want,
+		)
+	}
+
+	/* Should have got one line. */
+	if 1 <= len(lb.cBuf) {
+		if got, want := <-lb.cBuf, M.Info(msg).String(); got != want {
+			t.Errorf(
+				"Incorrect log buffered after close\n"+
+					" got: %s\n"+
+					"want: %s",
+				got,
+				want,
+			)
+		}
+	}
+
+	/* Shouldn't have got more than one line. */
+	for 0 < len(lb.cBuf) {
+		t.Errorf("Unexpected log line after close: %s", <-lb.cBuf)
+	}
+
 }
 
 // closed indicates if lb.Close has been called.
