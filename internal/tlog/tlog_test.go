@@ -247,17 +247,17 @@ func TestLogBufferClone(t *testing.T) {
 		/* Do we share a close and close buffer? */
 		t.Run("close", func(t *testing.T) {
 			/* Do we share a close? */
-			if closed(src) {
+			if src.IsClosed() {
 				t.Fatalf("Source closed before Close()")
-			} else if closed(dst) {
+			} else if dst.IsClosed() {
 				t.Fatalf("Dest closed before Close()")
 			}
 			if err := src.Close(); nil != err {
 				t.Fatalf("Error closing source: %s", err)
 			}
-			if !closed(src) {
+			if !src.IsClosed() {
 				t.Fatalf("Source not closed after Close()")
-			} else if !closed(dst) {
+			} else if !dst.IsClosed() {
 				t.Fatalf("Dest not closed after Close()")
 			}
 
@@ -323,7 +323,7 @@ func TestLogBufferClose(t *testing.T) {
 	lb, _ := NewLogBuffer()
 
 	/* Make sure we're all nice and clean. */
-	if closed(lb) {
+	if lb.IsClosed() {
 		t.Fatalf("Closed after NewLogBuffer")
 	} else if 0 != len(lb.buf) {
 		t.Fatalf("Buffer not empty after NewLogBuffer")
@@ -355,7 +355,7 @@ func TestLogBufferClose(t *testing.T) {
 	/* Does close work? */
 	if err := lb.Close(); nil != err {
 		t.Fatalf("Close failed: %s", err)
-	} else if !closed(lb) {
+	} else if !lb.IsClosed() {
 		t.Fatalf("Close did not change closed")
 	}
 
@@ -705,7 +705,7 @@ func TestTestEmptyAfterClose_NoCloseFirst(t *testing.T) {
 	lb.TestEmptyAfterClose(t)
 
 	/* Did it close? */
-	if !closed(lb) {
+	if !lb.IsClosed() {
 		t.Errorf(
 			"LogBuffer not closed after call to " +
 				"TestEmptyAFterClose",
@@ -745,9 +745,16 @@ func TestTestEmptyAfterClose_NoCloseFirst(t *testing.T) {
 
 }
 
-// closed indicates if lb.Close has been called.
-func closed(lb *LogBuffer) bool {
-	lb.mu.Lock()
-	defer lb.mu.Unlock()
-	return *lb.closed
+// Can we tell if we're closed?
+func TestLogBufferIsClosed(t *testing.T) {
+	lb, _ := NewLogBuffer()
+	if lb.IsClosed() {
+		t.Errorf("IsClosed returned true before Close")
+	}
+	if err := lb.Close(); nil != err {
+		t.Errorf("Close returned error: %s", err)
+	}
+	if !lb.IsClosed() {
+		t.Errorf("IsClosed returned false after Close")
+	}
 }

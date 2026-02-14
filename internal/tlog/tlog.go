@@ -142,6 +142,13 @@ func (l *LogBuffer) Close() error {
 	return nil
 }
 
+// IsClosed indicates if l.Close has been called.
+func (l *LogBuffer) IsClosed() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return *l.closed
+}
+
 // Expect checks that the next log messages are equivalent to msgs
 // (which may be no messages) and marks t as failed and prints a messages if
 // not.
