@@ -11,6 +11,7 @@ go install github.com/magisterquis/curlrevshell@betterlogging
 ```
 - Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
   less likely.
+- Updated dependencies.
 
 `dev`
 =====
