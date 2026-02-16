@@ -233,11 +233,11 @@ func (l *LogBuffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 		/* Get the next buffered message. */
 		gotMsg, err := l.NextMessage(ctx)
 		if nil != err {
-			t.Errorf(
-				"Error waiting for message %d/%d: %s",
-				1+len(want)-rem, len(want),
-				err,
-			)
+			t.Error(errorWaitingForMessageMessage{
+				Idx: 1 + len(want) - rem,
+				Len: len(want),
+				Err: err,
+			})
 			break
 		}
 		rem--
@@ -357,7 +357,7 @@ func (l *LogBuffer) testEmptyAfterClose(t ter) {
 	for {
 		select {
 		case m := <-l.cBuf:
-			t.Errorf("Log message sent after close: %s", m)
+			t.Error(messageSentAfterCloseMessage{Msg: m})
 		default:
 			/* No (more) messages. */
 			return
