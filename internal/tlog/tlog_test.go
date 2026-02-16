@@ -166,10 +166,10 @@ func TestLogBufferWrite_Full(t *testing.T) {
 	/* Fill the buffer. */
 	for i := range BufLen {
 		n := i + 1
-		if _, err := lb.Write([]byte(fmt.Sprintf(
+		if _, err := lb.Write(fmt.Appendf(nil,
 			"msg-%d",
 			n,
-		))); nil != err {
+		)); nil != err {
 			t.Fatalf("Write %d/%d failed: %s", n, BufLen, err)
 		}
 	}
