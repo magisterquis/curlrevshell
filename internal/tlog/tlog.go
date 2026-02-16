@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260214
+ * Last Modified 20260216
  */
 
 import (
@@ -146,11 +146,17 @@ func (l *LogBuffer) Close() error {
 // makes sure there are no buffered logs.
 func (l *LogBuffer) CloseExpectEmpty(ctx context.Context, t *testing.T) {
 	t.Helper()
+	l.closeExpectEmpty(ctx, t)
+}
+
+// closeExpectEmpty does what CloseExpectEmpty says it does, but takes a ter
+// for testing the unhappy path.
+func (l *LogBuffer) closeExpectEmpty(ctx context.Context, t ter) {
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
 		t.Errorf("Error closing LogBuffer: %s", err)
 	}
-	l.WithExpectEmpty().Expect(ctx, t)
+	l.WithExpectEmpty().expect(ctx, t)
 }
 
 // IsClosed indicates if l.Close has been called.
@@ -165,19 +171,14 @@ func (l *LogBuffer) IsClosed() bool {
 // not.
 // Unless WithExpectUnordered was used, messages are expected to be in the
 // order passed to Expect.
-// If the context is nil, t.Context is used.
-func (l *LogBuffer) Expect(
-	ctx context.Context,
-	t *testing.T,
-	msgs ...Msg,
-) {
+func (l *LogBuffer) Expect(ctx context.Context, t *testing.T, msgs ...Msg) {
 	t.Helper()
+	l.expect(ctx, t, msgs...)
+}
 
-	/* Make sure we have a context. */
-	if nil == ctx {
-		ctx = t.Context()
-	}
-
+// expect does what Expect says it does, but takes a ter for testing the
+// unhappy path.
+func (l *LogBuffer) expect(ctx context.Context, t ter, msgs ...Msg) {
 	/* Check for messages which should be there. */
 	if l.expectUnordered {
 		l.checkUnordered(ctx, t, msgs)
@@ -187,50 +188,38 @@ func (l *LogBuffer) Expect(
 
 	/* If we don't expect any more, make sure there's no more. */
 	for l.expectEmpty && 0 != len(l.buf) {
-		t.Errorf("Leftover log message: %s", <-l.buf)
+		t.Error(leftoverLogMessageMessage{Msg: <-l.buf})
 	}
 }
 
 // checkOrdered checks that all of the messages in msgs are buffered in the
 // order they're in in msgs.
-func (l *LogBuffer) checkOrdered(
-	ctx context.Context,
-	t *testing.T,
-	msgs []Msg,
-) {
-	t.Helper()
+func (l *LogBuffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
 	for i, wantMsg := range msgs {
 		n := i + 1
 		gotMsg, err := l.NextMessage(ctx)
 		if nil != err {
-			t.Errorf(
-				"Error waiting for message %d/%d: %s",
-				n, len(msgs),
-				err,
-			)
+			t.Error(errorWaitingForMessageMessage{
+				Idx: n,
+				Len: len(msgs),
+				Err: err,
+			})
 			return
 		}
 		if !wantMsg.Equal(gotMsg) {
-			t.Errorf(
-				"Incorrect log message %d/%d\n"+
-					" got: %s\n"+
-					"want: %s",
-				n, len(msgs),
-				gotMsg,
-				wantMsg,
-			)
+			t.Error(incorrectLogMessageMessage{
+				Idx:  n,
+				Len:  len(msgs),
+				Got:  gotMsg,
+				Want: wantMsg,
+			})
 		}
 	}
 }
 
 // checkUnordered checks that all of the Msgs in msgs are buffered in any
 // order.
-func (l *LogBuffer) checkUnordered(
-	ctx context.Context,
-	t *testing.T,
-	msgs []Msg,
-) {
-	t.Helper()
+func (l *LogBuffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 	/* Work out the ones we want.  This'll be something like O(n**2), but
 	with set sizes small enough a map isn't worth the effort. */
 	want := make([]*Msg, len(msgs))
@@ -251,6 +240,7 @@ func (l *LogBuffer) checkUnordered(
 			)
 			break
 		}
+		rem--
 		/* Work out where it is in the slice. */
 		idx := slices.IndexFunc(want, func(p *Msg) bool {
 			if nil == p {
@@ -259,12 +249,11 @@ func (l *LogBuffer) checkUnordered(
 			return (*p).Equal(gotMsg)
 		})
 		if -1 == idx { /* Unexpected message. */
-			t.Errorf("Unexpected log message: %s", gotMsg)
+			t.Error(unexpectedLogMessageMessage{Msg: gotMsg})
 			continue
 		}
 		/* Note we've seen it. */
 		want[idx] = nil
-		rem--
 	}
 
 	/* Anything left over is a problem. */
@@ -272,11 +261,11 @@ func (l *LogBuffer) checkUnordered(
 		if nil == p { /* Good. */
 			continue
 		}
-		t.Errorf(
-			"Did not find log message %d/%d: %s",
-			i+1, len(want),
-			*p,
-		)
+		t.Error(unfoundLogMessageMessage{
+			Idx:  i + 1,
+			Len:  len(want),
+			Want: *p,
+		})
 	}
 }
 
@@ -355,6 +344,12 @@ func (l *LogBuffer) WithExpectUnordered() *LogBuffer {
 // if l.Close has not been closed, TestEmptyAfterClose closes l.
 func (l *LogBuffer) TestEmptyAfterClose(t *testing.T) {
 	t.Helper()
+	l.testEmptyAfterClose(t)
+}
+
+// testEmptyAfterClose does what TestEmptyAfterClose says it does, but takes a
+// ter for testing the unhappy path.
+func (l *LogBuffer) testEmptyAfterClose(t ter) {
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
 		t.Fatalf("Error closng LogBuffer: %s", err)
