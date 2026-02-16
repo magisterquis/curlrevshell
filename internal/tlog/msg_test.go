@@ -5,7 +5,7 @@ package tlog
  * Tests for msg.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251215
+ * Last Modified 20251216
  */
 
 import (
@@ -382,4 +382,46 @@ func TestRemoveEmptyGroups(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Can we add a complete Group with With?
+func TestMsgWith_AddCompleteGroups(t *testing.T) {
+	got := M.
+		With("k1", "v1").
+		With("g1", Group{
+			"g1k1": "g1v1",
+			"g1k2": "g1v2",
+		}).
+		With("g2", Group{
+			"g2g1": Group{
+				"g2g1k1": "g2g1v1",
+				"g2g1k2": "g2g1v2",
+			},
+			"g2k2": "g2v2",
+		})
+	wantJSON := `{
+		"k1": "v1",
+		"g1": {
+			"g1k1": "g1v1",
+			"g1k2": "g1v2"
+		},
+		"g2": {
+			"g2g1": {
+				"g2g1k1": "g2g1v1",
+				"g2g1k2": "g2g1v2"
+			},
+			"g2k2": "g2v2"
+		}
+	}`
+
+	if want, err := NewMsgFromJSON(wantJSON); nil != err {
+		t.Fatalf("Error parsing JSON: %s", err)
+	} else if !got.Equal(want) {
+		t.Errorf(
+			"Incorrect Msg\n got: %s\nwant: %s",
+			got,
+			want,
+		)
+	}
+
 }
