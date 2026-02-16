@@ -46,8 +46,8 @@ type incorrectLogMessageMessage struct {
 func (i incorrectLogMessageMessage) String() string {
 	return fmt.Sprintf(
 		"Incorrect log message %d/%d\n"+
-			" got: %s\n"+
-			"want: %s",
+			" got:\n%s\n"+
+			"want:\n%s",
 		i.Idx, i.Len,
 		i.Got,
 		i.Want,
@@ -60,7 +60,7 @@ type messageSentAfterCloseMessage struct{ Msg string }
 
 // String returns a string suitable for passing to t.Error.
 func (m messageSentAfterCloseMessage) String() string {
-	return fmt.Sprintf("Log message sent after close: %s", m.Msg)
+	return fmt.Sprintf("Log message sent after close:\n%s", m.Msg)
 }
 
 // unexpectedLogMessageMessage notes an unexpected log message.
@@ -68,7 +68,7 @@ type unexpectedLogMessageMessage struct{ Msg Msg }
 
 // String returns a string suitable for passing to t.Error.
 func (u unexpectedLogMessageMessage) String() string {
-	return fmt.Sprintf("Unexpected log message: %s", u.Msg)
+	return fmt.Sprintf("Unexpected log message:\n%s", u.Msg)
 }
 
 // unfoundLogMessageMessage notes we did not find a log message we expected.
@@ -81,7 +81,7 @@ type unfoundLogMessageMessage struct {
 // String returns a string suitable for passing to t.Error.
 func (u unfoundLogMessageMessage) String() string {
 	return fmt.Sprintf(
-		"Did not find log message %d/%d: %s",
+		"Did not find log message %d/%d:\n%s",
 		u.Idx, u.Len,
 		u.Want,
 	)
