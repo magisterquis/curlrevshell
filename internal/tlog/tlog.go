@@ -352,7 +352,7 @@ func (l *LogBuffer) TestEmptyAfterClose(t *testing.T) {
 func (l *LogBuffer) testEmptyAfterClose(t ter) {
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
-		t.Fatalf("Error closng LogBuffer: %s", err)
+		t.Fatalf("Error closing LogBuffer: %s", err)
 	}
 	for {
 		select {
