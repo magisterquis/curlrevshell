@@ -9,6 +9,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@nojq
 ```
+- Get rid of tests' dependencies on [`jq`](https://jqlang.org).
 - Updated dependencies.
 
 `dev`
