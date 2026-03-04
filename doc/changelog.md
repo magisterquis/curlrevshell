@@ -2,18 +2,13 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`nojq`
-======
+`dev`
+=====
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@nojq
+go install github.com/magisterquis/curlrevshell@dev
 ```
-- Get rid of tests' dependencies on [`jq`](https://jqlang.org).
-- Updated dependencies.
-
-`dev`
-=====
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
   vulnerability.
 - Automate updates to [`README.md`](./README.md) and
@@ -24,6 +19,7 @@ go install github.com/magisterquis/curlrevshell@nojq
   a quick setup with quick defaults.
 - [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
   `</dev/null` with `2>&0` so we'll open it twice.
+- Get rid of tests' dependencies on [`jq`](https://jqlang.org).
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)
