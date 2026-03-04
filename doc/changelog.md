@@ -25,6 +25,7 @@ go install github.com/magisterquis/curlrevshell@betterio
   a quick setup with quick defaults.
 - [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
   `</dev/null` with `2>&0` so we'll open it twice.
+- Get rid of tests' dependencies on [`jq`](https://jqlang.org).
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)
