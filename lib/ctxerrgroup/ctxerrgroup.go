@@ -6,7 +6,7 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251220
+ * Last Modified 20260307
  */
 
 import (
@@ -23,7 +23,7 @@ type (
 	// The tag may be retrieved with [ContextTag].
 	tagContextKey struct{}
 
-	// tagsContextKey is used to by [Group.GoTag] to append the tag to
+	// tagsContextKey is used by [Group.GoTag] to append the tag to
 	// the list in the context passed to the function it calls.
 	// The list may be retrieved with [ContextTags].
 	tagsContextKey struct{}
