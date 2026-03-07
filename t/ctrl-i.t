@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20251101
+# Last Modified 20260304
 
 set -euo pipefail
 
@@ -160,7 +160,11 @@ function check_ctrl_i {
         done
 
         # Get curlrevshell's pid and send a SIGUSR1.
-        CRSPID="$(head -n 1 "$LOGF" | jq .PID)"
+        CRSPID="$(perl -MJSON::PP -ne '
+                my $j = decode_json $_ or die "decode_json: $!";
+                print $j->{PID};
+                last;
+        ' "$LOGF")"
         kill -s USR1 $CRSPID
         tap_ok "$?" "Sent SIGUSR1 to $CRSPID" "$0" $LINENO
 
