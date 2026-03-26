@@ -5,7 +5,7 @@ package tlog
  * UnJSON'd log message
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251215
+ * Last Modified 20260326
  */
 
 import (
@@ -66,8 +66,14 @@ func NewMsgFromJSON(s string) (Msg, error) {
 // [slog.Logger.With].
 // If the key already exists, its value is changed in the clone.
 // The value must be able to be marshalled to JSON, otherwise With panics.
+// Error values are stored as strings, for compatibility with
+// [slog.JSONHandler.Handle].
 func (m Msg) With(key string, value any) Msg {
 	n := m.MustClone()
+	/* Store error values as strings. */
+	if err, ok := value.(error); ok {
+		value = err.Error()
+	}
 	n.cur[key] = value
 	return n
 }

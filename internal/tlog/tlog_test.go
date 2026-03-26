@@ -5,7 +5,7 @@ package tlog
  * Tests for tlog.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260321
+ * Last Modified 20260326
  */
 
 import (
@@ -763,4 +763,17 @@ func TestBufferIsClosed(t *testing.T) {
 func TestBufferCloseExpectEmpty(t *testing.T) {
 	lb, _ := NewBuffer()
 	lb.CloseExpectEmpty(t.Context(), t)
+}
+
+// Can we test against an expected message with an error field?
+// {"error":"foo","level":"ERROR","msg":"bar"}
+func TestBufferExpect_ErrorKey(t *testing.T) {
+	var (
+		lk     = "error"
+		lm     = "a message"
+		lv     = errors.New("an error")
+		tb, sl = NewBuffer()
+	)
+	sl.With(lk, lv).Error(lm)
+	tb.WithExpectEmpty().Expect(t.Context(), t, M.With(lk, lv).Error(lm))
 }

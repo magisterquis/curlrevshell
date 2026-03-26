@@ -5,11 +5,12 @@ package tlog
  * Tests for msg.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251216
+ * Last Modified 20260326
  */
 
 import (
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -424,4 +425,18 @@ func TestMsgWith_AddCompleteGroups(t *testing.T) {
 		)
 	}
 
+}
+
+// Do msgs work with error values?
+func TestMsgWith_ErrorValue(t *testing.T) {
+	var (
+		key  = "error"
+		err  = errors.New("moose")
+		want = `{"` + key + `":"` + err.Error() + `"}`
+	)
+	if got, err := M.With(key, err).ToJSON(); nil != err {
+		t.Fatalf("Error converting to JSON: %s", err)
+	} else if got != want {
+		t.Errorf("Incorrect JSON\n got %s\nwant: %s", got, want)
+	}
 }
