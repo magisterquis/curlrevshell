@@ -2,7 +2,7 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20250804
+# Last Modified 20260318
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
@@ -26,7 +26,7 @@ tap_note() {(
         # Print each line.
         (
                 _tap_lines="$*"
-                while ! [ -z "$_tap_lines" ]; do
+                while [ -n "$_tap_lines" ]; do
                         # Hokey, but it works
                         _tap_echo "# ${_tap_lines%%
 *}"
@@ -39,6 +39,83 @@ tap_note() {(
                 done
         )
 )}
+
+# tap_BAIL_OUT ceases all testing and returns 255 after emitting the bail out
+# TAP message.  It should normally be called as return tap_BAIL_OUT.  After
+# calling tap_BAIL_OUT, further calls to most tap_ functions will do nothing,
+# the two exceptionsg being tap_done_testing, which will return
+# TAP_RETURN_BAILED_OUT and tap_reset, which resets the TAP state.
+#
+# Arguments:
+# $1 - The reason for the bail (optional)
+tap_BAIL_OUT() {
+        _tap_bailo="Bail out!"
+        if [ -n "$1" ]; then
+                _tap_bailo="${_tap_bailo}  ${*:-""}"
+        fi
+        /bin/echo "${_tap_bailo}"
+        return $TAP_RETURN_BAILED_OUT
+}
+
+# tap_skip is equivalent to a number of tap_ok 0's, plus some TAP which notes
+# that the tests were skipped, not actually run.  This is handy for when
+# tap_plan has been used to declare a number of tests, but several are unable
+# to be run at all, probably in a subtest.  Note that this is different than
+# tap_todo, which is used for tests which are expected to run but fail.
+#
+# Arguments:
+# $1 - The reason for the tests to be skipped
+# $2 - How many tests will be skipped
+tap_skip() { _tap_skip 0 "skip $1" "$2"; }
+
+# tap_todo_skip is like tap_skip except that the tests are marked as failing
+# and noted as not only skipped but also TODO.
+#
+# Arguments:
+# $1 - The reason for the tests to be skipped
+# $2 - How many tests will be skipped
+tap_todo_skip() {
+        # Make sure the repetition count is a number.
+        if ! _tap_isnum  "$2" ; then
+                _tap_echo "Repetition count '$2' isn't numeric" >&2
+                return $TAP_RETURN_EXPECTED_NUMBER
+        fi
+
+        _TAP_OK_NONOTOKDIAG=true _tap_skip 1 "TODO & SKIP $1" "$2";
+        # We didn't actually fail.  Whoops.
+        : $((_tap_nfail-=$2))
+}
+
+# _tap_skip calls _tap_ok a number of times with the separator #
+#
+# Arguments:
+# $1 - 0 for success
+# $2 - Test name, which should include skip or TODO & SKIP
+# $3 - Repetition count
+_tap_skip() {
+        # Need a count and a reason
+        if [ 3 -gt $# ]; then
+                _tap_echo "Not enough arguments" >&2
+                return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
+        fi
+
+        # Make sure the repetition count is a number (again).
+        if ! _tap_isnum  "$3" ; then
+                _tap_echo "Repetition count '$3' isn't numeric" >&2
+                return $TAP_RETURN_EXPECTED_NUMBER
+        fi
+
+        # Print ALL the skips.  Turns out OpenBSD's sh doesn't do POSIX loops?
+        i=1
+        _tap_todo_orig=$TAP_TODO
+        _tap_ok_separator_orig=${_TAP_OK_SEPARATOR}
+        while [ $i -le "$3" ]; do
+                TAP_TODO='' _TAP_OK_SEPARATOR="#" _tap_ok "$1" "$2"
+                : $((i+=1))
+        done
+        TAP_TODO=${_tap_todo_orig}
+        _TAP_OK_SEPARATOR=${_tap_ok_separator_orig}
+}
 
 # tap_like tests whether something we got matches a regex.  This uses Perl
 # under the hood.
@@ -73,7 +150,7 @@ _tap_like() {
 
         # Make sure we have enough arguments
         if [ 3 -gt $# ]; then
-                echo "Not enough arguments" >&2
+                _tap_echo "Not enough arguments" >&2
                 return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
         fi
 
@@ -90,7 +167,7 @@ _tap_like() {
         # Make sure our matcher is a matcher
         case "$2" in
                 "=~" | "!~")                                ;; # Ok
-                *) echo "Invalid operator $2" >&2;
+                *) _tap_echo "Invalid operator $2" >&2;
                         return $TAP_RETURN_INVALID_OPERATOR ;; # Not ok
         esac
 
@@ -159,19 +236,22 @@ tap_cmp_ok() {
 
         # Make sure we have enough arguments
         if [ 3 -gt $# ]; then
-                echo "Not enough arguments" >&2
+                _tap_echo "Not enough arguments" >&2
                 return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
         fi
 
-	# Do the comparing itself.
-	_tap_ok=0
-	test "$1" "$2" "$3" || _tap_ok=$?
-	tap_ok "${_tap_ok}" "${4:-""}" "${5:-""}" "${6:-""}"
+        # Do the comparing itself.
+        if test "$1" "$2" "$3"; then
+                _tap_ok=0
+        else
+                _tap_ok=1
+        fi
+        tap_ok "${_tap_ok}" "${4:-""}" "${5:-""}" "${6:-""}"
 
-	# If the test passed, no need to print anything else.
-	if [ 0 -eq ${_tap_ok} ]; then
-		return
-	fi
+        # If the test passed, no need to print anything else.
+        if [ 0 -eq ${_tap_ok} ]; then
+                return
+        fi
 
         # If we're in a TODO state, write to stdout.
         _tap_pf=tap_diag
@@ -179,30 +259,30 @@ tap_cmp_ok() {
                 _tap_pf=tap_note
         fi
 
-	# Report the fail nicely.
-	case $2 in
-		"="|"==") # Strings
-			${_tap_pf} "         got: '$1'"
-			${_tap_pf} "    expected: '$3'"
+        # Report the fail nicely.
+        case $2 in
+                "="|"==") # Strings
+                        ${_tap_pf} "         got: '$1'"
+                        ${_tap_pf} "    expected: '$3'"
                         ;;
                 "-eq")   # Numbers
-			${_tap_pf} "         got: $1"
-			${_tap_pf} "    expected: $3"
-			;;
+                        ${_tap_pf} "         got: $1"
+                        ${_tap_pf} "    expected: $3"
+                        ;;
                 "!=")     # Strings
-			${_tap_pf} "         got: '$1'"
-			${_tap_pf} "    expected: anything else"
-			;;
+                        ${_tap_pf} "         got: '$1'"
+                        ${_tap_pf} "    expected: anything else"
+                        ;;
                 "-ne")    # Numbers
-			${_tap_pf} "         got: $1"
-			${_tap_pf} "    expected: anything else"
-			;;
-		*)
-			${_tap_pf} "    '$1'"
-			${_tap_pf} "        $2"
-			${_tap_pf} "    '$3'"
-			;;
-	esac
+                        ${_tap_pf} "         got: $1"
+                        ${_tap_pf} "    expected: anything else"
+                        ;;
+                *)
+                        ${_tap_pf} "    '$1'"
+                        ${_tap_pf} "        $2"
+                        ${_tap_pf} "    '$3'"
+                        ;;
+        esac
 }
 
 # TAP_TODO, if set, notes that tests are expected to fail.  Output will include
@@ -222,7 +302,6 @@ TAP_RETURN_MAX_FAIL=240
 TAP_RETURN_INVALID_OPERATOR=241
 TAP_RETURN_NOT_ENOUGH_ARGUMENTS=242
 TAP_RETURN_PLAN_ALREADY_PRINTED=243
-TAP_RETURN_WRONG_TEST_COUNT=244
 TAP_RETURN_NO_SUBTESTS_RUN=245
 TAP_RETURN_SKIPPED_ALL=246
 TAP_RETURN_EXPECTED_NUMBER=247
@@ -287,7 +366,7 @@ tap_done_testing() {
 
         # Idempotency
         if [ -n "${_tap_doner}" ]; then
-                return ${_tap_doner}
+                return "${_tap_doner}"
         fi
 
         # Default exit status is the number of failed tests, capped at 250.
@@ -319,7 +398,7 @@ done_testing() expects ${_tap_ntest}" "$0"
                 return
         fi
 
-        return ${_tap_doner}
+        return "${_tap_doner}"
 }
 if [ -z "$TAP_NOTRAP" ]; then
         # Apparently zsh doesn't use the last exit status as its exit status
@@ -344,10 +423,10 @@ _tap_finalize() {
         fi
         # Note if we didn't run enough tests.
         _tap_qualifier=
-        if [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
+        if [ "${_tap_nplan}" -ne ${_tap_ntest} ]; then
                 _tap_qualifier=" run"
                 _tap_s=
-                if [ 1 -ne ${_tap_nplan} ]; then
+                if [ 1 -ne "${_tap_nplan}" ]; then
                         _tap_s=s
                 fi
                 tap_diag "Looks like you planned ${_tap_nplan} test${_tap_s} \
@@ -367,7 +446,7 @@ of ${_tap_ntest}${_tap_qualifier}." >&2
         _tap_final=0
         if [ 0 -ne ${_tap_nfail} ]; then
                 _tap_final=${_tap_nfail}
-        elif [ ${_tap_nplan} -ne ${_tap_ntest} ]; then
+        elif [ "${_tap_nplan}" -ne ${_tap_ntest} ]; then
                 _tap_final=1
         fi
         return ${_tap_final}
@@ -388,93 +467,28 @@ tap_plan() {
 
         # Need a count
         if [ 0 -eq $# ]; then
-                echo "Not enough arguments" >&2
+                _tap_echo "Not enough arguments" >&2
                 return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
         fi
+        if ! _tap_isnum  "$1" ; then
+                _tap_echo "Number of tests must be a positive integer. "\
+                        "You gave it '$1'."
+                return $TAP_RETURN_EXPECTED_NUMBER
+        fi
+
         # Don't double-call
         if [ 0 -ne "${_tap_nplan}" ]; then
-                echo "Plan already printed" >&2
+                _tap_echo "Plan already printed" >&2
                 return $TAP_RETURN_PLAN_ALREADY_PRINTED
         fi
         # Work out how many tests we're signing ourselves up for
-        _tap_nplan=$(($1))
+        _tap_nplan=$1
         _tap_plan_msg="1..${_tap_nplan}"
-        if [ 0 -eq ${_tap_nplan} ]; then
+        if [ 0 -eq "${_tap_nplan}" ]; then
                 _tap_skipa=${2:-"???"}
                 _tap_plan_msg="${_tap_plan_msg} # SKIP ${_tap_skipa}"
         fi
         _tap_echo "${_tap_plan_msg}"
-}
-
-# tap_BAIL_OUT ceases all testing and returns 255 after emitting the bail out
-# TAP message.  It should normally be called as return tap_BAIL_OUT.  After
-# calling tap_BAIL_OUT, further calls to most tap_ functions will do nothing,
-# the two exceptionsg being tap_done_testing, which will return
-# TAP_RETURN_BAILED_OUT and tap_reset, which resets the TAP state.
-#
-# Arguments:
-# $1 - The reason for the bail (optional)
-tap_BAIL_OUT() {
-        _tap_bailo="Bail out!"
-        if [ -n "$1" ]; then
-                _tap_bailo="${_tap_bailo}  ${*:-""}"
-        fi
-        echo "${_tap_bailo}"
-        return $TAP_RETURN_BAILED_OUT
-}
-
-# tap_skip is equivalent to a number of tap_ok 0's, plus some TAP which notes
-# that the tests were skipped, not actually run.  This is handy for when
-# tap_plan has been used to declare a number of tests, but several are unable
-# to be run at all, probably in a subtest.  Note that this is different than
-# tap_todo, which is used for tests which are expected to run but fail.
-#
-# Arguments:
-# $1 - The reason for the tests to be skipped
-# $2 - How many tests will be skipped
-tap_skip() { _tap_skip 0 "skip $1" "$2"; }
-
-# tap_todo_skip is like tap_skip except that the tests are marked as failing
-# and noted as not only skipped but also TODO.
-#
-# Arguments:
-# $1 - The reason for the tests to be skipped
-# $2 - How many tests will be skipped
-tap_todo_skip() {
-        # Make sure the repetition count is a number.
-        if ! _tap_isnum  "$2" ; then
-                _tap_echo "Repetition count '$1' isn't numeric" >&2
-                return $TAP_RETURN_EXPECTED_NUMBER
-        fi
-
-        _TAP_OK_NONOTOKDIAG=true _tap_skip 1 "TODO & SKIP $1" "$2";
-        # We didn't actually fail.  Whoops.
-        : $((_tap_nfail-=$2))
-}
-
-# _tap_skip calls _tap_ok a number of times with the separator #
-#
-# Arguments:
-# $1 - 0 for success
-# $2 - Test name, which should include skip or TODO & SKIP
-# $3 - Repetition count
-_tap_skip() {
-        # Need a count and a reason
-        if [ 3 -gt $# ]; then
-                echo "Not enough arguments" >&2
-                return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
-        fi
-
-        # Print ALL the skips.  Turns out OpenBSD's sh doesn't do POSIX loops?
-        i=1
-        _tap_todo_orig=$TAP_TODO
-        _tap_ok_separator_orig=${_TAP_OK_SEPARATOR}
-        while [ $i -le $3 ]; do
-                TAP_TODO= _TAP_OK_SEPARATOR="#" _tap_ok $1 "$2"
-                : $((i+=1))
-        done
-        TAP_TODO=${_tap_todo_orig}
-        _TAP_OK_SEPARATOR=${_tap_ok_separator_orig}
 }
 
 # tap_subtest runs a subtest, which should normally be its own function
@@ -517,6 +531,7 @@ tap_subtest() {
                 # out of the subshell is more trouble than its worth
                 elif [ -n "${_tap_skipa}" ]; then
                         _tap_space="${_tap_save_space}"
+                        # shellcheck disable=SC2030
                         _tap_ntest="${_tap_save_ntest}"
                         tap_skip "${_tap_skipa}" 1
                         return $TAP_RETURN_SKIPPED_ALL
@@ -528,7 +543,6 @@ tap_subtest() {
                 fi
                 set +e
                 _tap_finalize
-                [ 0 -eq $? ]
         ) || _tap_subtest_ret=$?
 
         # If we've bailed, note it for the rest of testing.  There's no really
@@ -541,6 +555,7 @@ tap_subtest() {
         # A skipped_all subtest already logged its own success or failure; we
         # just need to note that another test was run.
         elif [ $TAP_RETURN_SKIPPED_ALL -eq ${_tap_subtest_ret} ]; then
+                # shellcheck disable=SC2031
                 : $((_tap_ntest+=1))
                 return
         # If we didn't get any subtests, note it as an error.
@@ -601,7 +616,7 @@ _tap_ok() {
 
         # Need at least an ok or not.
         if [ 1 -gt $# ] || [ -z "$1" ]; then
-                echo "Not enough arguments" >&2
+                _tap_echo "Not enough arguments" >&2
                 return $TAP_RETURN_NOT_ENOUGH_ARGUMENTS
         fi
 
