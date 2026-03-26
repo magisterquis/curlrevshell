@@ -5,7 +5,7 @@ package tlog
  * Tests for failed tests for tlog.go
  * By J. Stuart McMurray
  * Created 20260215
- * Last Modified 20260216
+ * Last Modified 20260321
  */
 
 import (
@@ -14,17 +14,17 @@ import (
 )
 
 // newMockLog returns the bits needed to test failed tests cases with a
-// LogBuffer.
-func newFailBuffer() (*slog.Logger, *LogBuffer, *mockT) {
+// Buffer.
+func newFailBuffer() (*slog.Logger, *Buffer, *mockT) {
 	var (
-		lb, sl = NewLogBuffer()
+		lb, sl = NewBuffer()
 		mt     = newMockT()
 	)
 	return sl, lb, mt
 }
 
 // Does CloseExpectEmpty handle not empty properly?
-func TestLogBufferCloseExpectEmpty_NotEmpty(t *testing.T) {
+func TestBufferCloseExpectEmpty_NotEmpty(t *testing.T) {
 	var (
 		msg        = "kittens"
 		sl, lb, mt = newFailBuffer()
@@ -40,7 +40,7 @@ func TestLogBufferCloseExpectEmpty_NotEmpty(t *testing.T) {
 }
 
 // Does Expect handle incorrect messages?
-func TestLogBufferExpect_IncorrectMessages(t *testing.T) {
+func TestBufferExpect_IncorrectMessages(t *testing.T) {
 	var (
 		sl, lb, mt = newFailBuffer()
 		wantMsg    = M.Warn("m2")
@@ -71,13 +71,13 @@ func TestLogBufferExpect_IncorrectMessages(t *testing.T) {
 }
 
 // Does TestEmptyAfterClose catch an extra message?
-func TestLogBufferTestEmptyAfterClose_NotEmpty(t *testing.T) {
+func TestBufferTestEmptyAfterClose_NotEmpty(t *testing.T) {
 	var (
 		msg        = "kittens"
 		sl, lb, mt = newFailBuffer()
 	)
 	if err := lb.Close(); nil != err {
-		t.Errorf("Error closing LogBuffer: %s", err)
+		t.Errorf("Error closing Buffer: %s", err)
 	}
 	sl.Info(msg)
 	lb.testEmptyAfterClose(mt)
@@ -89,8 +89,8 @@ func TestLogBufferTestEmptyAfterClose_NotEmpty(t *testing.T) {
 	})
 }
 
-// Does WithExpectEmpty work when the LogBuffer's not empty?
-func TestLogBufferWithExpectEmpty_NotEmpty(t *testing.T) {
+// Does WithExpectEmpty work when the Buffer's not empty?
+func TestBufferWithExpectEmpty_NotEmpty(t *testing.T) {
 	var (
 		m1         = "kittens"
 		m2         = "moose"
@@ -108,7 +108,7 @@ func TestLogBufferWithExpectEmpty_NotEmpty(t *testing.T) {
 }
 
 // Can we detect an incorrect message out of order?
-func TestLogBufferWithExpectUnordered_Incorrect(t *testing.T) {
+func TestBufferWithExpectUnordered_Incorrect(t *testing.T) {
 	var (
 		sl, lb, mt = newFailBuffer()
 		wantMsg    = M.Warn("m2")
@@ -144,7 +144,7 @@ func TestLogBufferWithExpectUnordered_Incorrect(t *testing.T) {
 }
 
 // Can we handle not having as many messages as we expect?
-func TestLogBufferWithNoWait_MissingMessages(t *testing.T) {
+func TestBufferWithNoWait_MissingMessages(t *testing.T) {
 	var (
 		sl, lb, mt = newFailBuffer()
 		wantMsgs   []Msg

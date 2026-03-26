@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260216
+ * Last Modified 20260326
  */
 
 import (
@@ -20,14 +20,14 @@ import (
 	"testing"
 )
 
-// BufLen is the size of LogBuffer's internal buffers.
+// BufLen is the size of Buffer's internal buffers.
 const BufLen = 1024
 
-// LogBuffer holds log messages received from the [slog.Logger] returned by
+// Buffer holds log messages received from the [slog.Logger] returned by
 // New.
-// The With* methods return a copy of LogBuffer with options set but with the
+// The With* methods return a copy of Buffer with options set but with the
 // same underlying storage.
-type LogBuffer struct {
+type Buffer struct {
 	mu *sync.RWMutex
 
 	/* Main buffer. */
@@ -42,16 +42,16 @@ type LogBuffer struct {
 	expectNoWait    bool
 	expectUnordered bool
 
-	/* NB: Logbuffer.Clone makes a shallow copy of itself, so
+	/* NB: Buffer.Clone makes a shallow copy of itself, so
 	pointer fields are shared between clones but
 	non-pointer fields are not shared between clones. */
 }
 
-// NewLogBuffer returns a new Buffer and logger to write to the buffer.
+// NewBuffer returns a new Buffer and logger to write to the buffer.
 // Logs will be written at level DEBUG.
 // The buffer will have space for BufLen log entries.
-func NewLogBuffer() (*LogBuffer, *slog.Logger) {
-	lb := &LogBuffer{
+func NewBuffer() (*Buffer, *slog.Logger) {
+	lb := &Buffer{
 		mu:     new(sync.RWMutex),
 		buf:    make(chan string, BufLen),
 		closed: new(bool),
@@ -73,14 +73,14 @@ func NewLogBuffer() (*LogBuffer, *slog.Logger) {
 
 // Clone returns a copy of l which shares l's underlying buffers and closed
 // atomic Bool.
-func (l *LogBuffer) Clone() *LogBuffer {
+func (l *Buffer) Clone() *Buffer {
 	n := l
 	return n
 }
 
 // Write adds the lines b to l's internal buffer with no newlines.
 // It returns 0, [ErrBufferFull] if l's internal buffer is full.
-func (l *LogBuffer) Write(b []byte) (int, error) {
+func (l *Buffer) Write(b []byte) (int, error) {
 	var (
 		tot       = 0
 		errClosed error
@@ -107,7 +107,7 @@ func (l *LogBuffer) Write(b []byte) (int, error) {
 }
 
 // writeLine writes a single line to l.
-func (l *LogBuffer) writeLine(line string) (int, error) {
+func (l *Buffer) writeLine(line string) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -132,7 +132,7 @@ func (l *LogBuffer) writeLine(line string) (int, error) {
 // Close marks l as closed and returns nil.  It may be called more than once.
 // Further writes will return an error but will be noted for a later call to
 // l.TestEmptyAfterClose.
-func (l *LogBuffer) Close() error {
+func (l *Buffer) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !*l.closed {
@@ -144,23 +144,23 @@ func (l *LogBuffer) Close() error {
 
 // CloseExpectEmpty is a convenience method which first closes l and then
 // makes sure there are no buffered logs.
-func (l *LogBuffer) CloseExpectEmpty(ctx context.Context, t *testing.T) {
+func (l *Buffer) CloseExpectEmpty(ctx context.Context, t *testing.T) {
 	t.Helper()
 	l.closeExpectEmpty(ctx, t)
 }
 
 // closeExpectEmpty does what CloseExpectEmpty says it does, but takes a ter
 // for testing the unhappy path.
-func (l *LogBuffer) closeExpectEmpty(ctx context.Context, t ter) {
+func (l *Buffer) closeExpectEmpty(ctx context.Context, t ter) {
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
-		t.Errorf("Error closing LogBuffer: %s", err)
+		t.Errorf("Error closing Buffer: %s", err)
 	}
 	l.WithExpectEmpty().expect(ctx, t)
 }
 
 // IsClosed indicates if l.Close has been called.
-func (l *LogBuffer) IsClosed() bool {
+func (l *Buffer) IsClosed() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return *l.closed
@@ -171,14 +171,14 @@ func (l *LogBuffer) IsClosed() bool {
 // not.
 // Unless WithExpectUnordered was used, messages are expected to be in the
 // order passed to Expect.
-func (l *LogBuffer) Expect(ctx context.Context, t *testing.T, msgs ...Msg) {
+func (l *Buffer) Expect(ctx context.Context, t *testing.T, msgs ...Msg) {
 	t.Helper()
 	l.expect(ctx, t, msgs...)
 }
 
 // expect does what Expect says it does, but takes a ter for testing the
 // unhappy path.
-func (l *LogBuffer) expect(ctx context.Context, t ter, msgs ...Msg) {
+func (l *Buffer) expect(ctx context.Context, t ter, msgs ...Msg) {
 	/* Check for messages which should be there. */
 	if l.expectUnordered {
 		l.checkUnordered(ctx, t, msgs)
@@ -194,7 +194,7 @@ func (l *LogBuffer) expect(ctx context.Context, t ter, msgs ...Msg) {
 
 // checkOrdered checks that all of the messages in msgs are buffered in the
 // order they're in in msgs.
-func (l *LogBuffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
+func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
 	for i, wantMsg := range msgs {
 		n := i + 1
 		gotMsg, err := l.NextMessage(ctx)
@@ -219,7 +219,7 @@ func (l *LogBuffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
 
 // checkUnordered checks that all of the Msgs in msgs are buffered in any
 // order.
-func (l *LogBuffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
+func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 	/* Work out the ones we want.  This'll be something like O(n**2), but
 	with set sizes small enough a map isn't worth the effort. */
 	want := make([]*Msg, len(msgs))
@@ -271,7 +271,7 @@ func (l *LogBuffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 
 // NextMessage returns the next buffered message, according to l's
 // configuration.
-func (l *LogBuffer) NextMessage(ctx context.Context) (Msg, error) {
+func (l *Buffer) NextMessage(ctx context.Context) (Msg, error) {
 	/* ret prepares a receive from l.buf for returning. */
 	ret := func(line string, ok bool) (Msg, error) {
 		if !ok {
@@ -312,7 +312,7 @@ func (l *LogBuffer) NextMessage(ctx context.Context) (Msg, error) {
 // WithExpectEmpty returns a copy of l configured such that Expect also notes a
 // test failure if there were more buffered messages than passed to expect.
 // Leftover buffered messages will be unbuffered and logged as test failures.
-func (l *LogBuffer) WithExpectEmpty() *LogBuffer {
+func (l *Buffer) WithExpectEmpty() *Buffer {
 	n := l.Clone()
 	n.expectEmpty = true
 	return n
@@ -320,7 +320,7 @@ func (l *LogBuffer) WithExpectEmpty() *LogBuffer {
 
 // WithNoWait returns a copy of l configured such that expect does not block
 // waiting for as many log messages as it was passed.
-func (l *LogBuffer) WithNoWait() *LogBuffer {
+func (l *Buffer) WithNoWait() *Buffer {
 	n := l.Clone()
 	n.expectNoWait = true
 	return n
@@ -328,7 +328,7 @@ func (l *LogBuffer) WithNoWait() *LogBuffer {
 
 // WithExpectUnordered returns a copy of l configured such that Expect does not
 // expect logged messages to be in order.
-func (l *LogBuffer) WithExpectUnordered() *LogBuffer {
+func (l *Buffer) WithExpectUnordered() *Buffer {
 	n := l.Clone()
 	n.expectUnordered = true
 	return n
@@ -342,17 +342,17 @@ func (l *LogBuffer) WithExpectUnordered() *LogBuffer {
 // TestEmptyAfterClose will not be noted as a test failure unless another call
 // to TestEmptyAfterClose is made.
 // if l.Close has not been closed, TestEmptyAfterClose closes l.
-func (l *LogBuffer) TestEmptyAfterClose(t *testing.T) {
+func (l *Buffer) TestEmptyAfterClose(t *testing.T) {
 	t.Helper()
 	l.testEmptyAfterClose(t)
 }
 
 // testEmptyAfterClose does what TestEmptyAfterClose says it does, but takes a
 // ter for testing the unhappy path.
-func (l *LogBuffer) testEmptyAfterClose(t ter) {
+func (l *Buffer) testEmptyAfterClose(t ter) {
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
-		t.Fatalf("Error closing LogBuffer: %s", err)
+		t.Fatalf("Error closing Buffer: %s", err)
 	}
 	for {
 		select {

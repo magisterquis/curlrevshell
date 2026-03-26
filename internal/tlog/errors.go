@@ -5,7 +5,7 @@ package tlog
  * Error values and types
  * By J. Stuart McMurray
  * Created 20251215
- * Last Modified 20251216
+ * Last Modified 20260321
  */
 
 import (
@@ -13,7 +13,7 @@ import (
 	"fmt"
 )
 
-// ErrBufferClosed is returned by [LogBuffer.Write] if the buffer was closed
+// ErrBufferClosed is returned by [Buffer.Write] if the buffer was closed
 // before saving a message.
 var ErrBufferClosed = errors.New("buffer closed")
 
@@ -21,7 +21,7 @@ var ErrBufferClosed = errors.New("buffer closed")
 // and it ran out of messages.
 var ErrBufferEmpty = errors.New("buffer empty")
 
-// ErrBufferFull is returned by [LogBuffer.Write] when its internal buffer is
+// ErrBufferFull is returned by [Buffer.Write] when its internal buffer is
 // full.
 var ErrBufferFull = errors.New("buffer full")
 
@@ -55,7 +55,7 @@ func (i incorrectLogMessageMessage) String() string {
 }
 
 // messageSentAfterCloseMessage notes a log message which was sent after
-// [LogBuffer.Close] was called.
+// [Buffer.Close] was called.
 type messageSentAfterCloseMessage struct{ Msg string }
 
 // String returns a string suitable for passing to t.Error.
