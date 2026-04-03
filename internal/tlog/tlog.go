@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260326
+ * Last Modified 20260327
  */
 
 import (
@@ -152,6 +152,7 @@ func (l *Buffer) CloseExpectEmpty(ctx context.Context, t *testing.T) {
 // closeExpectEmpty does what CloseExpectEmpty says it does, but takes a ter
 // for testing the unhappy path.
 func (l *Buffer) closeExpectEmpty(ctx context.Context, t ter) {
+	t.Helper()
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
 		t.Errorf("Error closing Buffer: %s", err)
@@ -179,6 +180,7 @@ func (l *Buffer) Expect(ctx context.Context, t *testing.T, msgs ...Msg) {
 // expect does what Expect says it does, but takes a ter for testing the
 // unhappy path.
 func (l *Buffer) expect(ctx context.Context, t ter, msgs ...Msg) {
+	t.Helper()
 	/* Check for messages which should be there. */
 	if l.expectUnordered {
 		l.checkUnordered(ctx, t, msgs)
@@ -195,6 +197,7 @@ func (l *Buffer) expect(ctx context.Context, t ter, msgs ...Msg) {
 // checkOrdered checks that all of the messages in msgs are buffered in the
 // order they're in in msgs.
 func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
+	t.Helper()
 	for i, wantMsg := range msgs {
 		n := i + 1
 		gotMsg, err := l.NextMessage(ctx)
@@ -220,6 +223,7 @@ func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
 // checkUnordered checks that all of the Msgs in msgs are buffered in any
 // order.
 func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
+	t.Helper()
 	/* Work out the ones we want.  This'll be something like O(n**2), but
 	with set sizes small enough a map isn't worth the effort. */
 	want := make([]*Msg, len(msgs))
@@ -350,6 +354,7 @@ func (l *Buffer) TestEmptyAfterClose(t *testing.T) {
 // testEmptyAfterClose does what TestEmptyAfterClose says it does, but takes a
 // ter for testing the unhappy path.
 func (l *Buffer) testEmptyAfterClose(t ter) {
+	t.Helper()
 	if err := l.Close(); nil != err {
 		/* Unpossible. */
 		t.Fatalf("Error closing Buffer: %s", err)
