@@ -5,16 +5,18 @@ package tlog
  * Tests for tlog.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260326
+ * Last Modified 20260406
  */
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -591,7 +593,10 @@ func TestBufferExpect(t *testing.T) {
 	/* Does it work? */
 	t.Run("ordered", func(t *testing.T) {
 		lb, want := newLB()
-		lb.Expect(t.Context(), t, want...)
+		ok := lb.Expect(t.Context(), t, want...)
+		if !ok {
+			t.Errorf("Expect returned false, but shouldn't have")
+		}
 	})
 
 	t.Run("unordered", func(t *testing.T) {
@@ -604,7 +609,10 @@ func TestBufferExpect(t *testing.T) {
 				uwant[i], uwant[j] = uwant[j], uwant[i]
 			})
 		}
-		lb.WithExpectUnordered().Expect(t.Context(), t, want...)
+		ok := lb.WithExpectUnordered().Expect(t.Context(), t, want...)
+		if !ok {
+			t.Errorf("Expect returned false, but shouldn't have")
+		}
 	})
 }
 
@@ -617,9 +625,12 @@ func TestBufferExpect_EmptyGroup(t *testing.T) {
 	)
 	sl.
 		WithGroup(group).Info(msg)
-	lb.Expect(t.Context(), t, M.
+	ok := lb.Expect(t.Context(), t, M.
 		WithGroup(group).Info(msg),
 	)
+	if !ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
 }
 
 // Can we make sure we've an empty buffer?  Kinda hard to test without failing
@@ -638,7 +649,10 @@ func TestBufferExpect_ExpectEmpty(t *testing.T) {
 	if shouldFail {
 		sl.Debug("This should cause a test failure")
 	}
-	lb.WithExpectEmpty().Expect(t.Context(), t, M.Info(msg))
+	ok := lb.WithExpectEmpty().Expect(t.Context(), t, M.Info(msg))
+	if !ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
 }
 
 // Can we make sure we won't wait on an empty buffer?  Kinda hard to test
@@ -656,7 +670,10 @@ func TestBufferExpect_NoWait(t *testing.T) {
 	if !shouldFail {
 		sl.Info(msg)
 	}
-	lb.WithNoWait().Expect(t.Context(), t, M.Info(msg))
+	ok := lb.WithNoWait().Expect(t.Context(), t, M.Info(msg))
+	if !ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
 
 }
 
@@ -686,10 +703,19 @@ func TestBufferTestEmptyAfterClose(t *testing.T) {
 	}
 
 	/* Should get the normally-logged message. */
-	lb.Expect(t.Context(), t, want)
+	ok := lb.Expect(t.Context(), t, want)
+	if !ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
 
 	/* Shouldn't get anything after closing, unless we should. */
-	lb.TestEmptyAfterClose(t)
+	ok = lb.TestEmptyAfterClose(t)
+	if !ok {
+		t.Errorf(
+			"TestEmptyAfterClose returned false, " +
+				"but shouldn't have",
+		)
+	}
 }
 
 // Does TestEmptyAfterClose also Close?
@@ -699,10 +725,19 @@ func TestBufferTestEmptyAfterClose_NoCloseFirst(t *testing.T) {
 	msg := "kittens"
 	sl.Info(msg)
 	want := M.Info(msg)
-	lb.Expect(t.Context(), t, want)
+	ok := lb.Expect(t.Context(), t, want)
+	if !ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
 
 	/* Shouldn't get anything after closing, but should also close. */
-	lb.TestEmptyAfterClose(t)
+	ok = lb.TestEmptyAfterClose(t)
+	if !ok {
+		t.Errorf(
+			"TestEmptyAfterClose returned false, " +
+				"but shouldn't have",
+		)
+	}
 
 	/* Did it close? */
 	if !lb.IsClosed() {
@@ -762,7 +797,10 @@ func TestBufferIsClosed(t *testing.T) {
 // Can we close and expect nothing?
 func TestBufferCloseExpectEmpty(t *testing.T) {
 	lb, _ := NewBuffer()
-	lb.CloseExpectEmpty(t.Context(), t)
+	ok := lb.CloseExpectEmpty(t.Context(), t)
+	if !ok {
+		t.Errorf("CloseExpectEmpty returned false, but shouldn't have")
+	}
 }
 
 // Can we test against an expected message with an error field?
@@ -775,5 +813,73 @@ func TestBufferExpect_ErrorKey(t *testing.T) {
 		tb, sl = NewBuffer()
 	)
 	sl.With(lk, lv).Error(lm)
-	tb.WithExpectEmpty().Expect(t.Context(), t, M.With(lk, lv).Error(lm))
+	ok := tb.WithExpectEmpty().Expect(t.Context(), t,
+		M.
+			With(lk, lv).
+			Error(lm),
+	)
+	if !ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
+}
+
+// Do we return right away if the context is already done when we're getting
+// the next message from an empty Buffer?
+func TestBufferNextMessage_ContextDone(t *testing.T) {
+	var (
+		cause       = fmt.Errorf("%s", S("cancel-cause"))
+		ctx, cancel = context.WithCancelCause(t.Context())
+		tb, _       = NewBuffer()
+		m           Msg
+		err         error
+		wg          sync.WaitGroup
+	)
+	cancel(cause)
+
+	/* Block waiting for another message. */
+	wg.Go(func() { m, err = tb.NextMessage(ctx) })
+
+	/* After a bit, unblock. */
+	wg.Wait()
+	if !m.IsZero() {
+		t.Errorf("Got non-zero message: %s", m)
+	}
+	if got, want := err, cause; !errors.Is(err, want) {
+		t.Errorf("Unexpected error\n got: %s\nwant: %s", got, want)
+	}
+}
+
+// Do we get the right error trying to get a message from a closed buffer?
+func TestBufferNextMessage_AlreadyClosed(t *testing.T) {
+	tb, _ := NewBuffer()
+	if err := tb.Close(); nil != err {
+		t.Fatalf("Close returned error: %s", err)
+	}
+	m, err := tb.NextMessage(t.Context())
+	if !m.IsZero() {
+		t.Errorf("Got non-zero message: %s", m)
+	}
+	if got, want := err, ErrBufferClosed; !errors.Is(err, want) {
+		t.Errorf("Unexpected error\n got: %s\nwant: %s", got, want)
+	}
+}
+
+// Do we get the right error trying to get a message from corrupted JSON?
+func TestBufferNextMessage_CorruptedJSON(t *testing.T) {
+	var (
+		tb, _       = NewBuffer()
+		corruptJSON = S("corrupt-json")
+		ok          bool
+	)
+
+	/* Queue up some corrupt JSON. */
+	tb.buf <- corruptJSON
+
+	m, err := tb.NextMessage(t.Context())
+	if !m.IsZero() {
+		t.Errorf("Got non-zero message: %s", m)
+	}
+	if err, ok = errors.AsType[*json.SyntaxError](err); !ok {
+		t.Fatalf("Error is not %T", err)
+	}
 }

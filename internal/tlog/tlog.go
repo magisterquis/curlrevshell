@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260327
+ * Last Modified 20260406
  */
 
 import (
@@ -133,31 +133,33 @@ func (l *Buffer) writeLine(line string) (int, error) {
 // Further writes will return an error but will be noted for a later call to
 // l.TestEmptyAfterClose.
 func (l *Buffer) Close() error {
+	l.close()
+	return nil
+}
+
+// close does what Close says it does, but doesn't pretend to return an error.
+func (l *Buffer) close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if !*l.closed {
 		*l.closed = true
 		close(l.buf)
 	}
-	return nil
 }
 
 // CloseExpectEmpty is a convenience method which first closes l and then
 // makes sure there are no buffered logs.
-func (l *Buffer) CloseExpectEmpty(ctx context.Context, t *testing.T) {
+func (l *Buffer) CloseExpectEmpty(ctx context.Context, t *testing.T) bool {
 	t.Helper()
-	l.closeExpectEmpty(ctx, t)
+	return l.closeExpectEmpty(ctx, t)
 }
 
 // closeExpectEmpty does what CloseExpectEmpty says it does, but takes a ter
 // for testing the unhappy path.
-func (l *Buffer) closeExpectEmpty(ctx context.Context, t ter) {
+func (l *Buffer) closeExpectEmpty(ctx context.Context, t ter) bool {
 	t.Helper()
-	if err := l.Close(); nil != err {
-		/* Unpossible. */
-		t.Errorf("Error closing Buffer: %s", err)
-	}
-	l.WithExpectEmpty().expect(ctx, t)
+	l.close()
+	return l.WithExpectEmpty().expect(ctx, t)
 }
 
 // IsClosed indicates if l.Close has been called.
@@ -172,32 +174,41 @@ func (l *Buffer) IsClosed() bool {
 // not.
 // Unless WithExpectUnordered was used, messages are expected to be in the
 // order passed to Expect.
-func (l *Buffer) Expect(ctx context.Context, t *testing.T, msgs ...Msg) {
+func (l *Buffer) Expect(ctx context.Context, t *testing.T, msgs ...Msg) bool {
 	t.Helper()
-	l.expect(ctx, t, msgs...)
+	return l.expect(ctx, t, msgs...)
 }
 
 // expect does what Expect says it does, but takes a ter for testing the
 // unhappy path.
-func (l *Buffer) expect(ctx context.Context, t ter, msgs ...Msg) {
+func (l *Buffer) expect(ctx context.Context, t ter, msgs ...Msg) bool {
 	t.Helper()
+	ok := true
 	/* Check for messages which should be there. */
 	if l.expectUnordered {
-		l.checkUnordered(ctx, t, msgs)
+		if !l.checkUnordered(ctx, t, msgs) {
+			ok = false
+		}
 	} else {
-		l.checkOrdered(ctx, t, msgs)
+		if !l.checkOrdered(ctx, t, msgs) {
+			ok = false
+		}
 	}
 
 	/* If we don't expect any more, make sure there's no more. */
 	for l.expectEmpty && 0 != len(l.buf) {
+		ok = false
 		t.Error(leftoverLogMessageMessage{Msg: <-l.buf})
 	}
+
+	return ok
 }
 
 // checkOrdered checks that all of the messages in msgs are buffered in the
 // order they're in in msgs.
-func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
+func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) bool {
 	t.Helper()
+	ok := true
 	for i, wantMsg := range msgs {
 		n := i + 1
 		gotMsg, err := l.NextMessage(ctx)
@@ -207,9 +218,10 @@ func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
 				Len: len(msgs),
 				Err: err,
 			})
-			return
+			return false
 		}
 		if !wantMsg.Equal(gotMsg) {
+			ok = false
 			t.Error(incorrectLogMessageMessage{
 				Idx:  n,
 				Len:  len(msgs),
@@ -218,12 +230,14 @@ func (l *Buffer) checkOrdered(ctx context.Context, t ter, msgs []Msg) {
 			})
 		}
 	}
+	return ok
 }
 
 // checkUnordered checks that all of the Msgs in msgs are buffered in any
 // order.
-func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
+func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) bool {
 	t.Helper()
+	ok := true
 	/* Work out the ones we want.  This'll be something like O(n**2), but
 	with set sizes small enough a map isn't worth the effort. */
 	want := make([]*Msg, len(msgs))
@@ -237,6 +251,7 @@ func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 		/* Get the next buffered message. */
 		gotMsg, err := l.NextMessage(ctx)
 		if nil != err {
+			ok = false
 			t.Error(errorWaitingForMessageMessage{
 				Idx: 1 + len(want) - rem,
 				Len: len(want),
@@ -253,6 +268,7 @@ func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 			return (*p).Equal(gotMsg)
 		})
 		if -1 == idx { /* Unexpected message. */
+			ok = false
 			t.Error(unexpectedLogMessageMessage{Msg: gotMsg})
 			continue
 		}
@@ -265,12 +281,15 @@ func (l *Buffer) checkUnordered(ctx context.Context, t ter, msgs []Msg) {
 		if nil == p { /* Good. */
 			continue
 		}
+		ok = false
 		t.Error(unfoundLogMessageMessage{
 			Idx:  i + 1,
 			Len:  len(want),
 			Want: *p,
 		})
 	}
+
+	return ok
 }
 
 // NextMessage returns the next buffered message, according to l's
@@ -295,7 +314,7 @@ func (l *Buffer) NextMessage(ctx context.Context) (Msg, error) {
 	/* Read, without blocking. */
 	select {
 	case <-ctx.Done():
-		return Msg{}, ctx.Err()
+		return Msg{}, context.Cause(ctx)
 	case line, ok := <-l.buf: /* Normal buffered message. */
 		return ret(line, ok)
 	default: /* Didn't get anything. */
@@ -307,7 +326,7 @@ func (l *Buffer) NextMessage(ctx context.Context) (Msg, error) {
 	/* We must me meant to block. */
 	select {
 	case <-ctx.Done():
-		return Msg{}, ctx.Err()
+		return Msg{}, context.Cause(ctx)
 	case msg, ok := <-l.buf: /* Normal buffered message. */
 		return ret(msg, ok)
 	}
@@ -346,26 +365,25 @@ func (l *Buffer) WithExpectUnordered() *Buffer {
 // TestEmptyAfterClose will not be noted as a test failure unless another call
 // to TestEmptyAfterClose is made.
 // if l.Close has not been closed, TestEmptyAfterClose closes l.
-func (l *Buffer) TestEmptyAfterClose(t *testing.T) {
+func (l *Buffer) TestEmptyAfterClose(t *testing.T) bool {
 	t.Helper()
-	l.testEmptyAfterClose(t)
+	return l.testEmptyAfterClose(t)
 }
 
 // testEmptyAfterClose does what TestEmptyAfterClose says it does, but takes a
 // ter for testing the unhappy path.
-func (l *Buffer) testEmptyAfterClose(t ter) {
+func (l *Buffer) testEmptyAfterClose(t ter) bool {
 	t.Helper()
-	if err := l.Close(); nil != err {
-		/* Unpossible. */
-		t.Fatalf("Error closing Buffer: %s", err)
-	}
+	l.close()
+	ok := true
 	for {
 		select {
 		case m := <-l.cBuf:
+			ok = false
 			t.Error(messageSentAfterCloseMessage{Msg: m})
 		default:
 			/* No (more) messages. */
-			return
+			return ok
 		}
 	}
 }

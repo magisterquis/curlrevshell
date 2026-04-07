@@ -5,7 +5,7 @@ package tlog
  * UnJSON'd log message
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260326
+ * Last Modified 20260406
  */
 
 import (
@@ -111,7 +111,7 @@ func (m Msg) Clone() (Msg, error) {
 func (m Msg) MustClone() Msg {
 	n, err := m.Clone()
 	if nil != err {
-		panic("Msg.MustClone: " + err.Error())
+		panic(fmt.Errorf("Msg.MustClone: %w", err))
 	}
 	return n
 }
@@ -131,7 +131,7 @@ func (m Msg) Equal(n Msg) bool { return m.String() == n.String() }
 func (m Msg) String() string {
 	j, err := m.ToJSON()
 	if nil != err {
-		panic("Msg.String: " + err.Error())
+		panic(fmt.Errorf("Msg.String: %w", err))
 	}
 	return j
 }
@@ -158,17 +158,12 @@ func (m *Msg) UnmarshalJSON(b []byte) error {
 		/* Down the rabbithole one level. */
 		v, ok := m.cur[name]
 		if !ok {
-			return fmt.Errorf(
-				"group path %s missing",
-				m.Path[:i+1],
-			)
+			return groupPathMissingError{Path: m.Path[:i+1]}
 		}
 		/* Make sure it's actually a group. */
 		g, ok := v.(Group)
 		if !ok {
-			return fmt.Errorf(
-				"current group path %v leads to a %T, "+
-					"not a group",
+			return newGroupPathLeadsToNotGroupError(
 				m.Path[:i+1],
 				v,
 			)
@@ -192,7 +187,7 @@ func (m Msg) ToJSON() (string, error) {
 
 	/* JSONify the important bit. */
 	b, err := json.Marshal(n.Root)
-	if nil != err {
+	if nil != err { /* Unpossible */
 		return "", fmt.Errorf("JSON-encoding: %w", err)
 	}
 	return string(b), nil

@@ -16,6 +16,11 @@ import (
 
 func TestMockT_Smoketest(t *testing.T) { newMockT() }
 
+// Does helper do nothing? (or at least not cause a panic)?
+func TestMockTHelper(t *testing.T) {
+	newMockT().Helper()
+}
+
 // Can we queue Messages?
 func TestMockT_Messages(t *testing.T) {
 	var (

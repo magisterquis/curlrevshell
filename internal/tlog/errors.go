@@ -5,12 +5,13 @@ package tlog
  * Error values and types
  * By J. Stuart McMurray
  * Created 20251215
- * Last Modified 20260321
+ * Last Modified 20260406
  */
 
 import (
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // ErrBufferClosed is returned by [Buffer.Write] if the buffer was closed
@@ -102,4 +103,62 @@ func (e errorWaitingForMessageMessage) String() string {
 		e.Idx, e.Len,
 		e.Err,
 	)
+}
+
+// groupPathMissingError is returned from Msg.UnmarshalJSON to indicate a group
+// from msg.Path was missing.
+type groupPathMissingError struct{ Path []string }
+
+// Error implements the error interface.
+func (err groupPathMissingError) Error() string {
+	return fmt.Sprintf("group path %q missing", err.Path)
+}
+
+// Is indicates if target is a groupPathMissingError with the same slice
+// contents.
+func (err groupPathMissingError) Is(target error) bool {
+	t, ok := errors.AsType[groupPathMissingError](target)
+	if !ok {
+		return false
+	}
+	return slices.Equal(err.Path, t.Path)
+}
+
+// groupPathLeadsToNotGroupError is returned from Msg.UnmarshalJSON to
+// indicate a group from msg.Path pointed to a value, not a group.
+type groupPathLeadsToNotGroupError struct {
+	Path []string
+	Type string
+}
+
+// newGroupPathLeadsToNotGroupError returns a new
+// groupPathLeadsToNotGroupError for a path leading to a value.
+// path is not retained.
+func newGroupPathLeadsToNotGroupError(
+	path []string,
+	val any,
+) groupPathLeadsToNotGroupError {
+	return groupPathLeadsToNotGroupError{
+		Path: slices.Clone(path),
+		Type: fmt.Sprintf("%T", val),
+	}
+}
+
+// Error implements the error interface.
+func (err groupPathLeadsToNotGroupError) Error() string {
+	return fmt.Sprintf(
+		"group path %q leads to a value of type %s, not a group",
+		err.Path,
+		err.Type,
+	)
+}
+
+// Is indicates if target is a groupPathMissingError with the same slice
+// contents.
+func (err groupPathLeadsToNotGroupError) Is(target error) bool {
+	t, ok := errors.AsType[groupPathLeadsToNotGroupError](target)
+	if !ok {
+		return false
+	}
+	return err.Type == t.Type && slices.Equal(err.Path, t.Path)
 }
