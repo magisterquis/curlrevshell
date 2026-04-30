@@ -5,7 +5,7 @@ package tlog
  * Mock testing.T
  * By J. Stuart McMurray
  * Created 20260214
- * Last Modified 20260327
+ * Last Modified 20260430
  */
 
 import (
@@ -67,7 +67,11 @@ func (m *mockT) Fatalf(format string, args ...any) {
 }
 
 // Helper is a no-op.
-func (m *mockT) Helper() {}
+func (m *mockT) Helper() {
+	{
+		/* For test coverage numbers. */
+	}
+}
 
 // appendMessage appends a message to m.msgs.
 func (m *mockT) appendMessage(fatal bool, format string, args ...any) {
