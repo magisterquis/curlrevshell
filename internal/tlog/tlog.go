@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260406
+ * Last Modified 20260515
  */
 
 import (
@@ -386,4 +386,21 @@ func (l *Buffer) testEmptyAfterClose(t ter) bool {
 			return ok
 		}
 	}
+}
+
+// Strings unbuffers and returns the strings in l.
+func (l *Buffer) Strings() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var ret []string
+	/* f appends the strings in ch to ss. */
+	f := func(ss []string, ch chan string) []string {
+		for 0 < len(ch) {
+			ss = append(ss, <-ch)
+		}
+		return ss
+	}
+	ret = f(ret, l.buf)
+	ret = f(ret, l.cBuf)
+	return slices.Clip(ret)
 }

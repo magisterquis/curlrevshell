@@ -5,7 +5,7 @@ package tlog
  * Tests for tlog.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260406
+ * Last Modified 20260515
  */
 
 import (
@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -881,5 +882,53 @@ func TestBufferNextMessage_CorruptedJSON(t *testing.T) {
 	}
 	if err, ok = errors.AsType[*json.SyntaxError](err); !ok {
 		t.Fatalf("Error is not %T", err)
+	}
+}
+
+// Can we get the contents of the buffer as a string array?
+func TestBufferStrings(t *testing.T) {
+	var (
+		tb, sl = NewBuffer()
+		m1     = S("m1")
+		v1     = S("v1")
+		k1     = S("k1")
+		m2     = S("m2")
+		v2     = S("v2")
+		k2     = S("k2")
+		m3     = S("m3")
+		v3     = S("v3")
+		k3     = S("k3")
+		m4     = S("m4")
+		v4     = S("v4")
+		k4     = S("k4")
+		want   []string
+	)
+
+	/* f logs a message via sl and adds it to want. */
+	f := func(msg, key, value string) {
+		sl.Debug(msg, key, value)
+		want = append(want, fmt.Sprintf(
+			`{"level":"DEBUG","msg":"%s","%s":"%s"}`,
+			msg,
+			key,
+			value,
+		))
+	}
+
+	/* Make some logs. */
+	f(m1, k1, v1)
+	f(m2, k2, v2)
+	tb.Close()
+	f(m3, k3, v3)
+	f(m4, k4, v4)
+
+	if got := tb.Strings(); !slices.Equal(got, want) {
+		t.Errorf(
+			"Incorrect strings returned\n"+
+				"got\n%s\n"+
+				"want\n%s",
+			strings.Join(got, "\n"),
+			strings.Join(want, "\n"),
+		)
 	}
 }
