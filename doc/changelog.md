@@ -3,12 +3,14 @@ Changelog
 This lists the feature creep present in each tagged version.
 
 `ctxerrgroup`
-=============
+===============
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@ctxerrgroup
 ```
+- Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
+  less likely.
 - [`ctxerrgroup`](./lib/ctxerrgroup): Tags and tag lineage now available
   in GoTag'd goroutines.
 - Updated dependencies.
@@ -31,8 +33,8 @@ go install github.com/magisterquis/curlrevshell@ctxerrgroup
 `v0.0.1-beta.8` (2025-11-07)
 ============================
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
-- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
-  roll fancypants `-template` templates.
+- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier
+  to roll fancypants `-template` templates.
 - Added compile-time i/o/io/c-changey variables.
 - Added the aptly-named [`config.md`](./config.md) and
   [`template.md`](./template.md).
