@@ -6,7 +6,7 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260307
+ * Last Modified 20260603
  */
 
 import (
@@ -63,7 +63,7 @@ func (g *Group) GoContext(ctx context.Context, f func(context.Context) error) {
 }
 
 // GoTag is like GoContext, but errors returned by f will be wrapped in a
-// TaggedError..
+// TaggedError.
 func (g *Group) GoTag(ctx context.Context, tag string, f func(context.Context) error) {
 	/* Set the tag in the context, so goroutines have a chance at knowing
 	their purpose in life. */
