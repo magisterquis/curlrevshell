@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/magisterquis/goxterm v0.0.1-beta.4
-	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9
+	golang.org/x/exp v0.0.0-20260603202125-055de637280b
 	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.45.0
