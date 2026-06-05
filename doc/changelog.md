@@ -20,13 +20,17 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
   `</dev/null` with `2>&0` so we'll open it twice.
 - Get rid of tests' dependencies on [`jq`](https://jqlang.org).
+- [`ctxerrgroup`](./lib/ctxerrgroup): Tags and tag lineage now available
+  in GoTag'd goroutines.
+- Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
+  less likely.
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)
 ============================
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
-- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier to
-  roll fancypants `-template` templates.
+- [`crstemplate`](../lib/crstemplate): New library to make it slightly easier
+  to roll fancypants `-template` templates.
 - Added compile-time i/o/io/c-changey variables.
 - Added the aptly-named [`config.md`](./config.md) and
   [`template.md`](./template.md).

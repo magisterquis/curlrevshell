@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251107
+ * Last Modified 20251212
  */
 
 import (
@@ -26,6 +26,7 @@ import (
 	"github.com/magisterquis/curlrevshell/internal/currentversion"
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/internal/lockingfile"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
@@ -72,7 +73,7 @@ const (
 
 func main() { os.Exit(rmain()) }
 func rmain() int {
-	pledgeunveil.MustPledge("cpath inet rpath stdio tty unveil wpath")
+	pledgeunveil.MustPledge("cpath flock inet rpath stdio tty unveil wpath")
 	/* Command-line flags. */
 	var cbAddrs []string
 	var (
@@ -272,7 +273,7 @@ Options:
 	} else if nil != err {
 		panic("unveil: " + err.Error())
 	}
-	pledgeunveil.MustPledge("cpath inet rpath stdio tty wpath")
+	pledgeunveil.MustPledge("cpath flock inet rpath stdio tty wpath")
 
 	/* Channels for comms between subsystems. */
 	var (
@@ -292,7 +293,7 @@ Options:
 	lh := slog.DiscardHandler
 	if "" != *logFile {
 		/* Open the logfile. */
-		f, err := os.OpenFile(
+		f, err := lockingfile.OpenFile(
 			*logFile,
 			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
 			0600,
