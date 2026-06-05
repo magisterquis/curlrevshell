@@ -6,7 +6,7 @@ package ctxerrgroup
  * Like errgroup, but with more contexts
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260603
+ * Last Modified 20260605
  */
 
 import (

@@ -5,7 +5,7 @@ package ctxerrgroup
  * Tests for ctxerrgroup.go
  * By J. Stuart McMurray
  * Created 20241226
- * Last Modified 20251220
+ * Last Modified 20260605
  */
 
 import (
@@ -13,8 +13,11 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/magisterquis/curlrevshell/internal/tlog"
 )
@@ -392,4 +395,119 @@ func testGroupGoTagNestedParallel(t *testing.T) {
 	}
 	check(t, have1, got1, gots1)
 	check(t, have2, got2, gots2)
+}
+
+// Can we set a limit on the number of goroutines?
+func TestGroupSetLimit(t *testing.T) {
+	synctest.Test(t, testGroupSetLimit)
+}
+func testGroupSetLimit(t *testing.T) {
+	var (
+		eg        Group
+		limit     = 10
+		nGo       = limit * 100 /* Total number of calls to eg.Go. */
+		mu        sync.Mutex
+		active    int
+		maxActive int
+	)
+
+	/* Only allow so many at once. */
+	eg.SetLimit(limit)
+
+	/* Spawn lots and lots of Goroutines and make sure we never have too
+	many. */
+	for range nGo {
+		go eg.Go(func() error {
+			/* Note we're running and how many we've peaked at
+			running. */
+			mu.Lock()
+			active++
+			maxActive = max(active, maxActive)
+			mu.Unlock()
+
+			/* Work for a long time. */
+			time.Sleep(time.Hour)
+
+			/* All done, note we're no longer running. */
+			mu.Lock()
+			active--
+			maxActive = max(active, maxActive)
+			mu.Unlock()
+
+			return nil
+		})
+	}
+	/* Shouldn't have got one of these. */
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Wait returned error: %v", err)
+	}
+
+	/* Shouldn't have any more active goroutines. */
+	if 0 != active {
+		t.Errorf("Goroutines still active after Wait: %d", active)
+	}
+
+	/* Should have hit the max. */
+	if maxActive != limit {
+		t.Errorf(
+			"Incorrect maximum number of running goroutines\n"+
+				"limit: %d\n"+
+				"  max: %d",
+			limit,
+			maxActive,
+		)
+	}
+}
+
+// Are we told if we're over the limit?
+func TestGroupTryGo(t *testing.T) {
+	var (
+		limit    = 10
+		eg       Group
+		over     = 2
+		rejected int
+		done     = make(chan struct{})
+		started  atomic.Uint64
+	)
+	/* Don't start too many. */
+	eg.SetLimit(limit)
+
+	/* Start too many, we should have some rejected. */
+	for range limit + over {
+		if !eg.TryGo(func() error {
+			started.Add(1)
+			<-done
+			return nil
+		}) {
+			rejected++
+		}
+	}
+
+	/* All done. */
+	close(done)
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Wait returned error: %v", err)
+	}
+
+	/* Did we start enough? */
+	if got, want := started.Load(), uint64(limit); got != want {
+		t.Errorf(
+			"Incorrect number of goroutines started\n"+
+				" got: %d\n"+
+				"want: %d",
+			got,
+			want,
+		)
+	}
+
+	/* Did we not start enough? */
+	if rejected != over {
+		t.Errorf(
+			"Incorrect number of goroutines not started\n"+
+				" got: %d\n"+
+				"want: %d",
+			rejected,
+			over,
+		)
+	}
 }
