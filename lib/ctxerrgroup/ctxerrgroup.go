@@ -12,6 +12,7 @@ package ctxerrgroup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -68,10 +69,11 @@ func (g *Group) GoTag(ctx context.Context, tag string, f func(context.Context) e
 	/* Set the tag in the context, so goroutines have a chance at knowing
 	their purpose in life. */
 	ctx = context.WithValue(ctx, tagContextKey{}, tag)
-	/* And save it in a list, so goroutines can know who their parents
-	are. */
+
+	/* And save it in a copy of a list, so goroutines can know who their
+	parents are without anybody else fiddling about with the list. */
 	ctx = context.WithValue(ctx, tagsContextKey{}, append(
-		ContextTags(ctx),
+		slices.Clone(ContextTags(ctx)),
 		tag,
 	))
 

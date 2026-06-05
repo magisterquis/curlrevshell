@@ -14,6 +14,9 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"testing/synctest"
+
+	"github.com/magisterquis/curlrevshell/internal/tlog"
 )
 
 // Make sure it works if we don't use WithConetxt.
@@ -229,4 +232,164 @@ func TestContextTags(t *testing.T) {
 			want,
 		)
 	}
+}
+
+// Can we use nested tags properly?
+func TestGroupGoTag_NestedTags(t *testing.T) {
+	/* checkTags makes sure ctx has the right tag and tags, as returned by
+	ContextTag and ContextTags.   Runs in a subtest named name. */
+	checkTags := func(
+		t *testing.T,
+		name string,
+		ctx context.Context,
+		wantTag string,
+		wantTags []string,
+	) {
+		t.Run(name, func(t *testing.T) {
+			/* Is the current tag correct? */
+			if got, want := ContextTag(ctx), wantTag; got != want {
+				t.Errorf(
+					"Incorrect context tag\n"+
+						" got: %s\n"+
+						"want: %s",
+					got,
+					want,
+				)
+			}
+			/* Is the tag list correct? */
+			if got, want := ContextTags(ctx), wantTags; !slices.Equal(
+				got,
+				want,
+			) {
+				t.Errorf(
+					"Incorrect context tags\n"+
+						" got: %s\n"+
+						"want: %s",
+					got,
+					want,
+				)
+			}
+		})
+	}
+	/* Nest some error groups, make sure tags are correct. */
+	eg1, ctx := WithContext(t.Context())
+	checkTags(t, "root/before", ctx, "", nil)
+	eg1.GoTag(ctx, "eg1", func(ctx context.Context) error {
+		checkTags(t, "eg1/before", ctx, "eg1", []string{"eg1"})
+		eg2, ctx := WithContext(ctx)
+		eg2.GoTag(ctx, "eg2", func(ctx context.Context) error {
+			checkTags(t, "eg2/before", ctx, "eg2", []string{
+				"eg1",
+				"eg2",
+			})
+			eg3, ctx := WithContext(ctx)
+			eg3.GoTag(ctx, "eg3", func(ctx context.Context) error {
+				checkTags(t, "eg3", ctx, "eg3", []string{
+					"eg1",
+					"eg2",
+					"eg3",
+				})
+				return nil
+			})
+			err := eg3.Wait()
+			checkTags(t, "eg2/before", ctx, "eg2", []string{
+				"eg1",
+				"eg2",
+			})
+			return err
+		})
+		err := eg2.Wait()
+		checkTags(t, "eg1/after", ctx, "eg1", []string{"eg1"})
+		return err
+	})
+	eg1.Wait()
+	checkTags(t, "root/after", ctx, "", nil)
+}
+
+// Do nested tags work when there's parallel calls to GoTag?
+func TestGroupGoTag_NestedParallel(t *testing.T) {
+	synctest.Test(t, testGroupGoTagNestedParallel)
+}
+func testGroupGoTagNestedParallel(t *testing.T) {
+	var (
+		eg, ctx             = WithContext(t.Context())
+		greatGrandparentTag = tlog.S("great-grandparent")
+		grandparentTag      = tlog.S("grandparent")
+		parentTag           = tlog.S("parent")
+		have1               = tlog.S("tag1")
+		have2               = tlog.S("tag2")
+		got1                string
+		got2                string
+		gots1               []string
+		gots2               []string
+	)
+	/* We'll need a few layers of tags to get to where we have to worry
+	about append overwriting things. */
+	eg.GoTag(ctx, greatGrandparentTag, func(ctx context.Context) error {
+		eg, ctx := WithContext(ctx)
+		eg.GoTag(ctx, grandparentTag, func(ctx context.Context) error {
+			eg, ctx := WithContext(ctx)
+			eg.GoTag(ctx, parentTag, func(
+				ctx context.Context,
+			) error {
+				eg, ctx := WithContext(ctx)
+				var (
+					startCh = make(chan struct{})
+					doneCh  = make(chan struct{})
+				)
+				eg.GoTag(ctx, have1, func(
+					ctx context.Context,
+				) error {
+					close(startCh)
+					<-doneCh
+					got1 = ContextTag(ctx)
+					gots1 = ContextTags(ctx)
+					return nil
+				})
+				<-startCh
+				eg.GoTag(ctx, have2, func(
+					ctx context.Context,
+				) error {
+					defer close(doneCh)
+					got2 = ContextTag(ctx)
+					gots2 = ContextTags(ctx)
+					return nil
+				})
+				return eg.Wait()
+			})
+			return eg.Wait()
+		})
+		return eg.Wait()
+	})
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Errorgroup returned error: %v", err)
+	}
+	check := func(t *testing.T, have, got string, gots []string) {
+		if want := have; got != want {
+			t.Errorf(
+				"Tag incorrect\nhave:%s\n got: %s\nwant: %s",
+				have,
+				got,
+				want,
+			)
+		}
+		if got, want := gots, []string{
+			greatGrandparentTag,
+			grandparentTag,
+			parentTag,
+			have,
+		}; !slices.Equal(
+			got,
+			want,
+		) {
+			t.Errorf(
+				"Tags incorrect\nhave: %s\n got: %s\nwant: %s",
+				have,
+				got,
+				want,
+			)
+		}
+	}
+	check(t, have1, got1, gots1)
+	check(t, have2, got2, gots2)
 }
