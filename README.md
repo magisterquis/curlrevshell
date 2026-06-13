@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@dev
+   go install github.com/magisterquis/curlrevshell@bettertests
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,16 +33,16 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@dev
+$ go install github.com/magisterquis/curlrevshell@bettertests
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
-go: downloading golang.org/x/exp v0.0.0-20260603202125-055de637280b
-go: downloading golang.org/x/net v0.55.0
-go: downloading golang.org/x/sync v0.20.0
-go: downloading golang.org/x/sys v0.45.0
-go: downloading golang.org/x/text v0.37.0
-go: downloading golang.org/x/tools v0.45.0
+go: downloading golang.org/x/exp v0.0.0-20260611194520-c48552f49976
+go: downloading golang.org/x/net v0.56.0
+go: downloading golang.org/x/sync v0.21.0
+go: downloading golang.org/x/sys v0.46.0
+go: downloading golang.org/x/text v0.38.0
+go: downloading golang.org/x/tools v0.46.0
 $ curlrevshell
-01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (dev branch)
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (bettertests branch)
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260525141458-77587f90b906+dirty (dev branch)
+Version v0.0.1-beta.8.0.20260605210810-aaadb9bf702e+dirty (bettertests branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
