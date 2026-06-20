@@ -2,6 +2,7 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
+<<<<<<< HEAD
 `betterio`
 ==========
 The following changes are available on this branch and will (probably) be in
@@ -9,9 +10,6 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterio
 ```
-- Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
-  less likely.
-- Updated dependencies.
 
 `dev`
 =====
@@ -26,6 +24,10 @@ go install github.com/magisterquis/curlrevshell@betterio
 - [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
   `</dev/null` with `2>&0` so we'll open it twice.
 - Get rid of tests' dependencies on [`jq`](https://jqlang.org).
+- [`ctxerrgroup`](./lib/ctxerrgroup): Tags and tag lineage now available
+  in GoTag'd goroutines.
+- Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
+  less likely.
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)

@@ -5,42 +5,50 @@ package tlog
  * Tests for failed tests for tlog.go
  * By J. Stuart McMurray
  * Created 20260215
- * Last Modified 20260216
+ * Last Modified 20260406
  */
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"testing"
 )
 
 // newMockLog returns the bits needed to test failed tests cases with a
-// LogBuffer.
-func newFailBuffer() (*slog.Logger, *LogBuffer, *mockT) {
+// Buffer.
+func newFailBuffer() (*slog.Logger, *Buffer, *mockT) {
 	var (
-		lb, sl = NewLogBuffer()
+		lb, sl = NewBuffer()
 		mt     = newMockT()
 	)
 	return sl, lb, mt
 }
 
 // Does CloseExpectEmpty handle not empty properly?
-func TestLogBufferCloseExpectEmpty_NotEmpty(t *testing.T) {
+func TestBufferCloseExpectEmpty_NotEmpty(t *testing.T) {
 	var (
 		msg        = "kittens"
 		sl, lb, mt = newFailBuffer()
 	)
 	sl.Info(msg)
-	lb.closeExpectEmpty(t.Context(), mt)
+	ok := lb.closeExpectEmpty(t.Context(), mt)
+	if ok {
+		t.Errorf("closeExpectEmpty returned false, but shouldn't have")
+	}
 	mt.Expect(t, []mockTMessage{
 		newMockTMessage(
 			false,
 			leftoverLogMessageMessage{Msg: M.Info(msg).String()},
 		),
 	})
+	if ok {
+		t.Errorf("Expect returned false, but shouldn't have")
+	}
 }
 
 // Does Expect handle incorrect messages?
-func TestLogBufferExpect_IncorrectMessages(t *testing.T) {
+func TestBufferExpect_IncorrectMessages(t *testing.T) {
 	var (
 		sl, lb, mt = newFailBuffer()
 		wantMsg    = M.Warn("m2")
@@ -58,7 +66,10 @@ func TestLogBufferExpect_IncorrectMessages(t *testing.T) {
 	wantMsgs = append(wantMsgs, M.Debug("m3"))
 
 	/* Do we find the incorrect message? */
-	lb.expect(t.Context(), mt, wantMsgs...)
+	ok := lb.expect(t.Context(), mt, wantMsgs...)
+	if ok {
+		t.Errorf("expect returned true, but shouldn't have")
+	}
 	mt.Expect(t, []mockTMessage{newMockTMessage(
 		false,
 		incorrectLogMessageMessage{
@@ -71,16 +82,22 @@ func TestLogBufferExpect_IncorrectMessages(t *testing.T) {
 }
 
 // Does TestEmptyAfterClose catch an extra message?
-func TestLogBufferTestEmptyAfterClose_NotEmpty(t *testing.T) {
+func TestBufferTestEmptyAfterClose_NotEmpty(t *testing.T) {
 	var (
 		msg        = "kittens"
 		sl, lb, mt = newFailBuffer()
 	)
 	if err := lb.Close(); nil != err {
-		t.Errorf("Error closing LogBuffer: %s", err)
+		t.Errorf("Error closing Buffer: %s", err)
 	}
 	sl.Info(msg)
-	lb.testEmptyAfterClose(mt)
+	ok := lb.testEmptyAfterClose(mt)
+	if ok {
+		t.Errorf(
+			"testEmptyAfterClose returned true, " +
+				"but shouldn't have",
+		)
+	}
 	mt.Expect(t, []mockTMessage{
 		newMockTMessage(
 			false,
@@ -89,8 +106,8 @@ func TestLogBufferTestEmptyAfterClose_NotEmpty(t *testing.T) {
 	})
 }
 
-// Does WithExpectEmpty work when the LogBuffer's not empty?
-func TestLogBufferWithExpectEmpty_NotEmpty(t *testing.T) {
+// Does WithExpectEmpty work when the Buffer's not empty?
+func TestBufferWithExpectEmpty_NotEmpty(t *testing.T) {
 	var (
 		m1         = "kittens"
 		m2         = "moose"
@@ -98,7 +115,10 @@ func TestLogBufferWithExpectEmpty_NotEmpty(t *testing.T) {
 	)
 	sl.Info(m1)
 	sl.Error(m2)
-	lb.WithExpectEmpty().expect(t.Context(), mt, M.Info(m1))
+	ok := lb.WithExpectEmpty().expect(t.Context(), mt, M.Info(m1))
+	if ok {
+		t.Errorf("expect returned true, but shouldn't have")
+	}
 	mt.Expect(t, []mockTMessage{
 		newMockTMessage(
 			false,
@@ -108,7 +128,7 @@ func TestLogBufferWithExpectEmpty_NotEmpty(t *testing.T) {
 }
 
 // Can we detect an incorrect message out of order?
-func TestLogBufferWithExpectUnordered_Incorrect(t *testing.T) {
+func TestBufferWithExpectUnordered_Incorrect(t *testing.T) {
 	var (
 		sl, lb, mt = newFailBuffer()
 		wantMsg    = M.Warn("m2")
@@ -126,7 +146,10 @@ func TestLogBufferWithExpectUnordered_Incorrect(t *testing.T) {
 	wantMsgs = append(wantMsgs, wantMsg)
 
 	/* Do we find the incorrect message? */
-	lb.WithExpectUnordered().expect(t.Context(), mt, wantMsgs...)
+	ok := lb.WithExpectUnordered().expect(t.Context(), mt, wantMsgs...)
+	if ok {
+		t.Errorf("expect returned true, but shouldn't have")
+	}
 	mt.Expect(t, []mockTMessage{
 		newMockTMessage(
 			false,
@@ -144,7 +167,7 @@ func TestLogBufferWithExpectUnordered_Incorrect(t *testing.T) {
 }
 
 // Can we handle not having as many messages as we expect?
-func TestLogBufferWithNoWait_MissingMessages(t *testing.T) {
+func TestBufferWithNoWait_MissingMessages(t *testing.T) {
 	var (
 		sl, lb, mt = newFailBuffer()
 		wantMsgs   []Msg
@@ -159,7 +182,10 @@ func TestLogBufferWithNoWait_MissingMessages(t *testing.T) {
 	wantMsgs = append(wantMsgs, M.Error("m4"))
 
 	/* Do we get an error or a panic? */
-	lb.WithNoWait().expect(t.Context(), mt, wantMsgs...)
+	ok := lb.WithNoWait().expect(t.Context(), mt, wantMsgs...)
+	if ok {
+		t.Errorf("expect returned true, but shouldn't have")
+	}
 	mt.Expect(t, []mockTMessage{newMockTMessage(
 		false,
 		errorWaitingForMessageMessage{
@@ -168,4 +194,38 @@ func TestLogBufferWithNoWait_MissingMessages(t *testing.T) {
 			Err: ErrBufferEmpty,
 		},
 	)})
+}
+
+// Do we get the right error checking unordered messages with an empty buffer
+// and a done context?
+func TestBufferCheckUnordered_EmptyBufferAndExpiredContext(t *testing.T) {
+	var (
+		_, lb, mt   = newFailBuffer()
+		cause       = fmt.Errorf("%s", S("cancel-cause"))
+		ctx, cancel = context.WithCancelCause(t.Context())
+		msg         = M.Info(S("msg"))
+	)
+
+	/* Cancel the context, so getting the next message ends early. */
+	cancel(cause)
+
+	/* Shouldn't get a message. */
+	ok := lb.WithExpectUnordered().expect(ctx, mt, msg)
+	if ok {
+		t.Errorf("ExpectReturned true, but shouldn't have")
+	}
+
+	/* Should get a test fail. */
+	mt.Expect(t, []mockTMessage{
+		newMockTMessage(false, errorWaitingForMessageMessage{
+			Idx: 1,
+			Len: 1,
+			Err: cause,
+		}),
+		newMockTMessage(false, unfoundLogMessageMessage{
+			Idx:  1,
+			Len:  1,
+			Want: msg,
+		}),
+	})
 }

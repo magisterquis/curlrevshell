@@ -5,12 +5,15 @@ package tlog
  * Tests for msg.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251216
+ * Last Modified 20260406
  */
 
 import (
 	"encoding/json"
+	"errors"
+	"math"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -424,4 +427,166 @@ func TestMsgWith_AddCompleteGroups(t *testing.T) {
 		)
 	}
 
+}
+
+// Do msgs work with error values?
+func TestMsgWith_ErrorValue(t *testing.T) {
+	var (
+		key  = "error"
+		err  = errors.New("moose")
+		want = `{"` + key + `":"` + err.Error() + `"}`
+	)
+	if got, err := M.With(key, err).ToJSON(); nil != err {
+		t.Fatalf("Error converting to JSON: %s", err)
+	} else if got != want {
+		t.Errorf("Incorrect JSON\n got %s\nwant: %s", got, want)
+	}
+}
+
+// Do JSON fails cause Clone fails?
+func TestMsgClone_InvalidJSON(t *testing.T) {
+	t.Run("marshal_fail", func(t *testing.T) {
+		got, err := M.With("NaN", math.NaN()).Clone()
+		if !got.IsZero() {
+			t.Errorf("Got non-zero Msg on error")
+		}
+		if jute, ok := errors.AsType[*json.UnsupportedValueError](
+			err,
+		); !ok {
+			t.Errorf(
+				"Incorrect error type\n got: %T\nwant: %T",
+				err,
+				jute,
+			)
+		}
+	})
+	t.Run("unmarshal_fail", func(t *testing.T) {
+		/* Message with a non-JSON-roundtrippable value. */
+		got, err := M.With("num", unparseable{}).Clone()
+		if !got.IsZero() {
+			t.Errorf("Got non-zero Msg on error")
+		}
+		if jute, ok := errors.AsType[*json.UnmarshalTypeError](
+			err,
+		); !ok {
+			t.Errorf(
+				"Incorrect error type\n got: %T\nwant: %T",
+				err,
+				jute,
+			)
+		}
+	})
+}
+
+// Does a panic happen on an invalid Clone?
+func TestMsgMustClone_Panic(t *testing.T) {
+	defer func() {
+		r := recover()
+		/* Should have panic'd. */
+		if nil == r {
+			t.Fatalf("Did not get a panic")
+			return
+		}
+		/* Should get an error passed to panic. */
+		err, ok := r.(error)
+		if !ok {
+			t.Fatalf("Did not get an error from recovered panic")
+		}
+		/* Should involve JSON marshalling. */
+		if jute, ok := errors.AsType[*json.UnsupportedValueError](
+			err,
+		); !ok {
+			t.Errorf(
+				"Incorrect error type\n got: %T\nwant: %T",
+				err,
+				jute,
+			)
+		}
+
+	}()
+	M.With("NaN", math.NaN()).MustClone()
+}
+
+// Does a panic happen on a message that can't be stringified?
+func TestMsgString_Panic(t *testing.T) {
+	defer func() {
+		r := recover()
+		/* Should have panic'd. */
+		if nil == r {
+			t.Fatalf("Did not get a panic")
+			return
+		}
+		/* Should get an error passed to panic. */
+		err, ok := r.(error)
+		if !ok {
+			t.Fatalf("Did not get an error from recovered panic")
+		}
+		/* Should involve JSON marshalling. */
+		if jute, ok := errors.AsType[*json.UnsupportedValueError](
+			err,
+		); !ok {
+			t.Errorf(
+				"Incorrect error type\n got: %T\nwant: %T",
+				err,
+				jute,
+			)
+		}
+
+	}()
+	s := M.With("NaN", math.NaN()).String()
+	t.Errorf("String returned string and did not panic: %s", s)
+}
+
+// Do we get the right errors when unmarshalling JSON to a Msg?
+func TestMsgUnmarshalJSON(t *testing.T) {
+	var (
+		k1 = S("k1")
+		m  = M.With(k1, "v1").WithGroup("g1")
+	)
+	/* jrt round-trips to/from MarshalJSON and returns any error returned
+	by Msg.UnmarshalJSON.  Other errors will be passed to t.Fatalf. */
+	jrt := func(t *testing.T, m Msg) error {
+		b, err := m.MarshalJSON()
+		if nil != err {
+			t.Fatalf("Marshalling to JSON: %s", err)
+		}
+		var n Msg
+		return n.UnmarshalJSON(b)
+	}
+	t.Run("invalid_path", func(t *testing.T) {
+		m := m.MustClone()
+		m.Path = append(m.Path, S("incorrect-path"))
+		if got, want := jrt(t, m), (groupPathMissingError{
+			Path: m.Path,
+		}); !errors.Is(got, want) {
+			t.Errorf(
+				"Incorrect error\n got: %s\nwant: %s",
+				got,
+				want,
+			)
+		}
+	})
+	t.Run("path_not_group", func(t *testing.T) {
+		m := m.MustClone()
+		m.Path = []string{k1}
+		if got, want := jrt(t, m), newGroupPathLeadsToNotGroupError(
+			m.Path,
+			m.Root[k1],
+		); !errors.Is(got, want) {
+			t.Errorf(
+				"Incorrect error\n got: %s\nwant: %s",
+				got,
+				want,
+			)
+		}
+	})
+}
+
+// unparseable marshals to valid JSON, but unmarshals to a number which causes
+// an overflow.
+type unparseable struct{}
+
+// MarshalJSON returns 10**1024, as a string of decimal digits.
+func (unparseable) MarshalJSON() ([]byte, error) {
+	return []byte("1" + string(slices.Repeat([]rune{'0'}, 1024))), nil
 }

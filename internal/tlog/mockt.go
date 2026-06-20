@@ -5,7 +5,7 @@ package tlog
  * Mock testing.T
  * By J. Stuart McMurray
  * Created 20260214
- * Last Modified 20260216
+ * Last Modified 20260430
  */
 
 import (
@@ -23,6 +23,7 @@ type ter interface {
 	Errorf(format string, args ...any)
 	Error(...any)
 	Fatalf(format string, args ...any)
+	Helper()
 }
 
 // mockTMessage contains a message logged via mockT.
@@ -63,6 +64,13 @@ func (m *mockT) Error(a ...any) { m.Errorf("%s", fmt.Sprint(a...)) }
 // with its Fatal field set.
 func (m *mockT) Fatalf(format string, args ...any) {
 	m.appendMessage(true, format, args...)
+}
+
+// Helper is a no-op.
+func (m *mockT) Helper() {
+	{
+		/* For test coverage numbers. */
+	}
 }
 
 // appendMessage appends a message to m.msgs.
