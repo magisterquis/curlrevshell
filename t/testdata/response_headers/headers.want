@@ -1,0 +1,5 @@
+Content-Type: text/plain; charset=utf-8
+Foo: bar
+HTTP/1.1 200 OK
+Tridge: baaz
+Tridge: quux

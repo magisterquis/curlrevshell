@@ -9,6 +9,9 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@httpheaders
 ```
+- Sneaky response-header spoofing by setting
+  `CURSREVSHELL_RESPONSE_HEADERS_FILE` to the name of a file with JSON [HTTP
+  headers](https://pkg.go.dev/net/http#Header).
 - Updated dependencies.
 
 `dev`

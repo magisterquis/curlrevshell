@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251008
+ * Last Modified 20260627
  */
 
 import (
@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"reflect"
 	"slices"
 	"strconv"
@@ -44,8 +45,15 @@ const (
 	LKListenAddr  = "address"
 )
 
-// ShutdownWait is how long we wait for cilents to disconnect on shutdown.
-const ShutdownWait = 4 * time.Second
+const (
+	// ShutdownWait is how long we wait for cilents to disconnect on shutdown.
+	ShutdownWait = 4 * time.Second
+
+	// ResponseHeadersEnvVar is the name of an environment variable which,
+	// if set, points to a file with a JSON object of HTTP headers to add
+	// to HTTP responses.
+	ResponseHeadersEnvVar = "CURSREVSHELL_RESPONSE_HEADERS_FILE"
+)
 
 // ErrOneShellClosed indicates that the listener was closed as expected after
 // receiving a single shell.
@@ -327,9 +335,20 @@ func (s *Server) watchIOBEvents(
 
 // serveHTTP starts HTTP Service going.
 func (s *Server) serveHTTP(ctx context.Context) error {
+	/* Set up handlers. */
+	fn := os.Getenv(ResponseHeadersEnvVar)
+	mux, err := addResponseHeaders(s.newMux(), fn)
+	if nil != err {
+		return fmt.Errorf(
+			"loading response headers from %s: %w",
+			fn,
+			err,
+		)
+	}
+
 	/* Set up a server. */
 	hsvr := http.Server{
-		Handler:  s.newMux(),
+		Handler:  mux,
 		ErrorLog: log.New(s.dw, "Server error: ", log.Lmsgprefix),
 		BaseContext: func(_ net.Listener) context.Context {
 			return ctx
@@ -347,7 +366,6 @@ func (s *Server) serveHTTP(ctx context.Context) error {
 		}
 		ech <- err
 	}()
-	var err error
 	select {
 	case err = <-ech:
 	case <-ctx.Done():
