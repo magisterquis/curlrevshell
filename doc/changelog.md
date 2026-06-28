@@ -3,7 +3,7 @@ Changelog
 This lists the feature creep present in each tagged version.
 
 `dev`
-=====
+-----
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
@@ -29,8 +29,9 @@ go install github.com/magisterquis/curlrevshell@dev
 - Tests are a little better.
 - Updated dependencies.
 
+
 `v0.0.1-beta.8` (2025-11-07)
-============================
+----------------------------
 - [`-template`](./flags.md#-template): Template (nearly) ALL the things!
 - [`crstemplate`](../lib/crstemplate): New library to make it slightly easier
   to roll fancypants `-template` templates.
@@ -118,8 +119,9 @@ go install github.com/magisterquis/curlrevshell@dev
 - Finally removed `-callback-template`.
 - Updated dependencies.
 
+
 `v0.0.1-beta.7` (2024-10-22)
-============================
+----------------------------
 - `-callback-template`: Missing templates are probably not what you want.  Red
   text should help.
 - Extracting Shell I/O from logs with [`jq`](https://jqlang.github.io/jq/) is
@@ -162,7 +164,7 @@ go install github.com/magisterquis/curlrevshell@dev
 
 
 `v0.0.1-beta.6` (2024-05-22)
-============================
+----------------------------
 - No more blank lines or repeated comamnds when up-arrowing.
 - Option+Left/Right works, at least in iTerm2/Terminal.app on a Mac.
 - Ctrl+O mutes output until it calms down, as requested by someone who found
@@ -173,7 +175,7 @@ go install github.com/magisterquis/curlrevshell@dev
 
 
 `v0.0.1-beta.5`
-===============
+---------------
 - Actually try to put the generated TLS certificate in `$HOME` if we can't find
   a cache directory.
 - Change date on LICENSE, only four months late.
@@ -192,7 +194,7 @@ go install github.com/magisterquis/curlrevshell@dev
 
 
 `v0.0.1-beta.4`
-===============
+---------------
 - `-icanhazip`: Guess callback address using [icanhazip.com](https://icanhazip.com).
 - `-log`: JSON logging.  Do _you_ remember what you did a month ago?
 - [`flags.md`](./flags.md): Do _I_ remember what all these flags do?
