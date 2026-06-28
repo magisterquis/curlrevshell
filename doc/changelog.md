@@ -26,6 +26,7 @@ go install github.com/magisterquis/curlrevshell@dev
   less likely.
 - [`sstls`](./lib/sstls) - Overwriting an archive now overwrites the whole
   archive and leaves no survivors.
+- Tests are a little better.
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)
