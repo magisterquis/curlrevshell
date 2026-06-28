@@ -49,7 +49,7 @@ tap_subtest "Response headers unset" subtest "$0" $LINENO
 
 # Does it work if we set headers from a file?
 TF=t/testdata/response_headers/headers
-export CURSREVSHELL_RESPONSE_HEADERS_FILE=${TF}.json
+export CURLREVSHELL_RESPONSE_HEADERS_FILE=${TF}.json
 WANT=$(<${TF}.want)
 tap_subtest "Response headers set" subtest "$0" $LINENO
 

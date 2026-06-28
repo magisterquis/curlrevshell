@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260627
+ * Last Modified 20260628
  */
 
 import (
@@ -52,7 +52,7 @@ const (
 	// ResponseHeadersEnvVar is the name of an environment variable which,
 	// if set, points to a file with a JSON object of HTTP headers to add
 	// to HTTP responses.
-	ResponseHeadersEnvVar = "CURSREVSHELL_RESPONSE_HEADERS_FILE"
+	ResponseHeadersEnvVar = "CURLREVSHELL_RESPONSE_HEADERS_FILE"
 )
 
 // ErrOneShellClosed indicates that the listener was closed as expected after
