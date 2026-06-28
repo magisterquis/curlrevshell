@@ -24,6 +24,8 @@ go install github.com/magisterquis/curlrevshell@dev
   in GoTag'd goroutines.
 - Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
   less likely.
+- [`sstls`](./lib/sstls) - Overwriting an archive now overwrites the whole
+  archive and leaves no survivors.
 - Updated dependencies.
 
 `v0.0.1-beta.8` (2025-11-07)

@@ -5,7 +5,7 @@ package sstls
  * Read and Save certs with an archive file
  * By J. Stuart McMurray
  * Created 20240327
- * Last Modified 20251011
+ * Last Modified 20261011
  */
 
 import (
@@ -83,7 +83,11 @@ func LoadCachedCertificate(certFile string) (tls.Certificate, error) {
 // as needed with 0755 permissions.
 func SaveCertificate(certFile string, certPEM, keyPEM []byte) error {
 	openFile := func() (*os.File, error) {
-		return os.OpenFile(certFile, os.O_CREATE|os.O_WRONLY, 0600)
+		return os.OpenFile(
+			certFile,
+			os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+			0600,
+		)
 	}
 	/* Try opening the file.  If we don't have enough directories it'll
 	fail and we'll try again. */
