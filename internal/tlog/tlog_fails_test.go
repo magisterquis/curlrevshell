@@ -5,7 +5,7 @@ package tlog
  * Tests for failed tests for tlog.go
  * By J. Stuart McMurray
  * Created 20260215
- * Last Modified 20260406
+ * Last Modified 20260613
  */
 
 import (
@@ -228,4 +228,47 @@ func TestBufferCheckUnordered_EmptyBufferAndExpiredContext(t *testing.T) {
 			Want: msg,
 		}),
 	})
+}
+
+// Can we detect unordred messages after a .WithExpectUnordered() ?
+func TestBufferWithExpectUnordered_CloneAffectsParent(t *testing.T) {
+	var (
+		sl, lb, mt = newFailBuffer()
+		m1         = S("m1")
+		m2         = S("m2")
+		m3         = S("m3")
+		m4         = S("m4")
+	)
+
+	/* Do an unordered check. */
+	sl.Info(m1)
+	sl.Info(m2)
+	lb.WithExpectUnordered().Expect(t.Context(), t,
+		M.Info(m2),
+		M.Info(m1),
+	)
+
+	/* Now an ordered check, should fail */
+	sl.Info(m3)
+	sl.Info(m4)
+	lb.expect(t.Context(), mt,
+		M.Info(m4),
+		M.Info(m3),
+	)
+
+	mt.Expect(t, []mockTMessage{
+		newMockTMessage(false, incorrectLogMessageMessage{
+			Idx:  1,
+			Len:  2,
+			Got:  M.Info(m3),
+			Want: M.Info(m4),
+		}),
+		newMockTMessage(false, incorrectLogMessageMessage{
+			Idx:  2,
+			Len:  2,
+			Got:  M.Info(m4),
+			Want: M.Info(m3),
+		}),
+	})
+
 }

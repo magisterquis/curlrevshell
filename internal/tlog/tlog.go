@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260515
+ * Last Modified 20260613
  */
 
 import (
@@ -74,8 +74,10 @@ func NewBuffer() (*Buffer, *slog.Logger) {
 // Clone returns a copy of l which shares l's underlying buffers and closed
 // atomic Bool.
 func (l *Buffer) Clone() *Buffer {
-	n := l
-	return n
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	n := *l
+	return &n
 }
 
 // Write adds the lines b to l's internal buffer with no newlines.

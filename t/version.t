@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20260103
+# Last Modified 20260628
 
 set -euo pipefail
 
@@ -202,10 +202,10 @@ WANT=$(go list -deps -f '
 tap_is "$GOT" "$WANT" "Correct downloaded modules in README" "$0" $LINENO
 
 # Make sure the top of the changelog has the right version
-GOT="$(egrep -B1 '^=+$' doc/changelog.md |
+GOT="$(egrep -B1 '^-+$' doc/changelog.md |
         egrep '^`' |
         cut -f 2 -d '`' |
-        head -n 1)"
+        head -n 1 ||:)"
 tap_is "$GOT" "$TAG" "Changelog has correct tag" "$0" $LINENO
 
 # Make sure the welome message in the README at least has the right branch for
