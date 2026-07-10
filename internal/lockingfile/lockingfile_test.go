@@ -5,7 +5,7 @@ package lockingfile
  * Tests for lockingfile.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251212
+ * Last Modified 20260710
  */
 
 import (
@@ -17,11 +17,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"syscall"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/internal/tlog"
 )
 
 func TestFile_Smoketest(t *testing.T) {
@@ -29,6 +32,20 @@ func TestFile_Smoketest(t *testing.T) {
 	fn := filepath.Join(t.TempDir(), "kittens")
 	if _, err := OpenFile(fn, os.O_WRONLY|os.O_CREATE, 0600); nil != err {
 		t.Fatalf("Error creating %s: %s", fn, err)
+	}
+}
+
+// Do we get an error if we can't open a file?
+func TestOpenFile_Error(t *testing.T) {
+	var (
+		fn   = filepath.Join(t.TempDir(), "doesnotexist")
+		want = syscall.ENOENT
+	)
+	if _, got := OpenFile(fn, os.O_RDWR|os.O_EXCL, 0); !errors.Is(
+		got,
+		want,
+	) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
 	}
 }
 
@@ -64,6 +81,27 @@ func TestFileWrite(t *testing.T) {
 				" got: %q\n"+
 				"want: %q",
 			haves,
+			got,
+			want,
+		)
+	}
+}
+
+// Are write errors reported?
+func TestFileWrite_Error(t *testing.T) {
+	/* We'll try to write to a directory, which should fail. */
+	f, err := OpenFile(t.TempDir(), os.O_RDONLY, 0)
+	if nil != err {
+		t.Fatalf("Error opening temporary directory: %v", err)
+	}
+	/* Should fail with EBADF, specifically. */
+	var want error = syscall.EBADF
+	/* Does it? */
+	if _, got := f.Write([]byte(tlog.S("msg"))); !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error writing to directory\n"+
+				" got: %v\n"+
+				"want: %v",
 			got,
 			want,
 		)
@@ -268,25 +306,6 @@ func TestFileWrite_pipe(t *testing.T) {
 		t.Fatalf("Error allocating pipe: %s", err)
 	}
 
-	/* Make sure locking a pipe isn't supported.  Test is kinda pointless
-	otherwise. */
-	rc, err := pw.SyscallConn()
-	if nil != err {
-		t.Fatalf("Error getting raw file: %s", err)
-	}
-	var lerr error
-	if err := rc.Control(func(fd uintptr) {
-		lerr = syscall.Flock(int(fd), syscall.LOCK_EX)
-	}); nil != err {
-		t.Fatalf("Error calling flock: %s", err)
-	} else if nil == lerr {
-		t.Skipf("Locking pipes is supported")
-	} else if !errors.Is(lerr, syscall.EOPNOTSUPP) {
-		t.Fatalf("Unexpected lock error: %s", lerr)
-	} else if err := unlockFile(pw); nil != err {
-		t.Fatalf("Unexpected unlock error: %s", err)
-	}
-
 	/* Make sure we can write happily. */
 	var (
 		buf  []byte
@@ -314,5 +333,47 @@ func TestFileWrite_pipe(t *testing.T) {
 			got,
 			want,
 		)
+	}
+}
+
+// Does flock fail when expected?
+func TestFlock_Errors(t *testing.T) {
+	/* Pipe, which we can't lock. */
+	p, _, err := os.Pipe()
+	if nil != err {
+		t.Fatalf("Error creating pipe: %v", err)
+	}
+
+	/* Pipe error, which is platform-dependent. */
+	var pErr error
+	switch runtime.GOOS {
+	case "darwin":
+		pErr = syscall.ENOTSUP
+	default:
+		pErr = syscall.EOPNOTSUPP
+	}
+
+	for n, c := range map[string]struct {
+		f    *os.File
+		want error
+	}{"nil_file": {
+		f:    nil,
+		want: os.ErrInvalid,
+	}, "pipe": {
+		f:    p,
+		want: pErr,
+	}} {
+		t.Run(n, func(t *testing.T) {
+			got := flock(c.f, syscall.LOCK_EX)
+			if !errors.Is(got, c.want) {
+				t.Errorf(
+					"Incorrect error\n"+
+						" got: %v\n"+
+						"want: %v",
+					got,
+					c.want,
+				)
+			}
+		})
 	}
 }

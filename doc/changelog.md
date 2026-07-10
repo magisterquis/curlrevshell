@@ -9,6 +9,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterlogging
 ```
+- Logfile locking should work better with non-file files.
 - Updated dependencies.
 
 `dev`
