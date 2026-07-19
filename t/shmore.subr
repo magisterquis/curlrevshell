@@ -2,7 +2,7 @@
 # Shell knockoff of Test::More
 # By J. Stuart McMurray
 # Created 20241109
-# Last Modified 20260401
+# Last Modified 20260627
 
 # Shmore's source repository is
 # https://github.com/magisterquis/shmore
@@ -42,7 +42,7 @@ tap_note() {(
 
 # SHMORE_VERSION is the version of shmore we're using.
 # shellcheck disable=SC2034 # Used by users of the library.
-SHMORE_VERSION=v1.0.0
+SHMORE_VERSION=v1.0.1
 
 # tap_like tests whether something we got matches a regex.  This uses Perl
 # under the hood.
