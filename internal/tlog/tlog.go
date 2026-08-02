@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260613
+ * Last Modified 20260722
  */
 
 import (
@@ -21,7 +21,7 @@ import (
 )
 
 // BufLen is the size of Buffer's internal buffers.
-const BufLen = 1024
+const BufLen = 10240
 
 // Buffer holds log messages received from the [slog.Logger] returned by
 // New.
