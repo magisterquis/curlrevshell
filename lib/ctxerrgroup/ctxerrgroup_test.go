@@ -5,7 +5,7 @@ package ctxerrgroup
  * Tests for ctxerrgroup.go
  * By J. Stuart McMurray
  * Created 20241226
- * Last Modified 20260605
+ * Last Modified 20260803
  */
 
 import (
@@ -409,34 +409,63 @@ func testGroupSetLimit(t *testing.T) {
 		mu        sync.Mutex
 		active    int
 		maxActive int
+		wg        sync.WaitGroup
+		done      = make(chan struct{}, nGo)
 	)
 
 	/* Only allow so many at once. */
 	eg.SetLimit(limit)
 
-	/* Spawn lots and lots of Goroutines and make sure we never have too
-	many. */
-	for range nGo {
-		go eg.Go(func() error {
-			/* Note we're running and how many we've peaked at
-			running. */
-			mu.Lock()
-			active++
-			maxActive = max(active, maxActive)
-			mu.Unlock()
-
-			/* Work for a long time. */
-			time.Sleep(time.Hour)
-
+	/* noteActive notes a goroutine's active and returns a func to note
+	it's no longer active.  It should be called like
+	defer noteActive()().  */
+	noteActive := func() func() {
+		/* Note we're running and how many we've peaked at
+		running. */
+		mu.Lock()
+		active++
+		maxActive = max(active, maxActive)
+		mu.Unlock()
+		/* Function to un-active us. */
+		return func() {
 			/* All done, note we're no longer running. */
 			mu.Lock()
 			active--
 			maxActive = max(active, maxActive)
 			mu.Unlock()
+		}
+	}
+
+	/* Spawn one that'll keep the errgroup from exiting if we get lucky
+	enough that everybody else exits before anybody else jumps in. */
+	eg.Go(func() error {
+		defer noteActive()()
+		for range nGo {
+			<-done
+		}
+		return nil
+	})
+
+	/* Spawn lots and lots of Goroutines and make sure we never have too
+	many. */
+	for range nGo {
+		eg.Go(func() error {
+			defer noteActive()()
+
+			/* Work for a long time. */
+			time.Sleep(time.Hour)
+
+			/* Note we're done, so the keeper-aliver can eventually
+			return as well. */
+			done <- struct{}{}
 
 			return nil
 		})
 	}
+
+	/* Wait until all goroutines have been queued and finished. */
+	wg.Wait()
+
 	/* Shouldn't have got one of these. */
 	if err := eg.Wait(); nil != err {
 		t.Errorf("Wait returned error: %v", err)
@@ -451,12 +480,13 @@ func testGroupSetLimit(t *testing.T) {
 	if maxActive != limit {
 		t.Errorf(
 			"Incorrect maximum number of running goroutines\n"+
-				"limit: %d\n"+
-				"  max: %d",
+				"     limit: %d\n"+
+				"max active: %d",
 			limit,
 			maxActive,
 		)
 	}
+
 }
 
 // Are we told if we're over the limit?
