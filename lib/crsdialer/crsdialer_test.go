@@ -5,7 +5,7 @@ package crsdialer
  * Tests for crsdialer.go
  * By J. Stuart McMurray
  * Created 20250905
- * Last Modified 20250924
+ * Last Modified 20260802
  */
 
 import (
@@ -61,7 +61,7 @@ func TestDial(t *testing.T) {
 			} else if nil != sr {
 				panic("duplicate Request")
 			}
-			if err := hsrv.StartFullDuplex(w); nil != err {
+			if err := hsrv.StartFullDuplex(w, r); nil != err {
 				panic("starting full duplex: " + err.Error())
 			}
 			sw, sr = w, r

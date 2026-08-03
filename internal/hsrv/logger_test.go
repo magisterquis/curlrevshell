@@ -5,103 +5,68 @@ package hsrv
  * Tests for logger.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20240924
+ * Last Modified 20270801
  */
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
-func TestServerPrintf(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
-	haveColor := opshell.ColorBlue
-	s.Printf(haveColor, "Hello, %s!", "Kittens")
-	want := opshell.CLine{
-		Color:       haveColor,
-		Line:        "Hello, Kittens!",
-		NoTimestamp: true,
-	}
-	if got := <-och; got != want {
+// Can we return the hostname from an address without a port?
+func TestRemoteHost_NoPort(t *testing.T) {
+	var (
+		req  = httptest.NewRequest(http.MethodGet, "/", nil)
+		host = tlog.S("host")
+	)
+
+	/* Request needs no port.  Not likely in practice, but for just in
+	case. */
+
+	/* Can we split it properly? */
+	req.RemoteAddr = host
+	if got, want := remoteHost(req), host; got != want {
 		t.Errorf(
-			"Incorrect message:\n got: %#v\nwant: %#v",
+			"Incorrect host\nhave: %s\n got: %s\nwant: %s",
+			req.RemoteAddr,
 			got,
 			want,
 		)
 	}
-	cl.ExpectEmpty(t)
 }
 
-func TestServerLogf(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
-	haveColor := opshell.ColorBlue
-	s.Logf(haveColor, "Hello, %s!", "Kittens")
-	want := opshell.CLine{
-		Color: haveColor,
-		Line:  "Hello, Kittens!",
-	}
-	if got := <-och; got != want {
-		t.Errorf(
-			"Incorrect message:\n got: %#v\nwant: %#v",
-			got,
-			want,
-		)
-	}
-	cl.ExpectEmpty(t)
-}
+// Test ALL the logging functions. */
+func TestServer_Logging(t *testing.T) {
+	_, _, och, _, _, s := newTestServer(t.Context(), t, nil)
+	var (
+		elf  = tlog.S("elf")
+		lf   = tlog.S("lf")
+		ra   = tlog.S("host")
+		relf = tlog.S("relf")
+		rlf  = tlog.S("rlf")
 
-func TestServerRLogf(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
-	haveColor := opshell.ColorBlue
-	haveR := httptest.NewRequest("GET", "http://127.0.0.1:4444", nil)
-	s.RLogf(haveColor, haveR, "Hello, %s!", "Kittens")
-	want := opshell.CLine{
-		Color: haveColor,
-		Line:  "[192.0.2.1] Hello, Kittens!",
-	}
-	if got := <-och; got != want {
-		t.Errorf(
-			"Incorrect message:\n got: %#v\nwant: %#v",
-			got,
-			want,
-		)
-	}
-	cl.ExpectEmpty(t)
-}
-
-func TestServerErrorLogf(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
-	s.ErrorLogf("Hello, %s!", "Kittens")
-	want := opshell.CLine{
-		Color: ErrorColor,
-		Line:  "Hello, Kittens!",
-	}
-	if got := <-och; got != want {
-		t.Errorf(
-			"Incorrect message:\n got: %#v\nwant: %#v",
-			got,
-			want,
-		)
-	}
-	cl.ExpectEmpty(t)
-}
-
-func TestServerRErrorLogf(t *testing.T) {
-	cl, _, och, s, _ := newTestServer(t)
-	haveR := httptest.NewRequest("GET", "http://127.0.0.1:4444", nil)
-	s.RErrorLogf(haveR, "Hello, %s!", "Kittens")
-	want := opshell.CLine{
-		Color: ErrorColor,
-		Line:  "[192.0.2.1] Hello, Kittens!",
-	}
-	if got := <-och; got != want {
-		t.Errorf(
-			"Incorrect message:\n got: %#v\nwant: %#v",
-			got,
-			want,
-		)
-	}
-	cl.ExpectEmpty(t)
+		req = &http.Request{RemoteAddr: ra}
+		tag = "[" + ra + "] "
+	)
+	s.errorLogf("errorLogf: %s", elf)
+	s.logf(opshell.ColorYellow, "logf: %s", lf)
+	s.rErrorLogf(req, "rErrorLogf: %s", relf)
+	s.rLogf(opshell.ColorCyan, req, "rLogf: %s", rlf)
+	opshell.ExpectShellMessages(t, och, []opshell.CLine{{
+		Color: opshell.ColorRed,
+		Line:  "errorLogf: " + elf,
+	}, {
+		Color: opshell.ColorYellow,
+		Line:  "logf: " + lf,
+	}, {
+		Color: opshell.ColorRed,
+		Line:  tag + "rErrorLogf: " + relf,
+	}, {
+		Color: opshell.ColorCyan,
+		Line:  tag + "rLogf: " + rlf,
+	}}...)
 }

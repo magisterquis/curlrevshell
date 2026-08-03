@@ -5,980 +5,1002 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250215
+ * Last Modified 20260802
  */
 
 import (
+	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/lib/crstemplate"
+	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
+// Can we generate a mux without blowing up?
 func TestServerNewMux_Smoketest(t *testing.T) {
-	_, _, _, s, _ := newTestServer(t)
+	_, _, _, _, _, s := newTestServer(t.Context(), t, nil)
 	s.newMux()
 }
 
-func TestServerFileHandler(t *testing.T) {
-	cl, _, och, s, _ := newTestServerMaybeWithDir(t, true)
-	data := "kittens"
-	fn := "fname"
-	ffn := filepath.Join(s.params.StaticFilesDir, fn)
+// Can we serve static files from a directory?
+func TestServerFileHandler_Dir(t *testing.T) {
+	var (
+		data                = tlog.S("data")
+		fn                  = tlog.S("fn")
+		index               = "index.html"
+		indexData           = tlog.S("index")
+		tb, _, och, _, c, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{
+				makeFDir: true,
+				noLogHI:  true,
+			},
+		)
+
+		ffn = filepath.Join(s.params.StaticFilesDir, fn)
+		ifn = filepath.Join(s.params.StaticFilesDir, "index.html")
+		m   = tlog.M.With(LKStaticFilesDir, s.params.StaticFilesDir)
+	)
+
+	/* Make a file to serve. */
 	if err := os.WriteFile(ffn, []byte(data), 0600); nil != err {
 		t.Fatalf("Error writing %s: %s", ffn, err)
 	}
 
-	/* Make sure directory listing works. */
-	t.Run("directory_listing", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		s.fileHandler(rr, httptest.NewRequest(
-			http.MethodGet,
-			"/",
-			nil,
-		))
-		if http.StatusOK != rr.Code {
-			t.Errorf("Non-OK Code %d", rr.Code)
+	/* get checks the path p on the server.  It calls t.Fatalf on error. */
+	try := func(
+		t *testing.T,
+		p string, /* Path to request. */
+		wantStatus int, /* HTTP status code we expect. */
+		wantBody string, /* Response body we expect. */
+		wantCLine opshell.CLine,
+		wantLog tlog.Msg,
+	) {
+		/* Make sure path starts with a /. */
+		p = "/" + strings.TrimLeft(p, "/")
+		/* Try to get the path. */
+		res, err := c.Get("https://" + s.l.Addr().String() + p)
+		if nil != err {
+			t.Fatalf("Error GETting %s: %v", p, err)
 		}
-		want := `<!doctype html>
-<meta name="viewport" content="width=device-width">
-<pre>
-<a href="` + fn + `">` + fn + `</a>
-</pre>
-`
-		if got := rr.Body.String(); got != want {
+		defer res.Body.Close()
+		/* Status ok? */
+		if got, want := res.StatusCode, wantStatus; got != want {
 			t.Errorf(
-				"Incorrect body:\n"+
-					"got:\n%s\n"+
-					"want:\n%s\n",
+				"Incorrect status\n got: %d (%s)\nwant: %d",
+				got, res.Status,
+				want,
+			)
+		}
+		/* Get the body. */
+		b, err := io.ReadAll(res.Body)
+		if nil != err {
+			t.Fatalf("Error reading response: %v", err)
+		}
+		/* Is it correct? */
+		if got, want := string(b), wantBody; got != want {
+			t.Errorf(
+				"Incorrect body\ngot:\n%s\nwant:\n%s",
 				got,
 				want,
 			)
 		}
-		wantLog := opshell.CLine{
-			Color: FileColor,
-			Line:  "[192.0.2.1] File requested: /",
+		/* Output correct? */
+		opshell.ExpectShellMessages(t, och, wantCLine)
+		/* Log correct? */
+		if !wantLog.IsZero() {
+			tb.Expect(t.Context(), t, wantLog)
 		}
-		if got := <-och; got != wantLog {
-			t.Errorf(
-				"Incorrect log message:\n got: %#v\nwant: %#v",
-				got,
-				wantLog,
-			)
-		}
-		cl.ExpectEmpty(
+	}
+
+	/* Can we get the file? */
+	t.Run("get file", func(t *testing.T) {
+		try(
 			t,
-			`{"time":"","level":"INFO","msg":"File requested",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"static_files_dir":"`+s.params.StaticFilesDir+
-				`"}`,
-		)
-	})
-	/* Make sure directory listing works. */
-	t.Run("file_in_directory", func(t *testing.T) {
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		s.fileHandler(rr, httptest.NewRequest(
-			http.MethodGet,
-			"/"+fn,
-			nil,
-		))
-		if http.StatusOK != rr.Code {
-			t.Errorf("Non-OK Code %d", rr.Code)
-		}
-		want := data
-		if got := rr.Body.String(); got != want {
-			t.Errorf(
-				"Incorrect body:\n"+
-					"got:\n%s\n"+
-					"want:\n%s\n",
-				got,
-				want,
-			)
-		}
-		wantLog := opshell.CLine{
-			Color: FileColor,
-			Line:  "[192.0.2.1] File requested: /" + fn,
-		}
-		if got := <-och; got != wantLog {
-			t.Errorf(
-				"Incorrect log message:\n got: %#v\nwant: %#v",
-				got,
-				wantLog,
-			)
-		}
-		cl.ExpectEmpty(
-			t,
-			`{"time":"","level":"INFO","msg":"File requested",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/`+fn+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"static_files_dir":"`+s.params.StaticFilesDir+
-				`"}`,
+			fn,
+			http.StatusOK,
+			data,
+			opshell.CLine{
+				Color: fileColor,
+				Line:  "[127.0.0.1] File requested: /" + fn,
+			},
+			m.
+				With(LKRequestedFile, "/"+fn).
+				Info(LMFileRequested),
 		)
 	})
 
-	t.Run("file", func(t *testing.T) {
-		cl, _, och, s, _ := newTestServerMaybeWithDir(t, true)
-		s.params.StaticFilesDir = ffn
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		dfn := "dummy"
-		s.fileHandler(rr, httptest.NewRequest(
-			http.MethodGet,
-			"/"+dfn,
-			nil,
-		))
-		if http.StatusOK != rr.Code {
-			t.Errorf("Non-OK Code %d", rr.Code)
+	/* Do we get a 404 for file that doesn't exist. */
+	t.Run("nonexistent file", func(t *testing.T) {
+		nfn := tlog.S("nope")
+		try(t,
+			nfn,
+			http.StatusNotFound,
+			"404 page not found\n",
+			opshell.CLine{
+				Color: fileColor,
+				Line:  "[127.0.0.1] File requested: /" + nfn,
+			},
+			m.
+				With(LKRequestedFile, "/"+nfn).
+				Info(LMFileRequested),
+		)
+	})
+
+	/* Do we get a directory listing? */
+	t.Run("directory listing", func(t *testing.T) {
+		try(t,
+			"/",
+			http.StatusOK,
+			`<!doctype html>
+<meta name="viewport" content="width=device-width">
+<pre>
+<a href="`+fn+`">`+fn+`</a>
+</pre>`+"\n",
+			opshell.CLine{
+				Color: fileColor,
+				Line:  "[127.0.0.1] File requested: /",
+			},
+			m.
+				With(LKRequestedFile, "/").
+				Info(LMFileRequested),
+		)
+	})
+
+	/* Does an index.html hide /? */
+	t.Run("index.html/file", func(t *testing.T) {
+		if err := os.WriteFile(
+			ifn,
+			[]byte(indexData),
+			0600,
+		); nil != err {
+			t.Fatalf("Error writing %s: %v", index, err)
 		}
-		want := data
-		if got := rr.Body.String(); got != want {
+		try(t,
+			"/",
+			http.StatusOK,
+			indexData,
+			opshell.CLine{
+				Color: fileColor,
+				Line:  "[127.0.0.1] File requested: /",
+			},
+			m.
+				With(LKRequestedFile, "/").
+				Info(LMFileRequested),
+		)
+		if err := os.Remove(ifn); nil != err {
+			t.Errorf("Error removing %s: %v", index, err)
+		}
+	})
+
+	/* What if the directory doesn't exist? */
+	t.Run("missing_dir", func(t *testing.T) {
+		origSFD := s.params.StaticFilesDir
+		s.params.StaticFilesDir = filepath.Join(
+			s.params.StaticFilesDir,
+			tlog.S("nope"),
+		)
+		try(t,
+			"/",
+			http.StatusInternalServerError,
+			"\n",
+			opshell.CLine{
+				Color: fileColor,
+				Line:  "[127.0.0.1] File requested: /",
+			},
+			tlog.Msg{},
+		)
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Color: errorColor,
+			Line: fmt.Sprintf(
+				"[127.0.0.1] Could not open %s: %v",
+				s.params.StaticFilesDir,
+				&os.PathError{
+					Op:   "open",
+					Path: s.params.StaticFilesDir,
+					Err:  syscall.ENOENT,
+				},
+			),
+		})
+		s.params.StaticFilesDir = origSFD
+	})
+}
+
+// Can we serve a single static file?
+func TestServerFileHandler_SingleFile(t *testing.T) {
+	var (
+		data                = tlog.S("data")
+		fn                  = filepath.Join(t.TempDir(), "fn")
+		tb, _, och, _, c, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{
+				makeFDir: true,
+				noLogHI:  true,
+			},
+		)
+
+		m = tlog.M.With(LKStaticFilesDir, fn)
+	)
+
+	/* Serve a single file. */
+	s.params.StaticFilesDir = fn
+	if err := os.WriteFile(fn, []byte(data), 0600); nil != err {
+		t.Fatalf("Error writing file: %v", err)
+	}
+
+	/* get checks the path p on the server.  It calls t.Fatalf on error. */
+	try := func(
+		t *testing.T,
+		p string, /* Path to request. */
+	) {
+		/* Try to get the path. */
+		res, err := c.Get("https://" + s.l.Addr().String() + p)
+		if nil != err {
+			t.Fatalf("Error GETting %q: %v", p, err)
+		}
+		defer res.Body.Close()
+		/* Status ok? */
+		if got, want := res.StatusCode, http.StatusOK; got != want {
 			t.Errorf(
-				"Incorrect body:\n"+
-					"got:\n%s\n"+
-					"want:\n%s\n",
+				"Incorrect status\n got: %d (%s)\nwant: %d",
+				got, res.Status,
+				want,
+			)
+		}
+		/* Get the body. */
+		b, err := io.ReadAll(res.Body)
+		if nil != err {
+			t.Fatalf("Error reading response: %v", err)
+		}
+		/* Is it correct? */
+		if got, want := string(b), data; got != want {
+			t.Errorf(
+				"Incorrect body\ngot:\n%s\nwant:\n%s",
 				got,
 				want,
 			)
 		}
-		wantLog := opshell.CLine{
-			Color: FileColor,
-			Line:  "[192.0.2.1] File requested: /" + dfn,
+		/* Output correct? */
+		if "" == p {
+			p = "/"
 		}
-		if got := <-och; got != wantLog {
-			t.Errorf(
-				"Incorrect log message:\n got: %#v\nwant: %#v",
-				got,
-				wantLog,
-			)
-		}
-		cl.ExpectEmpty(
-			t,
-			`{"time":"","level":"INFO","msg":"File requested",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/`+dfn+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"static_files_dir":"`+s.params.StaticFilesDir+
-				`"}`,
+		opshell.ExpectShellMessages(t, och, opshell.CLine{
+			Color: fileColor,
+			Line:  "[127.0.0.1] File requested: " + p,
+		})
+		/* Log correct? */
+		tb.Expect(t.Context(), t,
+			m.
+				With(LKRequestedFile, p).
+				Info(LMFileRequested),
 		)
-	})
-	cl.ExpectEmpty(t)
+	}
+
+	/* No matter what we request, we should get more or less the same
+	output. */
+	for n, c := range map[string]string{
+		"empty_path": "",
+		"filename":   "/filename",
+		"index.html": "/index.html",
+		"slash":      "/",
+	} {
+		t.Run(n, func(t *testing.T) { try(t, c) })
+	}
+}
+
+// Do we handle not being able to stat a file properly?
+func TestServerFileHandler_StatError(t *testing.T) {
+	var (
+		_, _, och, _, c, s = newTestServer(
+			context.WithValue(
+				t.Context(),
+				testCloseFileBeforeStatKey{},
+				true,
+			),
+			t,
+			&testServerConfig{
+				makeFDir: true,
+				noLogHI:  true,
+			},
+		)
+	)
+
+	/* Try to get the path. */
+	res, err := c.Get("https://" + s.l.Addr().String())
+	if nil != err {
+		t.Fatalf("GET error: %v", err)
+	}
+	defer res.Body.Close()
+	/* Status ok? */
+	if got, want := res.StatusCode,
+		http.StatusInternalServerError; got != want {
+		t.Errorf(
+			"Incorrect status\n got: %d (%s)\nwant: %d",
+			got, res.Status,
+			want,
+		)
+	}
+	/* Get the body. */
+	b, err := io.ReadAll(res.Body)
+	if nil != err {
+		t.Fatalf("Error reading response: %v", err)
+	}
+	/* Is it correct? */
+	if got, want := string(b), "\n"; got != want {
+		t.Errorf(
+			"Incorrect body\ngot:\n%s\nwant:\n%s",
+			got,
+			want,
+		)
+	}
+	/* Output correct? */
+	opshell.ExpectShellMessages(t, och,
+		opshell.CLine{
+			Color: fileColor,
+			Line:  "[127.0.0.1] File requested: /",
+		},
+		opshell.CLine{
+			Color: errorColor,
+			Line: fmt.Sprintf(
+				"[127.0.0.1] Could not get info about %s: %s",
+				s.params.StaticFilesDir,
+				&os.PathError{
+					Op:   "stat",
+					Path: s.params.StaticFilesDir,
+					Err:  os.ErrClosed,
+				},
+			),
+		},
+	)
 }
 
 /* Make sure closing stdin stops the handler. */
 func TestServerInputHandler_CloseStdin(t *testing.T) {
-	cl, ich, _, s, _ := newTestServer(t)
+	var (
+		buf                      = new(bytes.Buffer)
+		id                       = t.Name()
+		msgs                     = make([]string, 10)
+		rr                       = httptest.NewRecorder()
+		wg                       sync.WaitGroup
+		wantLogs                 []tlog.Msg
+		tb, ich, och, done, _, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{
+				noLogHI: true,
+				wantErr: iobroker.ErrInputClosed,
+			},
+		)
 
-	/* Roll a request */
-	id := t.Name()
-	rr := httptest.NewRecorder()
-	rr.Body = new(bytes.Buffer)
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/i/"+id,
-		nil,
+		req = httptest.NewRequestWithContext(
+			testCtxWithNoLogHI(t),
+			http.MethodGet,
+			"/"+s.params.URLPaths.In+"/"+id,
+			nil,
+		)
+		m = tlog.M.
+			With(iobroker.LKDirection, iobroker.LVInput).
+			With(iobroker.LKID, id)
 	)
+
+	/* Connect to the input side. */
+	rr.Body = buf
 	req.SetPathValue(idParam, id)
+	wg.Go(func() { s.inputHandler(rr, req) })
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(
+			t,
+			connectedColor,
+			req,
+			"Input connected: ID %s",
+			id,
+		),
+	)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMNewConnection),
+	)
 
-	/* Start the handler handling. */
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.inputHandler(rr, req)
-	}()
+	/* Send some input to make sure the handler's started. */
+	for i := range msgs {
+		msgs[i] = tlog.S("msg-" + strconv.Itoa(i))
+		wantLogs = append(wantLogs, m.
+			With(iobroker.LKData, msgs[i]+"\n").
+			Info(iobroker.LMShellIO),
+		)
+		ich <- msgs[i]
+	}
+	tb.Expect(t.Context(), t, wantLogs...)
 
-	/* Close the input and wait for the handler to return. */
+	/* Shell input get there? */
+	if got, want := buf.String(),
+		strings.Join(msgs, "\n")+"\n"; got != want {
+		t.Errorf(
+			"Incorrect shell input\n got: %q\nwant: %q",
+			got,
+			want,
+		)
+	}
+
+	/* Close the input and wait for everything to settle. */
 	close(ich)
 	wg.Wait()
+	<-done
 
-	/* Make sure we log the disconnect. */
-	cl.ExpectEmpty(t,
-		`{"time":"","level":"INFO","msg":"New connection",`+
-			`"http_request":{`+
-			`"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET",`+
-			`"request_uri":"/i/`+id+`",`+
-			`"protocol":"HTTP/1.1","host":"example.com",`+
-			`"sni":"","user_agent":"",`+
-			`"id":"`+id+`"},"direction":"input"}`,
-		`{"time":"","level":"INFO",`+
-			`"msg":"Disconnected","http_request":{`+
-			`"remote_addr":"192.0.2.1:1234","method":"GET",`+
-			`"request_uri":"/i/`+id+`","protocol":"HTTP/1.1",`+
-			`"host":"example.com","sni":"","user_agent":"",`+
-			`"id":"`+id+`"},"direction":"input"}`,
+	/* Logs correct? */
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(t, errorColor, req, "Input connection closed"),
+	)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMConnectionClosed),
 	)
 }
 
-func TestServerInputHandler(t *testing.T) {
-	cl, ich, och, s, shutdown := newTestServer(t)
+// Can we handle input connecting and then disconnecting?
+func TestServerInputHandler_Disconnect(t *testing.T) {
+	var (
+		buf         = new(bytes.Buffer)
+		id          = t.Name()
+		msgs        = make([]string, 10)
+		rr          = httptest.NewRecorder()
+		wantLogs    []tlog.Msg
+		wg          sync.WaitGroup
+		ctx, cancel = context.WithCancel(
+			testCtxWithNoLogHI(t),
+		)
+		tb, ich, och, _, _, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{noLogHI: true},
+		)
 
-	try := func(t *testing.T) {
-		/* Input lines. */
-		haveLines := []string{t.Name() + "line1", t.Name() + "line2"}
-		for _, l := range haveLines {
-			ich <- l
-		}
-
-		/* Make request as an implant. */
-		id := t.Name()
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(errors.New("test finished"))
-		req := httptest.NewRequest(
+		req = httptest.NewRequestWithContext(
+			ctx,
 			http.MethodGet,
-			"/i/"+id,
+			"/"+s.params.URLPaths.In+"/"+id,
 			nil,
-		).WithContext(ctx)
-		req.SetPathValue(idParam, id)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			s.inputHandler(rr, req)
-		}()
+		)
+		m = tlog.M.
+			With(iobroker.LKDirection, iobroker.LVInput).
+			With(iobroker.LKID, id)
+	)
+	defer cancel()
 
-		/* Should get a server message plus two input lines. */
-		wantErr := "test disconnect"
-		wantLogs := []string{
-			`{"time":"","level":"INFO","msg":"New connection",` +
-				`"http_request":{` +
-				`"remote_addr":"192.0.2.1:1234",` +
-				`"method":"GET",` +
-				`"request_uri":"/i/` + id + `",` +
-				`"protocol":"HTTP/1.1","host":"example.com",` +
-				`"sni":"","user_agent":"",` +
-				`"id":"` + id + `"},"direction":"input"}`,
-		}
-		for _, l := range haveLines {
-			msg := `{"time":"","level":"INFO",` +
-				`"msg":"Shell I/O","http_request":{` +
-				`"remote_addr":"192.0.2.1:1234",` +
-				`"method":"GET",` +
-				`"request_uri":"/i/` + id + `",` +
-				`"protocol":"HTTP/1.1","host":"example.com",` +
-				`"sni":"","user_agent":"","id":"` + id + `"},` +
-				`"direction":"input","data":"` + l + `\n"}`
-			wantLogs = append(wantLogs, msg)
-		}
-		cl.ExpectEmpty(t, wantLogs...)
+	/* Connect to the input side. */
+	rr.Body = buf
+	req.SetPathValue(idParam, id)
+	wg.Go(func() { s.inputHandler(rr, req) })
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(
+			t,
+			connectedColor,
+			req,
+			"Input connected: ID %s",
+			id,
+		),
+	)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMNewConnection),
+	)
 
-		/* Wait for the request to finish and server to end. */
-		cancel(errors.New(wantErr))
-		wg.Wait()
+	/* Send some input to make sure the handler's started. */
+	for i := range msgs {
+		msgs[i] = tlog.S("msg-" + strconv.Itoa(i))
+		wantLogs = append(wantLogs, m.
+			With(iobroker.LKData, msgs[i]+"\n").
+			Info(iobroker.LMShellIO),
+		)
+		ich <- msgs[i]
+	}
+	tb.Expect(t.Context(), t, wantLogs...)
 
-		/* Did it work? */
-		if http.StatusOK != rr.Code {
-			t.Errorf("Non-OK Code %d", rr.Code)
-		}
-		wantBody := strings.Join(haveLines, "\n") + "\n"
-		if got := rr.Body.String(); got != wantBody {
-			t.Errorf(
-				"Incorrect body:\n"+
-					"got:\n%s\n"+
-					"want:\n%s\n",
-				got,
-				wantBody,
-			)
-		}
-
-		/* Make sure shell output is good. */
-		wantCLines := []opshell.CLine{{
-			Color: ConnectedColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Input connected: ID %q",
-				id,
-			),
-		}, {
-			Color: ErrorColor,
-			Line: "[192.0.2.1] Input connection closed: " +
-				wantErr,
-		}, {
-			Color: ErrorColor,
-			Line: "[192.0.2.1] " +
-				iobroker.ShellDisconnectedMessage,
-		}}
-		wantCLines = appendCallbackHelp(t, s, wantCLines)
-		opshell.ExpectShellMessages(t, och, wantCLines...)
-
-		/* Make sure we log the disconnect. */
-		cl.ExpectEmpty(t, `{"time":"","level":"ERROR",`+
-			`"msg":"Disconnected","http_request":{`+
-			`"remote_addr":"192.0.2.1:1234","method":"GET",`+
-			`"request_uri":"/i/`+id+`","protocol":"HTTP/1.1",`+
-			`"host":"example.com","sni":"","user_agent":"",`+
-			`"id":"`+id+`"},"direction":"input",`+
-			`"error":"`+wantErr+`"}`,
+	/* Shell input get there? */
+	if got, want := buf.String(),
+		strings.Join(msgs, "\n")+"\n"; got != want {
+		t.Errorf(
+			"Incorrect shell input\n got: %q\nwant: %q",
+			got,
+			want,
 		)
 	}
 
-	/* Try a couple of times, to make sure multiple implants work. */
-	t.Run("kittens", try)
-	t.Run("moose", try)
-
-	/* Make sure we have no leftovers. */
-	opshell.ExpectNoShellMessages(t, och, shutdown)
-}
-
-func TestServerInputHandler_RejectSecondConnection(t *testing.T) {
-	cl, ich, och, s, shutdown := newTestServer(t)
-	defer close(ich) /* Don't keep server hanging. */
-
-	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancelCause(context.Background())
-	defer cancel(errors.New("test finished"))
-
-	/* First (connected) connection. */
-	t.Run("connected_connection", func(t *testing.T) {
-		id := "kittens"
-		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(
-			http.MethodGet,
-			"/i/"+id,
-			nil,
-		).WithContext(ctx)
-		req.SetPathValue(idParam, id)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			s.inputHandler(rr, req)
-		}()
-		wantCLine := []opshell.CLine{{
-			Color: ConnectedColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Input connected: ID %q",
-				id,
-			),
-		}}
-		opshell.ExpectShellMessages(t, och, wantCLine...)
-		cl.ExpectEmpty(
-			t,
-			`{"time":"","level":"INFO","msg":"New connection",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/i/`+id+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"`+id+`"},`+
-				`"direction":"input"}`,
-		)
-	})
-
-	/* Second (rejected) connection. */
-	t.Run("rejected_connection", func(t *testing.T) {
-		id := "moose"
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		req := httptest.NewRequest(http.MethodGet, "/i/"+id, nil)
-		req.SetPathValue(idParam, id)
-		s.inputHandler(rr, req)
-
-		/* Did it work? */
-		if want := http.StatusOK; want != rr.Code {
-			t.Errorf(
-				"Incorrect status code\n"+
-					" got: %d\n"+
-					"want: %d",
-				rr.Code,
-				want,
-			)
-		}
-		if got := len(rr.Body.String()); 0 != got {
-			t.Errorf("Response body non-empty, has %d bytes", got)
-		}
-		cl.ExpectEmpty(
-			t,
-			`{"time":"","level":"ERROR",`+
-				`"msg":"Connection already established",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/i/`+id+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"`+id+`"},`+
-				`"direction":"input"}`,
-		)
-		opshell.ExpectShellMessages(t, och, opshell.CLine{
-			Color: ErrorColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Rejected unexpected input connection with ID %q",
-				id,
-			),
-		})
-	})
-
-	/* Wait for the first connection to die. */
-	wantErr := "test disconnect"
-	cancel(errors.New(wantErr))
+	/* Disconnect the request and wait for everything to settle. */
+	cancel()
 	wg.Wait()
 
-	/* Make sure logs are good. */
-	wantCLines := []opshell.CLine{{
-		Color: ErrorColor,
-		Line:  "[192.0.2.1] Input connection closed: " + wantErr,
-	}, {
-		Color: ErrorColor,
-		Line:  "[192.0.2.1] Shell is gone :(",
-	}}
-	wantCLines = appendCallbackHelp(t, s, wantCLines)
-
-	opshell.ExpectShellMessages(t, och, wantCLines...)
-	cl.ExpectEmpty(
-		t,
-		`{"time":"","level":"ERROR","msg":"Disconnected",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET","request_uri":"/i/kittens",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"direction":"input",`+
-			`"error":"`+wantErr+`"}`,
+	/* Logs correct? */
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(t, errorColor, req, "Input connection closed"),
 	)
-	opshell.ExpectNoShellMessages(t, och, shutdown)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMConnectionClosed),
+	)
 }
 
+// Can we get shell output?
 func TestServerOutputHandler(t *testing.T) {
-	cl, ich, och, s, shutdown := newTestServer(t)
-	defer close(ich) /* Don't keep server hanging. */
-	output := "moose"
-	id := "kittens"
-
-	/* Normal output. */
-	t.Run("normal_output", func(t *testing.T) {
-		/* Roll a request. */
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		pr, pw := io.Pipe()
-		req := httptest.NewRequest(http.MethodGet, "/o/"+id, pr)
-		req.SetPathValue(idParam, id)
-
-		/* Send off the output but keep the request open. */
-		ech := make(chan error)
-		go func() {
-			if _, err := pw.Write([]byte(output)); nil != err {
-				ech <- fmt.Errorf("sending output: %w", err)
-			}
-			ech <- nil
-		}()
-
-		/* Connect to the output handler. */
-		go func() {
-			s.outputHandler(rr, req)
-
-			/* Did it work? */
-			if http.StatusOK != rr.Code {
-				ech <- fmt.Errorf("Non-OK Code %d", rr.Code)
-				return
-			}
-			if got := rr.Body.Len(); got != 0 {
-				ech <- fmt.Errorf(
-					"response body non-empty, "+
-						"has %d bytes",
-					got,
-				)
-			}
-			ech <- nil
-		}()
-
-		/* Wait until our output gets there. */
-		wantLogs := []opshell.CLine{{
-			Color: ConnectedColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Output connected: ID %q",
-				id,
-			),
-		}, {
-			Line:  output,
-			Plain: true,
-		}}
-		opshell.ExpectShellMessages(t, och, wantLogs...)
-
-		/* Disconnect. */
-		if err := pw.Close(); nil != err {
-			t.Errorf("Error closing output pipe: %s", err)
-		}
-		for range 2 {
-			err, ok := <-ech
-			if !ok {
-				t.Fatalf("Error channel unexpected closed")
-			} else if nil != err {
-				t.Errorf("Handle/Output error: %s", err)
-			}
-		}
-
-		/* Make sure our shell restarts itself. */
-		wantLogs = []opshell.CLine{{
-			Color: ErrorColor,
-			Line:  "[192.0.2.1] Output connection closed",
-		}, {
-			Color: ErrorColor,
-			Line: "[192.0.2.1] " +
-				iobroker.ShellDisconnectedMessage,
-		}}
-		wantLogs = appendCallbackHelp(t, s, wantLogs)
-		opshell.ExpectShellMessages(t, och, wantLogs...)
-
-		/* And make sure logs look good. */
-		cl.ExpectEmpty(
+	var (
+		ctx, cancel         = context.WithCancel(testCtxWithNoLogHI(t))
+		id                  = t.Name()
+		msgs                = make([]string, 10)
+		pr, pw              = io.Pipe()
+		rr                  = httptest.NewRecorder()
+		wantCLines          []opshell.CLine
+		wantLogs            []tlog.Msg
+		wg                  sync.WaitGroup
+		tb, _, och, _, _, s = newTestServer(
+			t.Context(),
 			t,
-			`{"time":"","level":"INFO","msg":"New connection",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/o/`+id+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"`+id+`"},`+
-				`"direction":"output"}`,
-			`{"time":"","level":"INFO","msg":"Shell I/O",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/o/`+id+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"",`+
-				`"id":"`+id+`"},"direction":"output",`+
-				`"data":"`+output+`"}`,
-			`{"time":"","level":"INFO","msg":"Disconnected",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/o/`+id+`",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"`+id+`"},`+
-				`"direction":"output"}`,
+			&testServerConfig{noLogHI: true},
 		)
-	})
 
-	/* Output for wrong ID. */
-	t.Run("wrong_id", func(t *testing.T) {
-		/* Make input request as an implant. */
-		irr := httptest.NewRecorder()
-		irr.Body = new(bytes.Buffer)
-		ctx, cancel := context.WithCancelCause(context.Background())
-		defer cancel(errors.New("test finished"))
-		ireq := httptest.NewRequest(
-			http.MethodGet,
-			"/i/"+id,
-			nil,
-		).WithContext(ctx)
-		ireq.SetPathValue(idParam, id)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			s.inputHandler(irr, ireq)
-		}()
-
-		/* Wait for the input to connect. */
-		wantCLine := opshell.CLine{
-			Color: ConnectedColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Input connected: ID %q",
-				id,
-			),
-		}
-		if got := <-och; wantCLine != got {
-			t.Fatalf(
-				"Incorrect input connected message:\n"+
-					" got: %#v\n"+
-					"want: %#v",
-				got,
-				wantCLine,
-			)
-		}
-
-		newid := "zoomies!"
-		rr := httptest.NewRecorder()
-		rr.Body = new(bytes.Buffer)
-		req := httptest.NewRequest(
-			http.MethodGet,
-			"/o/"+id,
-			strings.NewReader(output),
+		req = httptest.NewRequestWithContext(
+			ctx,
+			http.MethodPut,
+			"/"+s.params.URLPaths.Out+"/"+id,
+			pr,
 		)
-		req.SetPathValue(idParam, newid)
-		s.outputHandler(rr, req)
-
-		/* Wait for input handler to finish. */
-		wantErr := "test disconnect"
-		cancel(errors.New(wantErr))
-		wg.Wait()
-
-		/* Did it work? */
-		if want := http.StatusOK; want != rr.Code {
-			t.Fatalf(
-				"Incorrect status code\n"+
-					" got: %d\n"+
-					"want: %d",
-				rr.Code,
-				want,
-			)
-		}
-		if got := len(rr.Body.String()); 0 != got {
-			t.Errorf("Response body non-empty, has %d bytes", got)
-		}
-		wantLogs := []opshell.CLine{{
-			Color: ErrorColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] Rejected output "+
-					"connection with ID %q, expected %q",
-				newid,
-				id,
-			),
-		}, {
-			Color: ErrorColor,
-			Line: "[192.0.2.1] Input connection closed: " +
-				wantErr,
-		}, {
-			Color: ErrorColor,
-			Line: "[192.0.2.1] " +
-				iobroker.ShellDisconnectedMessage,
-		}}
-		wantLogs = appendCallbackHelp(t, s, wantLogs)
-		opshell.ExpectShellMessages(t, och, wantLogs...)
-		cl.ExpectEmpty(
-			t,
-			`{"time":"","level":"INFO","msg":"New connection",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/i/kittens",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"kittens"},`+
-				`"direction":"input"}`,
-			`{"time":"","level":"ERROR","msg":"Incorrect key",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/o/kittens",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"zoomies!"},`+
-				`"direction":"output","key":"kittens",`+
-				`"incorrect_key":"zoomies!"}`,
-			`{"time":"","level":"ERROR","msg":"Disconnected",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"GET","request_uri":"/i/kittens",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":"kittens"},`+
-				`"direction":"input",`+
-				`"error":"test disconnect"}`,
-		)
-	})
-
-	/* Server logs? */
-	cl.ExpectEmpty(t)
-	opshell.ExpectNoShellMessages(t, och, shutdown)
-}
-
-func TestServerOutputHandler_DisconnectInput(t *testing.T) {
-	cl, ich, och, s, shutdown := newTestServer(t)
-	defer close(ich) /* Don't keep server hanging. */
-	id := "kittens"
-	output := "moose"
-
-	/* Make input request as an implant. */
-	irr := httptest.NewRecorder()
-	irr.Body = new(bytes.Buffer)
-	ireq := httptest.NewRequest(
-		http.MethodGet,
-		"/i/"+id,
-		nil,
+		m = tlog.M.
+			With(iobroker.LKDirection, iobroker.LVOutput).
+			With(iobroker.LKID, id)
 	)
-	ireq.SetPathValue(idParam, id)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.inputHandler(irr, ireq)
-	}()
-
-	/* Wait for the input to connect. */
-	opshell.ExpectShellMessages(t, och, opshell.CLine{
-		Color: ConnectedColor,
-		Line:  fmt.Sprintf("[192.0.2.1] Input connected: ID %q", id),
-	})
-
-	/* Hook up output and handler and make sure shell output gets there. */
-	pr, pw := io.Pipe()
-	defer pw.Close()
+	defer cancel()
 	defer pr.Close()
-	orr := httptest.NewRecorder()
-	orr.Body = new(bytes.Buffer)
-	oreq := httptest.NewRequest(http.MethodGet, "/o/"+id, pr)
-	oreq.SetPathValue(idParam, id)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.outputHandler(orr, oreq)
-	}()
-	if _, err := pw.Write([]byte(output)); nil != err {
-		t.Fatalf("Failed to send output: %s", err)
-	}
-	pw.Close()
-	wantLogs := []opshell.CLine{{
-		Color: ConnectedColor,
-		Line:  fmt.Sprintf("[192.0.2.1] Output connected: ID %q", id),
-	}, {
-		Color: ConnectedColor,
-		Line:  "[192.0.2.1] " + iobroker.ShellReadyMessage,
-	}, {
-		Line:  output,
-		Plain: true,
-	}}
-	opshell.ExpectShellMessages(t, och, wantLogs...)
+	defer pw.Close()
 
-	/* Wait for input handler to finish as well. */
+	/* Connect to the output side. */
+	req.SetPathValue(idParam, id)
+	wg.Go(func() { s.outputHandler(rr, req) })
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(
+			t,
+			connectedColor,
+			req,
+			"Output connected: ID %s",
+			id,
+		),
+	)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMNewConnection),
+	)
+
+	/* Send some output to make sure the handler's started. */
+	for i := range msgs {
+		msgs[i] = tlog.S("msg-" + strconv.Itoa(i))
+		wantLogs = append(wantLogs, m.
+			With(iobroker.LKData, msgs[i]).
+			Info(iobroker.LMShellIO),
+		)
+		wantCLines = append(wantCLines, opshell.CLine{
+			Line:  msgs[i],
+			Plain: true,
+		})
+		if _, err := io.WriteString(pw, msgs[i]); nil != err {
+			t.Fatalf("Error sending output line: %v", err)
+		}
+	}
+
+	/* Did it get there? */
+	tb.Expect(t.Context(), t, wantLogs...)
+	opshell.ExpectShellMessages(t, och, wantCLines...)
+
+	/* Disconnect the request and wait for everything to settle. */
+	cancel()
 	wg.Wait()
 
-	/* Did it work? */
-	if http.StatusOK != irr.Code {
-		t.Errorf("Non-OK Input Code %d", irr.Code)
-	}
-	if http.StatusOK != orr.Code {
-		t.Errorf("Non-OK Output Code %d", orr.Code)
-	}
-	if got := irr.Body.Len(); got != 0 {
-		t.Errorf("Input response body non-empty, has %d bytes", got)
-	}
-	if got := orr.Body.Len(); got != 0 {
-		t.Errorf("Output response body non-empty, has %d bytes", got)
-	}
-	wantLogs = []opshell.CLine{{
-		Color: ErrorColor,
-		Line:  "[192.0.2.1] Output connection closed",
-	}, {
-		Color: ErrorColor,
-		Line:  "[192.0.2.1] Input connection closed",
-	}, {
-		Color: ErrorColor,
-		Line:  "[192.0.2.1] " + iobroker.ShellDisconnectedMessage,
-	}}
-	wantLogs = appendCallbackHelp(t, s, wantLogs)
-	opshell.ExpectShellMessages(t, och, wantLogs...)
-	cl.ExpectEmpty(
-		t,
-		`{"time":"","level":"INFO","msg":"New connection",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET","request_uri":"/i/kittens",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"direction":"input"}`,
-		`{"time":"","level":"INFO","msg":"New connection",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET","request_uri":"/o/kittens",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"direction":"output"}`,
-		`{"time":"","level":"INFO","msg":"Shell I/O",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET","request_uri":"/o/kittens",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},`+
-			`"direction":"output","data":"moose"}`,
-		`{"time":"","level":"INFO","msg":"Disconnected",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET","request_uri":"/o/kittens",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"direction":"output"}`,
-		`{"time":"","level":"INFO","msg":"Disconnected",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"GET","request_uri":"/i/kittens",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":"kittens"},"direction":"input"}`,
+	/* Logs correct? */
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(t, errorColor, req, "Output connection closed"),
 	)
-	opshell.ExpectNoShellMessages(t, och, shutdown)
+	tb.Expect(t.Context(), t,
+		m.
+			Info(iobroker.LMConnectionClosed),
+	)
 }
 
+// Can we hook up to both input and output simultaneously?
 func TestServerInOutHandler(t *testing.T) {
-	cl, ich, och, s, shutdown := newTestServer(t)
-	defer close(ich) /* Don't keep server hanging. */
+	var (
+		ctx, cancel           = context.WithCancel(t.Context())
+		exitMsg               = tlog.S("exit")
+		id                    = t.Name()
+		nMsgs                 = 10
+		pr, pw                = io.Pipe()
+		shellSuffix           = tlog.S("shell-suffix")
+		wg                    sync.WaitGroup
+		tb, ich, och, _, c, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{noLogHI: true},
+		)
 
-	/* Hook up a connection. */
-	pr, pw := io.Pipe()
-	rr := httptest.NewRecorder()
-	rr.Body = new(bytes.Buffer)
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/io",
+		m = tlog.M.
+			With(iobroker.LKID, id)
+		mB = m.
+			With(iobroker.LKDirection, iobroker.LVBidir)
+	)
+	defer cancel()
+	defer pr.Close()
+	defer pw.Close()
+
+	/* Connect to the server. */
+	addrCh := make(chan string, 1)
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		GotConn: func(ci httptrace.GotConnInfo) {
+			addrCh <- ci.Conn.LocalAddr().String()
+		},
+	})
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPut,
+		fmt.Sprintf(
+			"https://%s/%s/%s",
+			s.l.Addr(),
+			s.params.URLPaths.InOut,
+			id,
+		),
 		pr,
 	)
-
-	/* Set the handler handling. */
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.inOutHandler(rr, req)
-	}()
-
-	/* Make sure we got a connection. */
-	cl.ExpectUnordered(
-		t,
-		`{"time":"","level":"INFO","msg":"New connection",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"POST","request_uri":"/io",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":""},`+
-			`"direction":"output"}`,
-		`{"time":"","level":"INFO","msg":"New connection",`+
-			`"http_request":{"remote_addr":"192.0.2.1:1234",`+
-			`"method":"POST","request_uri":"/io",`+
-			`"protocol":"HTTP/1.1","host":"example.com","sni":"",`+
-			`"user_agent":"","id":""},`+
-			`"direction":"input"}`,
-	)
-	opshell.ExpectShellMessages(t, och, opshell.CLine{
-		Color: ConnectedColor,
-		Line: fmt.Sprintf(
-			"[192.0.2.1] %s",
-			iobroker.ShellReadyMessage,
-		),
-	})
-	if t.Failed() {
-		t.FailNow()
+	if nil != err {
+		t.Fatalf("Error rolling HTTP request: %v", err)
 	}
+	res, err := c.Do(req)
+	if nil != err {
+		t.Fatalf("Error sending request: %v", err)
+	}
+	defer res.Body.Close()
 
-	/* Make sure we can send to the shell. */
-	t.Run("input", func(t *testing.T) {
-		have := "kittens"
-		/* Send the input. */
-		ich <- have
-		/* Make sure we got it back and logged it properly. */
-		want := have + "\n"
-		wantJSON, err := json.Marshal(want)
-		if nil != err {
-			t.Fatalf("Error JSONifying %q: %s", want, err)
-		}
-		cl.Expect(
+	/* Add the RemoteAddr (really, local address) in the request for
+	checking logs. */
+	req.RemoteAddr = <-addrCh
+
+	/* Wait until the shell connects. */
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(
 			t,
-			`{"time":"","level":"INFO","msg":"Shell I/O",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"POST","request_uri":"/io",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"direction":"input",`+
-				`"data":`+string(wantJSON)+`}`,
-		)
-		if got := rr.Body.String(); got != want {
-			t.Errorf(
-				"Shell got wrong data:\n"+
-					"have: %q\n"+
-					" got: %q\n"+
-					"want: %q",
-				have,
-				got,
-				want,
-			)
+			iobroker.LogColor,
+			res.Request,
+			"Connected: ID %s",
+			id,
+		),
+		testReqCLine(
+			t,
+			iobroker.LogColor,
+			req,
+			iobroker.SMShellIsReady,
+		),
+	)
+	tb.Expect(t.Context(), t,
+		mB.
+			Info(iobroker.LMNewConnection),
+		mB.
+			Info(iobroker.LMShellStarting),
+	)
+
+	/* "Shell" just sends input back to output. */
+	wg.Go(func() {
+		/* Close the connection when we're done, analogous to a
+		shell exiting. */
+		defer cancel()
+		/* Read input lines. */
+		scanner := bufio.NewScanner(res.Body)
+		for scanner.Scan() {
+			l := scanner.Text()
+			/* exitMsg is like exit to a shell. */
+			if exitMsg == l {
+				return
+			}
+			/* Just proxy the line back to the opshell. */
+			if _, err := fmt.Fprintf(
+				pw,
+				"%s-%s",
+				l,
+				shellSuffix,
+			); nil != err {
+				t.Errorf("Error sending line %q: %v", l, err)
+				return
+			}
+		}
+		if err := scanner.Err(); nil != err {
+			t.Errorf("Error reading shell input: %v", err)
+			return
 		}
 	})
 
-	/* Make sure we can receive from the shell. */
-	t.Run("output", func(t *testing.T) {
+	/* Send some info through the shell. */
+	for i := range nMsgs {
 		var (
-			have = "kittens"
-			werr error
-			wg   sync.WaitGroup
+			msg  = tlog.S("msg-" + strconv.Itoa(i))
+			oMsg = msg + "-" + shellSuffix
+			iMsg = msg + "\n"
 		)
-		/* Send the output. */
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, werr = pw.Write([]byte(have))
-		}()
-		/* Make sure we logged it and displayed it properly. */
-		wantJSON, err := json.Marshal(have)
-		if nil != err {
-			t.Fatalf("Error JSONifying %q: %s", have, err)
-		}
-		cl.Expect(
-			t,
-			`{"time":"","level":"INFO","msg":"Shell I/O",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"POST","request_uri":"/io",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"direction":"output",`+
-				`"data":`+string(wantJSON)+`}`,
-		)
+		ich <- msg
 		opshell.ExpectShellMessages(t, och, opshell.CLine{
-			Line:  have,
+			Line:  oMsg,
 			Plain: true,
 		})
-		/* Make sure our write actually worked. */
-		wg.Wait()
-		if nil != werr {
-			t.Errorf("Error sending shell output: %s", err)
-		}
-	})
-
-	/* Make sure we disconnect properly. */
-	t.Run("disconnect", func(t *testing.T) {
-		/* Kill our shell. */
-		pw.Close()
-		/* Make sure we got a connection. */
-		cl.ExpectUnordered(
-			t,
-			`{"time":"","level":"INFO","msg":"Disconnected",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"POST","request_uri":"/io",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"direction":"input"}`,
-			`{"time":"","level":"INFO","msg":"Disconnected",`+
-				`"http_request":{`+
-				`"remote_addr":"192.0.2.1:1234",`+
-				`"method":"POST","request_uri":"/io",`+
-				`"protocol":"HTTP/1.1","host":"example.com",`+
-				`"sni":"","user_agent":"","id":""},`+
-				`"direction":"output"}`,
+		tb.WithExpectUnordered().Expect(t.Context(), t,
+			m.
+				With(iobroker.LKData, iMsg).
+				With(
+					iobroker.LKDirection,
+					iobroker.LVInput,
+				).
+				Info(iobroker.LMShellIO),
+			m.
+				With(iobroker.LKData, oMsg).
+				With(
+					iobroker.LKDirection,
+					iobroker.LVOutput,
+				).
+				Info(iobroker.LMShellIO),
 		)
-		wantCLines := []opshell.CLine{{
-			Color: ErrorColor,
-			Line: fmt.Sprintf(
-				"[192.0.2.1] %s",
-				iobroker.ShellDisconnectedMessage,
-			),
-		}}
-		wantCLines = appendCallbackHelp(t, s, wantCLines)
-		opshell.ExpectShellMessages(t, och, wantCLines...)
-		opshell.ExpectNoShellMessages(t, och, shutdown)
-	})
+	}
+
+	/* Tell the shell to exit. */
+	ich <- exitMsg
+	tb.Expect(t.Context(), t, m.
+		With(iobroker.LKData, exitMsg+"\n").
+		With(iobroker.LKDirection, iobroker.LVInput).
+		Info(iobroker.LMShellIO),
+	)
+
+	/* Disconnect the request and wait for everything to settle. */
+	wg.Wait()
+
+	/* Logs correct? */
+	opshell.ExpectShellMessages(t, och,
+		testReqCLine(
+			t,
+			iobroker.ErrColor,
+			req,
+			iobroker.SMConnectionClosed,
+		),
+		testReqCLine(
+			t,
+			iobroker.ErrColor,
+			req,
+			iobroker.SMShellIsGone,
+		),
+	)
+	tb.Expect(t.Context(), t,
+		mB.
+			Info(iobroker.LMConnectionClosed),
+		mB.
+			Info(iobroker.LMShellFinished),
+	)
 }
 
-// appendCallbackHelp appends the expected To get a shell: lines to clines and
-// returns the appended slice.
-func appendCallbackHelp(
-	t *testing.T,
-	s *Server,
-	clines []opshell.CLine,
-) []opshell.CLine {
-	clines = append(clines, []opshell.CLine{{
-		Color: ScriptColor,
-		Line:  "To get a shell:",
-	}}...)
-	for _, l := range lAddrLines(t, s, crstemplate.SubtemplateCallback) {
-		clines = append(clines, opshell.CLine{
-			Color:       ScriptColor,
-			Line:        l,
-			NoTimestamp: true,
-		})
+// Do we add correct connection metadata?
+func TestServerRequestLogger(t *testing.T) {
+	var (
+		addrCh              = make(chan string, 1)
+		method              = http.MethodGet
+		path                = "/" + tlog.S("path")
+		uaCh                = make(chan string, 1)
+		sni                 = tlog.S("sni")
+		tb, _, och, _, c, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{makeFDir: true},
+		)
+	)
+
+	/* Configure the client to send an SNI. */
+	c.Transport.(*http.Transport).TLSClientConfig.ServerName = sni
+
+	/* Connect to the server, request /, and get our local address and
+	user-agent string in the process. */
+	req, err := http.NewRequestWithContext(
+		httptrace.WithClientTrace(t.Context(), &httptrace.ClientTrace{
+			GotConn: func(ci httptrace.GotConnInfo) {
+				addrCh <- ci.Conn.LocalAddr().String()
+			},
+			WroteHeaderField: func(key string, value []string) {
+				if "User-Agent" ==
+					http.CanonicalHeaderKey(key) {
+					select {
+					case uaCh <- strings.Join(value, "!"):
+					default:
+						t.Errorf(
+							"Multiple User-Agent " +
+								"strings",
+						)
+					}
+				}
+			},
+		}),
+		method,
+		fmt.Sprintf("https://%s%s", s.l.Addr(), path),
+		nil,
+	)
+	if nil != err {
+		t.Fatalf("Error rolling HTTP request: %v", err)
 	}
-	return clines
+	res, err := c.Do(req)
+	if nil != err {
+		t.Fatalf("Error sending request: %v", err)
+	}
+	defer res.Body.Close()
+	req.RemoteAddr = <-addrCh
+
+	/* Logs ok? */
+	ra := s.l.Addr().String()
+	opshell.ExpectShellMessages(t, och, testReqCLine(
+		t,
+		fileColor,
+		req,
+		"File requested: %s", path,
+	))
+	tb.Expect(t.Context(), t,
+		tlog.M.
+			With(LKRequestInfo, map[string]any{
+				"remote_addr": req.RemoteAddr,
+				"method":      method,
+				"request_uri": path,
+				"protocol":    req.Proto,
+				"host":        ra,
+				"sni":         sni,
+				"user_agent":  <-uaCh,
+				"id":          "",
+			}).
+			With(LKRequestedFile, path).
+			With(LKStaticFilesDir, s.params.StaticFilesDir).
+			Info(LMFileRequested),
+	)
+}
+
+// Do we handle failures to enable duplex mode properly?
+func TestStartFullDuplex_Error(t *testing.T) {
+	var (
+		_, _, och, _, _, s = newTestServer(
+			t.Context(),
+			t,
+			&testServerConfig{noLogHI: true},
+		)
+		req = httptest.NewRequest(http.MethodPost, "/", nil)
+		rr  = httptest.NewRecorder()
+		buf = new(bytes.Buffer)
+	)
+
+	/* Try to handle in/out with a writer which doesn't support duplex. */
+	rr.Body = buf
+	s.inOutHandler(rr, req)
+
+	/* Shouldn't have got an error or body. */
+	if http.StatusOK != rr.Code {
+		t.Errorf("Unexpect response code: %v", rr.Code)
+	}
+	if 0 != buf.Len() {
+		t.Errorf("Unexpected response body: %q", buf.String())
+	}
+
+	/* But should be warned. */
+	opshell.ExpectShellMessages(t, och, testReqCLine(
+		t,
+		errorColor,
+		req,
+		"Error starting duplex comms: enabling full duplex: %v",
+		http.ErrNotSupported,
+	))
+}
+
+// Can we add testNoLogHIKey to t.Context?
+func TestTestCtxWithNoLogHI(t *testing.T) {
+	ctx := testCtxWithNoLogHI(t)
+	v := ctx.Value(testNoLogHIKey{})
+	if nil == v {
+		t.Fatalf("Value not set")
+	}
+	b, ok := v.(bool)
+	if !ok {
+		t.Fatalf("Value not a bool")
+	}
+	if !b {
+		t.Fatalf("Value was false")
+	}
+}
+
+// Can we make a tagged CLine from an httptest.NewRequest request?
+func TestTestReqCLine_httptestNewRequest(t *testing.T) {
+	var (
+		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		n   = 123
+		s   = tlog.S("s")
+	)
+
+	/* Work out the tag. */
+	h, _, ok := strings.Cut(req.RemoteAddr, ":")
+	if !ok {
+		t.Fatalf("Remote address %q had no colon", req.RemoteAddr)
+	}
+
+	got := testReqCLine(t, opshell.ColorRed, req, "%d %s", 123, s)
+	want := opshell.CLine{
+		Color: opshell.ColorRed,
+		Line:  "[" + h + "] " + strconv.Itoa(n) + " " + s,
+	}
+
+	if got != want {
+		t.Errorf("CLine incorrect\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// testResponseRecoderFlushError is an http.ResponseWriter with a FlushError
+// method that always returns the embedded error.
+type testResponseRecorderErrFlush struct {
+	*httptest.ResponseRecorder
+	feErr error
+}
+
+// FlushError returns rr.feErr.
+func (rr testResponseRecorderErrFlush) FlushError() error { return rr.feErr }
+
+// EnableFullDuplex returns nil.
+func (rr testResponseRecorderErrFlush) EnableFullDuplex() error { return nil }
+
+// Do we handle an inability to flush properly?
+func TestStartFullDuplex_FlushError(t *testing.T) {
+	var (
+		rr = &testResponseRecorderErrFlush{
+			ResponseRecorder: httptest.NewRecorder(),
+			feErr:            fmt.Errorf("%s", tlog.S("err")),
+		}
+		req = httptest.NewRequest(http.MethodGet, "/", nil)
+	)
+	if got, want := StartFullDuplex(
+		rr,
+		req,
+	), rr.feErr; !errors.Is(got, want) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// testCtxWithNoLogHI returns t.Context plus testNoLogHIKey set in the context.
+func testCtxWithNoLogHI(t *testing.T) context.Context {
+	return context.WithValue(t.Context(), testNoLogHIKey{}, true)
+}
+
+// testReqCLine returns a CLine tagged with req's RemoteAddr.
+func testReqCLine(
+	t *testing.T,
+	color opshell.Color,
+	req *http.Request, /* Tag from RemoteAddr. */
+	f string, a ...any, /* Rest of the line. */
+) opshell.CLine {
+	t.Helper()
+	h, _, err := net.SplitHostPort(req.RemoteAddr)
+	if nil != err {
+		t.Fatalf(
+			"Error getting host from remote address %q: %v",
+			req.RemoteAddr,
+			err,
+		)
+	}
+	return opshell.CLine{
+		Color: color,
+		Line:  fmt.Sprintf("[%s] %s", h, fmt.Sprintf(f, a...)),
+	}
 }

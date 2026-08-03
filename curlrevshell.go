@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251212
+ * Last Modified 20270802
  */
 
 import (
@@ -282,11 +282,7 @@ Options:
 	)
 
 	/* And an adapter betwen io.{Read,Writ}er and channels. */
-	iob, err := iobroker.New(ich, och)
-	if nil != err {
-		log.Printf("Error setting up comms between subsystems: %s", err)
-		return 3
-	}
+	iob := iobroker.New(och)
 
 	/* Set up logging.  If we're not writing to a logfile, we'll just kinda
 	discard log messages.  Beats checking for nil, anyways. */
@@ -392,13 +388,10 @@ Options:
 		sl,
 		*addr,
 		*tmplf,
-		ich,
-		och,
 		iob,
 		*certFile,
 		cbAddrs,
 		*printIPv6,
-		*oneShell,
 		*printDebug,
 		crstemplate.Params{
 			StaticFilesDir: *fdir,
@@ -420,11 +413,16 @@ Options:
 		return 2
 	}
 
+	/* Print helpful help messages. */
+	svr.RegisterOneLiners()
+
 	/* Start ALL the things. */
 	eg, ectx := ctxerrgroup.WithContext(context.Background())
 	eg.GoTag(ectx, "shell", shell.Do)
 	eg.GoTag(ectx, "server", svr.Do)
-	eg.GoTag(ectx, "i/o broker", iob.Do)
+	eg.GoTag(ectx, "i/o broker", func(ctx context.Context) error {
+		return iob.Run(ctx, ich, *oneShell)
+	})
 
 	/* SIGUSR1 is equivalent to Ctrl+I. */
 	eg.GoContext(ectx, func(ctx context.Context) error {
@@ -445,8 +443,10 @@ Options:
 	err = eg.Wait()
 	shell.SetPrompt("")
 	if nil != err &&
+		!errors.Is(err, hsrv.ErrOneShellClosed) &&
 		!errors.Is(err, io.EOF) &&
-		!errors.Is(err, hsrv.ErrOneShellClosed) {
+		!errors.Is(err, iobroker.ErrInputClosed) &&
+		!errors.Is(err, opshell.ErrInputDone) {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
 		sl.Info(LMTerminating, hsrv.LKError, err)
 		return 1

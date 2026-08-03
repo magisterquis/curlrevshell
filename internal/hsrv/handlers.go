@@ -5,63 +5,57 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250905
+ * Last Modified 20260801
  */
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"reflect"
+	"strings"
 	"testing"
 )
 
-// Log messages and keys.
 const (
-	LMFileRequested = "File requested"
-
-	LKStaticFilesDir = "static_files_dir"
-)
-
-const (
-	// ClosingListenerMessage is what we print to tell the user we're
-	// closing the listener after getting a shell when we've also got
-	// -one-shell.
-	ClosingListenerMessage = "Closing listener, because -" + OneShellFlag
-
 	// OneShellFlag is the flag we use to indicate we only want one shell.
 	OneShellFlag = "one-shell"
 )
 
-const (
-	// idParam is the named value in the path for the implant ID.
-	idParam = "id"
+// idParam is the named value in the path for the implant ID.
+const idParam = "id"
+
+type (
+	// testNoLogHIKey disables logging HTTP info, if found in a context
+	// during testing.
+	testNoLogHIKey struct{}
+	// testCloseFileBeforeStatKey causes fileHandler to close the file it
+	// has open before calling Stat on it, for error injection.
+	testCloseFileBeforeStatKey struct{}
 )
 
 // newMux returns a new ServeMux, ready to serve.
 func (s *Server) newMux() *http.ServeMux {
-	mux := http.NewServeMux()
+	var (
+		mux = http.NewServeMux()
+		p   = s.params
+	)
 
 	/* Shell I/O handler. */
-	mux.HandleFunc("/"+s.params.URLPaths.InOut, s.inOutHandler)
-	mux.HandleFunc("/"+s.params.URLPaths.InOut+"/", s.inOutHandler)
+	mux.HandleFunc("/"+p.URLPaths.InOut, s.inOutHandler)
+	mux.HandleFunc("/"+p.URLPaths.InOut+"/", s.inOutHandler)
+	mux.HandleFunc("/"+p.URLPaths.InOut+"/{"+idParam+"}", s.inOutHandler)
 	/* Shell input handler. */
-	mux.HandleFunc(
-		"/"+s.params.URLPaths.In+"/{"+idParam+"}",
-		s.inputHandler,
-	)
+	mux.HandleFunc("/"+p.URLPaths.In+"/{"+idParam+"}", s.inputHandler)
 	/* Shell output handler. */
-	mux.HandleFunc(
-		"/"+s.params.URLPaths.Out+"/{"+idParam+"}",
-		s.outputHandler,
-	)
+	mux.HandleFunc("/"+p.URLPaths.Out+"/{"+idParam+"}", s.outputHandler)
 	/* Callback script handler. */
-	mux.HandleFunc("/"+s.params.URLPaths.Script, s.scriptHandler)
-	mux.HandleFunc("/"+s.params.URLPaths.Script+"/", s.scriptHandler)
+	mux.HandleFunc("/"+p.URLPaths.Script, s.scriptHandler)
+	mux.HandleFunc("/"+p.URLPaths.Script+"/", s.scriptHandler)
 
 	/* If we're serving static files, do that. */
-	if "" != s.params.StaticFilesDir {
+	if "" != p.StaticFilesDir {
 		mux.HandleFunc("/", s.fileHandler)
 	}
 
@@ -71,15 +65,15 @@ func (s *Server) newMux() *http.ServeMux {
 // fileHandler logs and serves files.
 func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 	sl := s.requestLogger(r).With(
-		LKStaticFilesDir,
-		s.params.StaticFilesDir,
+		LKRequestedFile, r.URL.String(),
+		LKStaticFilesDir, s.params.StaticFilesDir,
 	)
 
 	/* Work out what to send back. */
-	s.RLogf(FileColor, r, "File requested: %s", r.URL)
+	s.rLogf(fileColor, r, "File requested: %s", r.URL)
 	f, err := os.Open(s.params.StaticFilesDir)
 	if nil != err {
-		s.RErrorLogf(
+		s.rErrorLogf(
 			r,
 			"Could not open %s: %s",
 			s.params.StaticFilesDir,
@@ -89,9 +83,19 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
+
+	/* Fault injection. */
+	if testing.Testing() {
+		if bv, ok := r.Context().Value(
+			testCloseFileBeforeStatKey{},
+		).(bool); ok && bv {
+			f.Close()
+		}
+	}
+
 	fi, err := f.Stat()
 	if nil != err {
-		s.RErrorLogf(
+		s.rErrorLogf(
 			r,
 			"Could not get info about %s: %s",
 			s.params.StaticFilesDir,
@@ -121,54 +125,64 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 // inputHandler sends input to a shell.
 func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
-	s.iob.ConnectIn(
+	s.iob.HandleInput(
 		r.Context(),
 		s.requestLogger(r),
+		r.PathValue(idParam),
 		remoteHost(r),
 		w,
-		r.PathValue(idParam),
 	)
 }
 
 // outputHandler receives output from a shell.
 func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
-	s.iob.ConnectOut(
+	s.iob.HandleOutput(
 		r.Context(),
 		s.requestLogger(r),
+		r.PathValue(idParam),
 		remoteHost(r),
 		r.Body,
-		r.PathValue(idParam),
 	)
 }
 
 // inOutHandler handles both input and output for a shell.
 func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
-	if err := StartFullDuplex(w); nil != err {
-		s.RErrorLogf(r, "Starting duplex comms: %s", err)
+	if err := StartFullDuplex(w, r); nil != err {
+		s.rErrorLogf(r, "Error starting duplex comms: %s", err)
+		return
 	}
-	s.iob.ConnectInOut(
+	s.iob.HandleBidirectional(
 		r.Context(),
 		s.requestLogger(r),
+		r.PathValue(idParam),
 		remoteHost(r),
-		w,
-		r.Body,
+		newRequestRWC(w, r),
 	)
 }
 
 // StartFullDuplex enables full duplex mode on w, if possible.  This is
-// necessary for some clients which are waiting on a go-ahead. */
-func StartFullDuplex(w http.ResponseWriter) error {
+// necessary for some clients which are waiting on a go-ahead.
+func StartFullDuplex(w http.ResponseWriter, r *http.Request) error {
 	rc := http.NewResponseController(w)
 
 	/* Full duplex is required by real HTTP clients, but doesn't work
 	with the handler-tester. */
-	if err := rc.EnableFullDuplex(); nil != err &&
-		!(testing.Testing() && errors.Is(err, http.ErrNotSupported)) {
+	if err := rc.EnableFullDuplex(); nil != err {
 		return fmt.Errorf("enabling full duplex: %w", err)
 	}
 
+	/* If we expect a 100 Continue, write it.  Ideally this would happen
+	when we start reading, but there's no way to guarantee we'll read
+	before we start writing, which will write a 200.
+
+	Kinda fragile, see https://github.com/golang/go/issues/67555 */
+
 	/* Write the header from the get-go.  Helps with clients waiting on
 	a proper go-ahead. */
+	if expects100Continue(r) {
+		w.WriteHeader(http.StatusContinue)
+	}
+
 	if err := rc.Flush(); nil != err {
 		return fmt.Errorf(
 			"sending initial HTTP response header: %w",
@@ -181,14 +195,25 @@ func StartFullDuplex(w http.ResponseWriter) error {
 
 // requestLogger returns a log.Logger which has information about r.
 func (s *Server) requestLogger(r *http.Request) *slog.Logger {
+	sl := s.sl
+
+	/* We may skip this for testing. */
+	if testing.Testing() {
+		if noHI, ok := r.Context().Value(
+			testNoLogHIKey{},
+		).(bool); ok && noHI {
+			return sl
+		}
+	}
+
 	/* Work out the SNI, which may or may not exyist. */
 	var sni string
 	if nil != r.TLS {
 		sni = r.TLS.ServerName
 	}
 	/* Logger with ALL the info. */
-	return s.sl.With(slog.Group(
-		"http_request",
+	return sl.With(slog.Group(
+		LKRequestInfo,
 		"remote_addr", r.RemoteAddr,
 		"method", r.Method,
 		"request_uri", r.RequestURI,
@@ -198,4 +223,18 @@ func (s *Server) requestLogger(r *http.Request) *slog.Logger {
 		"user_agent", r.UserAgent(),
 		"id", r.PathValue(idParam),
 	))
+}
+
+// expects100Continue attempts to determine if r expects a 100 Continue reply.
+func expects100Continue(r *http.Request) bool {
+	/* HTTP library may have done it for us, though it'd be nice to not
+	rely on an unexported type. */
+	if "*http.expectContinueReader" == reflect.TypeOf(r.Body).String() {
+		return true
+	}
+	/* Look for it in headers.  Edge cases are abundant, though. */
+	return strings.Contains(
+		strings.ToLower(r.Header.Get("Expect")),
+		"100-continue",
+	)
 }

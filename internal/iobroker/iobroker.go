@@ -1,446 +1,220 @@
-// Package iobroker converts io.Read/Writers into opshell channels.
+// Package iobroker - Hook up io.Read/Writers to opshell channels
 package iobroker
 
 /*
  * iobroker.go
- * Turn stream I/O into shell-friendly I/O
+ * Hook up io.Read/Writers to opshell channels
  * By J. Stuart McMurray
- * Created 20240919
- * Last Modified 20250314
+ * Created 20260620
+ * Last Modified 20260803
  */
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/subtle"
-	"errors"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"strings"
 	"sync"
+	"sync/atomic"
+	"testing"
 
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
-// bidirKeyLen is the size of the bidirectional sentinel key, in bytes.
-const bidirKeyLen = 1024
+// streamDir is the direction of a stream connection, input or output.
+type streamDir string
 
-// sDirection is a stream direction
-type sDirection string
+// Shell messages and Log messages, keys, and values. */
+const (
+	LMAlreadyConnected = "Connection already established"
+	LMConnectionClosed = "Connection closed"
+	LMIDIncorrect      = "ID incorrect"
+	LMIDMissing        = "ID missing"
+	LMNewConnection    = "New connection"
+	LMShellFinished    = "Shell finished"
+	LMShellIO          = "Shell I/O"
+	LMShellStarting    = "Shell starting"
+	LMUnknownInputType = "Unknown input type"
 
-// Broker handles I/O From shells.  It ensures only one shell is connected
-// at once, but also makes sure it disconnects properly.
+	LKData      = "data"
+	LKDirection = "direction"
+	LKError     = "error"
+	LKID        = "id"
+	LKType      = "type"
+
+	LVBidir  streamDir = "bidirectional"
+	LVInput  streamDir = "input"
+	LVOutput streamDir = "output"
+
+	SMBufferingInput   = "Buffering input until a shell connects..."
+	SMConnectionClosed = "Connection closed"
+	SMShellIsGone      = "Shell is gone :("
+	SMShellIsReady     = "Shell is ready to go!"
+)
+
+type (
+	// testRunStartedKey is used to extract a channel from a context for
+	// notifying tests run has started.
+	testRunStartedKey struct{}
+	// testHandleSingleShellStartedKey is used to extract a func() from
+	// a context for notifying tests the first handleSingleShell is
+	// starting.  The func() should probably be idempotent.
+	handleSingleShellStartedKey struct{}
+)
+
+// Broker allows io.Read/Writers to be hooked up to opshell channels.  It
+// ensures at most one input and one output stream are connected at the same
+// time, and disconnects a connected input stream if the connected output
+// stream disconnects.
+// With the exception of Run, Broker's methods are safe for simultaneous use
+// from multiple goroutines.
 type Broker struct {
-	mu        sync.Mutex
-	key       string
-	cancelIn  func()
-	cancelOut func()
-	bidirKey  string /* Bidirectional sentinel key. */
-	wg        sync.WaitGroup
-	noMore    bool
-
-	evMu        sync.Mutex
-	evCh        chan Event
-	evListeners map[chan<- Event]struct{}
-
-	ich <-chan string
+	/* output Channel. */
 	och chan<- opshell.CLine
+
+	/* Channels for sending stream info to/from handlers. */
+	isiCh      chan inputStreamInfo
+	osiCh      chan outputStreamInfo
+	closeOSICh func() /* sync.OnceFunc. */
+	closeISICh func() /* sync.OnceFunc. */
+
+	/* Connected stream ID's and such. */
+	streamIDMu   sync.Mutex
+	inStreamID   string
+	outStreamID  string
+	shellStarted bool /* Logged that we got a shell. */
+
+	/* Closed after ich is closed. */
+	inputDone      <-chan struct{} /* ich is closed. */
+	closeInputDone func()          /* sync.OnceFunc. */
+
+	/* Help messages to be printed before accepting shells. */
+	helpMessagesMu sync.Mutex
+	helpMessages   []helpMessage
+
+	runStarted atomic.Bool
 }
 
-// New returns a new Broker, ready for use.  New's methods are safe for
-// concurrent usage.
-func New(ich <-chan string, och chan<- opshell.CLine) (*Broker, error) {
-	/* Work out a bidirectional sentinel key. */
-	bidirKeyBuf := make([]byte, bidirKeyLen)
-	if _, err := rand.Read(bidirKeyBuf); nil != err {
-		return nil, fmt.Errorf(
-			"generatting random bidirectional sentinel key: %w",
-			err,
-		)
-	}
+// New returns a new Broker, ready for use.  Call its Run method to
+// start it going.
+func New(och chan<- opshell.CLine) *Broker {
+	var (
+		inputDone = make(chan struct{})
+		isiCh     = make(chan inputStreamInfo)
+		osiCh     = make(chan outputStreamInfo)
+	)
 	return &Broker{
-		ich:         ich,
-		och:         och,
-		bidirKey:    string(bidirKeyBuf),
-		evCh:        make(chan Event, EVChanLen),
-		evListeners: make(map[chan<- Event]struct{}),
-	}, nil
+		och:            och,
+		isiCh:          isiCh,
+		osiCh:          osiCh,
+		closeOSICh:     sync.OnceFunc(func() { close(osiCh) }),
+		closeISICh:     sync.OnceFunc(func() { close(isiCh) }),
+		inputDone:      inputDone,
+		closeInputDone: sync.OnceFunc(func() { close(inputDone) }),
+	}
 }
 
-// Do starts the broker going.  Specifically, it starts events processing.
-func (b *Broker) Do(ctx context.Context) error {
-	eg, ectx := errgroup.WithContext(ctx)
-	eg.Go(func() error { b.processEvents(ectx); return nil })
-	eg.Go(func() error {
-		<-ectx.Done() /* Wait for a shutdown. */
-		/* Don't allow more connections. */
-		b.mu.Lock()
-		b.noMore = true
-		b.mu.Unlock()
-		/* Wait for connections to finish. */
-		b.wg.Wait()
+// Run starts the broker going.
+// If oneShell is true, after the first time an input stream and output stream
+// are simultaneously connected, no new connections will be accepted and
+// Run will return when the streams disconnect.
+func (b *Broker) Run(
+	ctx context.Context,
+	ich <-chan string,
+	oneShell bool,
+) error {
+	/* Idempotency. */
+	if !b.runStarted.CompareAndSwap(false, true) {
+		panic(errBrokerAlreadyRunning)
+	}
+
+	/* Let future streams know we're done, when we're done. */
+	defer func() {
+		b.closeOSICh()
+		b.closeISICh()
+		b.closeInputDone()
+	}()
+
+	if testing.Testing() {
+		if ch, ok := ctx.Value(
+			testRunStartedKey{},
+		).(chan struct{}); ok {
+			close(ch)
+		}
+	}
+
+	/* Input's also done when we're shutting down. */
+	defer context.AfterFunc(ctx, b.closeInputDone)
+
+	/* Guiding principle: We only do things when we own ich/och; no exiting
+	on context done if we don't have ich/och. */
+	for !b.isInputDone() && nil == ctx.Err() {
+		/* Print help messages, e.g. To Get a Shell... */
+		b.printHelpMessages(ctx)
+
+		/* Accept and handle a single shell. */
+		b.handleSingleShell(ctx, ich)
+
+		/* Don't do this again if we're only handling one shell. */
+		if oneShell && nil == ctx.Err() {
+			return ErrOneShell
+		}
+	}
+
+	/* If the input stream is closed, let everybody else know. */
+	if b.isInputDone() {
+		return ErrInputClosed
+	}
+
+	/* Anything else is just the context closing. */
+	return nil
+}
+
+// handleSingleShell accepts and handles a single shell.
+func (b *Broker) handleSingleShell(
+	ctx context.Context,
+	ich <-chan string,
+) {
+	/* Tell interested tests we're starting. */
+	if testing.Testing() {
+		if f, ok := ctx.Value(
+			handleSingleShellStartedKey{},
+		).(func()); ok {
+			f()
+		}
+	}
+
+	/* Wrangler of goroutines. */
+	eg, ctx := ctxerrgroup.WithContext(ctx)
+	shellDone := make(chan struct{})
+	defer close(shellDone)
+
+	/* Input stream.  We accept multiple input streams per output
+	stream so as to disconnect input when output disconnects.  As a
+	side-effect, beaconing for input is possible, albeit somewhat
+	awkward. */
+	eg.GoTag(ctx, "input", func(ctx context.Context) error {
+		for !b.isInputDone() && nil == ctx.Err() {
+			b.runInput(ctx, ich)
+		}
 		return nil
 	})
-	return eg.Wait()
+
+	/* Output stream.  We pass och to an output stream and wait
+	for it back. */
+	eg.GoTag(ctx, "output", func(ctx context.Context) error {
+		err := b.runOutput(ctx, b.och, shellDone)
+		return err
+	})
+
+	/* Wait for this shell to be done.  Returned errors are fake. */
+	eg.Wait()
 }
 
-// ConnectIn connects w to a shell with the given key, which should match
-// a corresponding call to ConnectOut.  Addr is used for logging.
-func (b *Broker) ConnectIn(
-	ctx context.Context,
-	sl *slog.Logger,
-	addr string,
-	w io.Writer,
-	key string,
-) {
-	b.connect(
-		ctx,
-		sl,
-		addr,
-		&b.cancelIn,
-		&b.cancelOut,
-		LVInput,
-		key,
-		func(ctx context.Context, sl *slog.Logger) error {
-			return b.proxyIn(ctx, sl, w)
-		},
-	)
-}
-
-// ConnectOut connects r to a shell with the given key, which should match
-// a corresponding call to ConnectOut.
-func (b *Broker) ConnectOut(
-	ctx context.Context,
-	sl *slog.Logger,
-	addr string,
-	r io.Reader,
-	key string,
-) {
-	b.connect(
-		ctx,
-		sl,
-		addr,
-		&b.cancelOut,
-		&b.cancelIn,
-		LVOutput,
-		key,
-		func(ctx context.Context, sl *slog.Logger) error {
-			return b.proxyOut(ctx, sl, r)
-		},
-	)
-}
-
-// ConnectInOut connects a bidirectional connection to a shell.  w and r may
-// be the same io.ReadWriter.
-func (b *Broker) ConnectInOut(
-	ctx context.Context,
-	sl *slog.Logger,
-	addr string,
-	w io.Writer,
-	r io.Reader,
-) {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		b.ConnectIn(ctx, sl, addr, w, b.bidirKey)
-	}()
-	go func() {
-		defer wg.Done()
-		b.ConnectOut(ctx, sl, addr, r, b.bidirKey)
-	}()
-	wg.Wait()
-}
-
-// connect makes sure we can use this stream.  It makes sure there's not
-// already a cancel function in f and that the key is correct.
-func (b *Broker) connect(
-	ctx context.Context,
-	sl *slog.Logger,
-	addr string,
-	cancelUs *func(),
-	cancelOther *func(),
-	dir sDirection,
-	key string,
-	proxy func(context.Context, *slog.Logger) error,
-) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	/* Make sure we're not no longer accepting connections. */
-	if b.noMore {
-		return
+// isInputDone indicates whether b.inputDone is closed.
+func (b *Broker) isInputDone() bool {
+	select {
+	case <-b.inputDone:
+		return true
+	default:
+		return false
 	}
-	b.wg.Add(1)
-	defer b.wg.Done()
-
-	/* dirT is the direction, capitalized. */
-	dirT := cases.Title(language.English).String(string(dir))
-
-	/* Need a key. */
-	if "" == key {
-		sl.Error(LMKeyMissing)
-		b.Errorf(addr, "Missing Key")
-		return
-	}
-
-	/* Log with the proper direction. */
-	sl = sl.With(LKDirection, dir)
-
-	/* Make sure the previous shell isn't still disconnecting. */
-	if "" == b.key && (nil != *cancelUs || nil != *cancelOther) {
-		sl.Error(LMDisconnecting)
-		if key == b.bidirKey {
-			b.Errorf(
-				addr,
-				"Rejected %s side of bidirectional "+
-					"connection while waiting for shell "+
-					"disconnect",
-				string(dir),
-			)
-		} else {
-			b.Errorf(
-				addr,
-				"Rejected %s connection with ID %q "+
-					"while waiting for shell disconnect",
-				string(dir),
-				key,
-			)
-		}
-		return
-	}
-
-	/* Don't double-connect. */
-	if nil != *cancelUs {
-		sl.Error(LMAlreadyConnected)
-		if key == b.bidirKey {
-			b.Errorf(
-				addr,
-				"Rejected unexpected %s side of "+
-					"bidirectinoal connection",
-				string(dir),
-			)
-		} else {
-			b.Errorf(
-				addr,
-				"Rejected unexpected %s connection with ID %q",
-				string(dir),
-				key,
-			)
-		}
-		return
-	}
-
-	/* Make sure we have the right key if something's already connected. */
-	if "" != b.key && 1 != subtle.ConstantTimeCompare(
-		[]byte(key),
-		[]byte(b.key),
-	) {
-		sl.Error(
-			LMIncorrectKey,
-			LKKey, b.key,
-			LKIncorrectKey, key,
-		)
-		if key == b.bidirKey {
-			b.Errorf(
-				addr,
-				"Rejected %s side of bidirectonal "+
-					"connection, expected unidirectional "+
-					"%s connection with ID %q",
-				string(dir),
-				string(dir),
-				b.key,
-			)
-		} else {
-			b.Errorf(
-				addr,
-				"Rejected %s connection with ID %q, "+
-					"expected %q",
-				string(dir),
-				key,
-				b.key,
-			)
-		}
-		return
-	}
-
-	/* Looks like we're all set. */
-	cctx, cancel := context.WithCancel(ctx)
-	*cancelUs = cancel
-
-	/* Note we've a new connection. */
-	sl.Info(LMNewConnection)
-	if key != b.bidirKey {
-		b.Logf(addr, "%s connected: ID %q", dirT, key)
-	}
-
-	/* If we've got both sides, let the user know. */
-	if nil != *cancelUs && nil != *cancelOther {
-		b.Logf(addr, "%s", ShellReadyMessage)
-		b.evCh <- Event{Type: EventTypeConnected}
-	}
-
-	/* Everything looks good.  Set the key to prevent the wrong output
-	connection and unlock b for now.
-	We'll lock it again befor we exit. */
-	b.key = key
-	b.mu.Unlock()
-
-	/* Actually do the proxy. */
-	ct := "connection"
-	if key == b.bidirKey {
-		ct = "side of bidirectional " + ct
-	}
-	msg := fmt.Sprintf("%s %s closed", dirT, ct)
-	if err := proxy(cctx, sl); nil != err {
-		sl.Error(LMDisconnected, LKError, err)
-		b.Errorf(addr, "%s: %s", msg, err)
-	} else {
-		sl.Info(LMDisconnected)
-		if key != b.bidirKey {
-			b.Errorf(addr, "%s", msg)
-		}
-	}
-
-	/* Relock B, which will be unlocked by a defer, above, and start the
-	shell disconnecting. */
-	b.mu.Lock()
-	b.key = ""
-	*cancelUs = nil
-	if f := *cancelOther; nil != f {
-		go f() /* Avoid deadlock. */
-	}
-
-	/* If both sides of the shell are gone, tell the user. */
-	if nil == *cancelUs && nil == *cancelOther {
-		b.Errorf(addr, "%s", ShellDisconnectedMessage)
-		b.evCh <- Event{Type: EventTypeDisconnected}
-	}
-}
-
-// ProxyIn proxies from the ich passed to New. to the writer set by b.ConnectIn
-// or b.ConnectInOut.
-func (b *Broker) proxyIn(
-	ctx context.Context,
-	sl *slog.Logger,
-	w io.Writer,
-) error {
-	/* Set up to flush the writer, if it's flushable. */
-	flush := func() error { return nil }
-	if f, ok := w.(interface{ FlushError() error }); ok {
-		flush = f.FlushError
-	} else if f, ok := w.(http.Flusher); ok {
-		flush = func() error { f.Flush(); return nil }
-	}
-
-	/* Proxy. */
-	for {
-		select {
-		case l, ok := <-b.ich:
-			if !ok { /* Input channel closed. */
-				return nil
-			}
-			/* Add back a missing newline. */
-			if !strings.HasSuffix(l, "\n") {
-				l += "\n"
-			}
-			if _, err := io.WriteString(w, l); nil != err {
-				return fmt.Errorf("sending line: %w", err)
-			}
-			if err := flush(); nil != err {
-				return fmt.Errorf("flushing line: %w", err)
-			}
-			sl.Info(LMShellIO, LKData, l)
-		case <-ctx.Done(): /* Something else told us to stop. */
-			if err := context.Cause(ctx); !errors.Is(
-				err,
-				context.Canceled,
-			) {
-				return err
-			}
-			return nil
-		}
-	}
-}
-
-// proxyOut proxies from the writer set by b.ConnectOut or b.ConnectInOut to
-// the och passed to New.
-func (b *Broker) proxyOut(
-	ctx context.Context,
-	sl *slog.Logger,
-	r io.Reader,
-) error {
-	/* Make read data available to us. */
-	type outRet struct {
-		o   string
-		err error
-	}
-	och := make(chan outRet, 2)
-	go func() {
-		defer close(och)
-		var (
-			buf = make([]byte, 2048)
-			n   int
-			err error
-		)
-		for nil == ctx.Err() && nil == err {
-			n, err = r.Read(buf) /* Try to read a bit. */
-			if 0 != n {          /* Send data if we have it. */
-				och <- outRet{o: string(buf[:n])}
-			}
-			if nil != err { /* And an error if we have one. */
-				och <- outRet{err: err}
-			}
-		}
-	}()
-
-	/* Proxy output until something happens. */
-	var err error
-	for nil == err {
-		select {
-		case o, ok := <-och: /* Chunk of output. */
-			if !ok {
-				err = io.EOF /* Will be cleared later. */
-				break
-			}
-			/* If we got output. send it forth. */
-			if "" != o.o {
-				select {
-				case b.och <- opshell.CLine{
-					Line:  o.o,
-					Plain: true,
-				}:
-					sl.Info(LMShellIO, LKData, o.o)
-				case <-ctx.Done(): /* Should stop. */
-				}
-			}
-			/* If we got an error, we're done. */
-			if nil != o.err {
-				err = o.err
-			}
-		case <-ctx.Done(): /* Someone told us to stop. */
-		}
-		/* If the context is done, save the error if we don't have
-		a better one. */
-		if nil != ctx.Err() {
-			if nil == err {
-				err = context.Cause(ctx)
-			}
-		}
-	}
-
-	/* Some errors just indicate "normal" termination. */
-	if errors.Is(err, io.EOF) ||
-		errors.Is(err, context.Canceled) ||
-		errors.Is(err, io.ErrClosedPipe) ||
-		errors.Is(err, io.ErrUnexpectedEOF) {
-		return nil
-	}
-
-	return err
 }

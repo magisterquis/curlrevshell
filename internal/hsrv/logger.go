@@ -5,66 +5,49 @@ package hsrv
  * io.Writer which sends pink messages to opshell.Shell
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20250924
+ * Last Modified 20260801
  */
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 
+	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
 // Colors for log things
 const (
-	ErrorColor     = opshell.ColorRed
-	FileColor      = opshell.ColorBlue
-	ScriptColor    = opshell.ColorCyan
-	ConnectedColor = opshell.ColorGreen
+	errorColor     = opshell.ColorRed
+	fileColor      = opshell.ColorBlue
+	scriptColor    = opshell.ColorCyan
+	connectedColor = opshell.ColorGreen
 )
 
-// Printf sends a colored message to the shell.  The shell will ensure it ends
-// in a newline.  No timestamp will be printed before the line.
-func (s *Server) Printf(color opshell.Color, format string, v ...any) {
+// logf sends a colered message to the shell.
+func (s *Server) logf(color opshell.Color, format string, v ...any) {
 	/* Send the message to be logged. */
-	s.och <- opshell.CLine{
-		Color:       color,
-		Line:        fmt.Sprintf(format, v...),
-		NoTimestamp: true,
-	}
+	s.iob.Colorf("", color, format, v...)
 }
 
-// Logf sends a colered message to the shell.
-func (s *Server) Logf(color opshell.Color, format string, v ...any) {
-	/* Send the message to be logged. */
-	s.och <- opshell.CLine{
-		Color: color,
-		Line:  fmt.Sprintf(format, v...),
-	}
+// rLogf sends a colored message to the shell with the requetsor's IP address.
+func (s *Server) rLogf(
+	color opshell.Color,
+	r *http.Request,
+	format string,
+	v ...any,
+) {
+	s.iob.Colorf(remoteHost(r), color, format, v...)
 }
 
-// RLogf sends a colored message to the shell with the requetsor's IP address.
-func (s *Server) RLogf(color opshell.Color, r *http.Request, format string, v ...any) {
-	s.Logf(color, "%s", fmt.Sprintf(
-		"[%s] %s",
-		remoteHost(r),
-		fmt.Sprintf(format, v...),
-	))
+// errorLogf sends a error message back.
+func (s *Server) errorLogf(format string, v ...any) {
+	s.logf(errorColor, format, v...)
 }
 
-// ErrorLogf sends a error message back.
-func (s *Server) ErrorLogf(format string, v ...any) {
-	s.Logf(ErrorColor, format, v...)
-}
-
-// RErrorLogf sends a pink message to the shell with r's remote address.
-func (s *Server) RErrorLogf(r *http.Request, format string, v ...any) {
-	s.ErrorLogf("%s", fmt.Sprintf(
-		"[%s] %s",
-		remoteHost(r),
-		fmt.Sprintf(format, v...),
-	))
+// rErrorLogf sends a pink message to the shell with r's remote address.
+func (s *Server) rErrorLogf(r *http.Request, format string, v ...any) {
+	s.rLogf(errorColor, r, format, v...)
 }
 
 // remoteHost attempts to get just the host part of the remote address.  If
@@ -78,10 +61,10 @@ func remoteHost(r *http.Request) string {
 
 // pinkSender is an io.Writer which used to send pink opshell.CLines, but now
 // sends red opshell.CLines.
-type pinkSender struct{ och chan<- opshell.CLine }
+type pinkSender struct{ iob *iobroker.Broker }
 
 // Write implements io.Writer.  It always returns len(p), nil.
 func (ps pinkSender) Write(p []byte) (n int, err error) {
-	ps.och <- opshell.CLine{Color: ErrorColor, Line: string(p)}
+	ps.iob.Colorf("", opshell.ColorMagenta, "%s", p)
 	return len(p), nil
 }

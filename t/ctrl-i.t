@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20260304
+# Last Modified 20260802
 
 set -euo pipefail
 
@@ -151,10 +151,11 @@ function check_ctrl_i {
 
         # Connect up curl to get the Ctrl+I output after a SIGUSR1.
         read -pr CURL;
-        CURL=${CURL%/c*}/io
-        <&p $CURL -T. --no-progress-meter --output $GOTF 2>&1 &
+        ID=id-$RANDOM
+        CURL=${CURL%/c*}/i/$ID
+        $CURL --no-progress-meter --output $GOTF 2>&1 &
         while read -pr; do
-                if [[ "$REPLY" == *"Shell is ready to go"* ]]; then
+                if [[ "$REPLY" == *"Input connected: ID $ID" ]]; then
                         break
                 fi
         done
