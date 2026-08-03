@@ -2,13 +2,14 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`betterio`
+`adapters`
 ----------
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@betterio
+go install github.com/magisterquis/curlrevshell@adapters
 ```
+- Logfile locking should work better with non-file files.
 - Updated dependencies.
 
 `dev`
