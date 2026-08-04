@@ -8,7 +8,7 @@ but with the following "features":
 - Self-signed TLS certificate, plus certificate pinning
 - Optionally serves static files
 - Accepts multiple shells in series, like `nc -lk` but in color
-- IPv6-ready
+- IPv6-ready, Websocket-ready, Team-Red-y
 - Logged [feature creep](./doc/changelog.md)
 - Non-zero [documentation](./doc/README.md)
 - Makefiles which coldheartedly assume
@@ -71,6 +71,7 @@ Endpoint          | Description
 `/i/{id}`         | Long-lived connection for input from you to the shell.
 `/io`             | A bidirectional connection between you and the shell, kinda `/i` and `/o` at the same time.
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
+`/w               | Like `/io` but expects the [websocket song and dance](https://datatracker.ietf.org/doc/html/rfc6455)
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
 The endpoints can be changed (for evasion, humor, etc); see

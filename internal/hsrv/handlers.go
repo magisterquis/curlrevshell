@@ -5,17 +5,20 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260801
+ * Last Modified 20260804
  */
 
 import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	"golang.org/x/net/websocket"
 )
 
 const (
@@ -33,6 +36,9 @@ type (
 	// testCloseFileBeforeStatKey causes fileHandler to close the file it
 	// has open before calling Stat on it, for error injection.
 	testCloseFileBeforeStatKey struct{}
+	// testRemoteAddrKey points to a channel in a context on which the
+	// websocket handler sends the requests's remote address.
+	testWSRemoteAddrKey struct{}
 )
 
 // newMux returns a new ServeMux, ready to serve.
@@ -50,6 +56,10 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/"+p.URLPaths.In+"/{"+idParam+"}", s.inputHandler)
 	/* Shell output handler. */
 	mux.HandleFunc("/"+p.URLPaths.Out+"/{"+idParam+"}", s.outputHandler)
+	/* Shell over websockets handler. */
+	mux.HandleFunc("/"+p.URLPaths.Websocket, s.websocketHandler)
+	mux.HandleFunc("/"+p.URLPaths.Websocket+"/", s.websocketHandler)
+	mux.HandleFunc("/"+p.URLPaths.Websocket+"/{"+idParam+"}", s.websocketHandler)
 	/* Callback script handler. */
 	mux.HandleFunc("/"+p.URLPaths.Script, s.scriptHandler)
 	mux.HandleFunc("/"+p.URLPaths.Script+"/", s.scriptHandler)
@@ -158,6 +168,41 @@ func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
 		remoteHost(r),
 		newRequestRWC(w, r),
 	)
+}
+
+// websocketHandler upgrades to a websocket and handles both input and output
+// for a shell.
+func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
+	/* Send a test r.RemoteAddr if asked. */
+	if testing.Testing() {
+		if ch, ok := r.Context().Value(
+			testWSRemoteAddrKey{},
+		).(chan string); ok {
+			ch <- r.RemoteAddr
+		}
+	}
+	websocket.Server{
+		// Handshake makes sure that conf.Origin is set so we don't
+		// end up with a nil pointer derefence if someone calls
+		// RemoteAddr.
+		Handshake: func(
+			conf *websocket.Config,
+			r *http.Request,
+		) error {
+			conf.Origin = &url.URL{Host: r.RemoteAddr}
+			return nil
+		},
+		// Handler hooks up the websocket and the I/O Broker. */
+		Handler: func(c *websocket.Conn) {
+			s.iob.HandleBidirectional(
+				r.Context(),
+				s.requestLogger(r),
+				r.PathValue(idParam),
+				remoteHost(r),
+				c,
+			)
+		},
+	}.ServeHTTP(w, r)
 }
 
 // StartFullDuplex enables full duplex mode on w, if possible.  This is

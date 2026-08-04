@@ -2,13 +2,16 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`betterio`
+`websockets`
 ----------
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@betterio
+go install github.com/magisterquis/curlrevshell@websockets
 ```
+- Added `/w`, like `/io` plus the
+  [Websocket song and dance](https://datatracker.ietf.org/doc/html/rfc6455).
+- `make test` now builds all the test prerequisities (probably).
 - Updated dependencies.
 
 `dev`

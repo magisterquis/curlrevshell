@@ -7,7 +7,7 @@ but with the following "features":
 - Self-signed TLS certificate, plus certificate pinning
 - Optionally serves static files
 - Accepts multiple shells in series, like `nc -lk` but in color
-- IPv6-ready
+- IPv6-ready, Websocket-ready, Team-Red-y
 - Logged [feature creep](./doc/changelog.md)
 - Non-zero [documentation](./doc/README.md)
 - Makefiles which coldheartedly assume
@@ -22,7 +22,7 @@ Quickstart
 1. Install the Go compiler (https://go.dev/doc/install).
 2. Install `curlrevshell` and start it.
    ```sh
-   go install github.com/magisterquis/curlrevshell@betterio
+   go install github.com/magisterquis/curlrevshell@websockets
    curlrevshell
    ```
 3. Get a shell, using one of the lines under `To get a shell:`.
@@ -33,7 +33,7 @@ Example
 -------
 It should look like the following, but with nicer colors:
 ```
-$ go install github.com/magisterquis/curlrevshell@betterio
+$ go install github.com/magisterquis/curlrevshell@websockets
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
 go: downloading golang.org/x/exp v0.0.0-20260727155853-b88d891fe743
 go: downloading golang.org/x/net v0.57.0
@@ -42,7 +42,7 @@ go: downloading golang.org/x/sys v0.47.0
 go: downloading golang.org/x/text v0.40.0
 go: downloading golang.org/x/tools v0.48.0
 $ curlrevshell
-01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (betterio branch)
+01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (websockets branch)
 01:04:42.760 Listening on 0.0.0.0:4444
 01:04:42.760 To get a shell:
 
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260802225911-7366af5662d8+dirty (betterio branch)
+Version v0.0.1-beta.8.0.20260803194200-452326428573+dirty (websockets branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
@@ -118,6 +118,7 @@ Endpoint          | Description
 `/i/{id}`         | Long-lived connection for input from you to the shell.
 `/io`             | A bidirectional connection between you and the shell, kinda `/i` and `/o` at the same time.
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
+`/w               | Like `/io` but expects the [websocket song and dance](https://datatracker.ietf.org/doc/html/rfc6455)
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
 
 The endpoints can be changed (for evasion, humor, etc); see

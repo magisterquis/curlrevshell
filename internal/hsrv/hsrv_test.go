@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260801
+ * Last Modified 20260804
  */
 
 import (
@@ -410,10 +410,11 @@ func TestServer_Debug(t *testing.T) {
 // Make sure we set ourselves up to debug-log paths correctly.
 func TestSlogAttrsFromURLPaths(t *testing.T) {
 	have := crstemplate.URLPaths{
-		In:     "up_In",
-		InOut:  "up_InOut",
-		Out:    "up_Out",
-		Script: "up_Script",
+		In:        "up_In",
+		InOut:     "up_InOut",
+		Out:       "up_Out",
+		Websocket: "up_Websocket",
+		Script:    "up_Script",
 	}
 
 	got := slogAttrsFromURLPaths(have)
@@ -423,6 +424,7 @@ func TestSlogAttrsFromURLPaths(t *testing.T) {
 		slog.String("InOut", "up_InOut"),
 		slog.String("Out", "up_Out"),
 		slog.String("Script", "up_Script"),
+		slog.String("Websocket", "up_Websocket"),
 	}
 
 	if !slices.EqualFunc(got, want, func(a, b slog.Attr) bool {
@@ -593,19 +595,21 @@ func TestNew_AllCallbackAddressesEmpty(t *testing.T) {
 // Do we log different URL Paths properly?
 func TestNew_NonDefaultURLPaths(t *testing.T) {
 	var (
-		in     = tlog.S("in")
-		out    = tlog.S("out")
-		inout  = tlog.S("inout")
-		script = tlog.S("script")
+		in        = tlog.S("in")
+		out       = tlog.S("out")
+		inout     = tlog.S("inout")
+		script    = tlog.S("script")
+		websocket = tlog.S("websocket")
 	)
 
 	/* Non-default paths. */
 	tb, _, _, _, _, _ := newTestServer(t.Context(), t, &testServerConfig{
 		urlPaths: &crstemplate.URLPaths{
-			In:     in,
-			InOut:  inout,
-			Out:    out,
-			Script: script,
+			In:        in,
+			InOut:     inout,
+			Out:       out,
+			Websocket: websocket,
+			Script:    script,
 		},
 	})
 
@@ -616,6 +620,7 @@ func TestNew_NonDefaultURLPaths(t *testing.T) {
 			With("Out", out).
 			With("InOut", inout).
 			With("Script", script).
+			With("Websocket", websocket).
 			Info(LMURLPaths),
 	)
 }

@@ -5,7 +5,7 @@ package crstemplate
  * Parameters passed to -template templates
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20250205
+ * Last Modified 20260803
  */
 
 import "net/http"
@@ -70,10 +70,11 @@ type Params struct {
 // URLPaths contain the parts of the URL paths indicating what an HTTPS
 // request is for.
 type URLPaths struct {
-	In     string /* Default: i */
-	InOut  string /* Default: io */
-	Out    string /* Default: o */
-	Script string /* Default: c */
+	In        string /* Default: i */
+	InOut     string /* Default: io */
+	Out       string /* Default: o */
+	Websocket string /* Default: w */
+	Script    string /* Default: c */
 }
 
 // BasicAuth contains the Basic Auth credentials sent in a request.

@@ -5,7 +5,7 @@ package iobroker
  * Hook up shell input streams to ich
  * By J. Stuart McMurray
  * Created 20260628
- * Last Modified 20260721
+ * Last Modified 20260804
  */
 
 import (
@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
+	"golang.org/x/net/websocket"
 )
 
 // HandleInput proxies from b's input channel (ich)  to the connected shell
@@ -69,6 +70,9 @@ func proxyInput(
 		flush = rc.Flush
 	} else if f, ok := in.(interface{ Flush() error }); ok {
 		flush = f.Flush
+	} else if _, ok := in.(*websocket.Conn); ok {
+		/* Doesn't need a flush. */
+		flush = func() error { return nil }
 	} else if testing.Testing() {
 		switch in.(type) {
 		case *io.PipeWriter, bidirpipe.Pipe:

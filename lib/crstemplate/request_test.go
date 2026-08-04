@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250802
+ * Last Modified 20250804
  */
 
 import (
@@ -36,10 +36,11 @@ func newTestParamsWithoutRequest(t *testing.T) Params {
 		PubkeyFP:          "testFPtestFPtestFPtestFPtestFPtestFPtestFPx=",
 		CallbackAddresses: []string{"example.com:6", "7.8.9.0:1"},
 		URLPaths: URLPaths{
-			In:     "testI",
-			InOut:  "testIO",
-			Out:    "testO",
-			Script: "testC",
+			In:        "testI",
+			InOut:     "testIO",
+			Out:       "testO",
+			Script:    "testC",
+			Websocket: "testW",
 		},
 		StaticFilesDir: t.TempDir(),
 	}

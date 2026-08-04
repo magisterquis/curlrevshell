@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20270802
+ * Last Modified 20270803
  */
 
 import (
@@ -48,10 +48,11 @@ var (
 // URL Paths, which may be set at compile-time to change from /i and /o and
 // so on.
 var (
-	URLPathIn     = crstemplate.DefaultURLPathIn
-	URLPathInOut  = crstemplate.DefaultURLPathInOut
-	URLPathOut    = crstemplate.DefaultURLPathOut
-	URLPathScript = crstemplate.DefaultURLPathScript
+	URLPathIn        = crstemplate.DefaultURLPathIn
+	URLPathInOut     = crstemplate.DefaultURLPathInOut
+	URLPathOut       = crstemplate.DefaultURLPathOut
+	URLPathWebsocket = crstemplate.DefaultURLPathWebsocket
+	URLPathScript    = crstemplate.DefaultURLPathScript
 )
 
 // Default file paths.  ./crs/... is a reasonable choice.  They correspond to
@@ -396,10 +397,11 @@ Options:
 		crstemplate.Params{
 			StaticFilesDir: *fdir,
 			URLPaths: crstemplate.URLPaths{
-				In:     URLPathIn,
-				InOut:  URLPathInOut,
-				Out:    URLPathOut,
-				Script: URLPathScript,
+				In:        URLPathIn,
+				InOut:     URLPathInOut,
+				Out:       URLPathOut,
+				Websocket: URLPathWebsocket,
+				Script:    URLPathScript,
 			},
 		},
 	)

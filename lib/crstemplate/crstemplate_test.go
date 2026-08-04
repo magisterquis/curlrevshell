@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20260103
+ * Last Modified 20260804
  */
 
 import (
@@ -75,8 +75,6 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 			)
 		}
 	)
-
-	var ()
 
 	/* Make sure we don't miss anything if we've added a field later. */
 	if got := firstEmptyField(params, ""); "" != got {

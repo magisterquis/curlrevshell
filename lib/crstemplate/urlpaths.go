@@ -5,7 +5,7 @@ package crstemplate
  * Make sure URL paths work nicely
  * By J. Stuart McMurray
  * Created 20250215
- * Last Modified 20250215
+ * Last Modified 20260803
  */
 
 import (
@@ -16,10 +16,11 @@ import (
 // DefaultURLPaths are the URL paths we use if we don't have any others.  This
 // should not be modified.
 var DefaultURLPaths = URLPaths{
-	In:     DefaultURLPathIn,
-	InOut:  DefaultURLPathInOut,
-	Out:    DefaultURLPathOut,
-	Script: DefaultURLPathScript,
+	In:        DefaultURLPathIn,
+	InOut:     DefaultURLPathInOut,
+	Out:       DefaultURLPathOut,
+	Websocket: DefaultURLPathWebsocket,
+	Script:    DefaultURLPathScript,
 }
 
 // CleanURLPaths removes leading and trailing slashes from the fields in p.
