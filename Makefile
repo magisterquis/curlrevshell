@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20251209
+# Last Modified 20260804
 
 BINNAME      != basename $$(pwd)
 GOBUILDFLAGS  = -trimpath -ldflags "-w -s"
@@ -23,7 +23,7 @@ build: ${BINNAME} ## Build curlrevshell
 ${BINNAME}! gosubdirs
 	go build ${GOBUILDFLAGS} -o ${BINNAME}
 
-test: docs ## Run tests
+test: gosubdirs docs ## Run tests
 	go test ${GOBUILDFLAGS} ${TESTFLAGS} ./...
 	go vet  ${GOBUILDFLAGS} ./...
 	! which staticcheck >/dev/null || staticcheck ./...
