@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260804
+ * Last Modified 20260805
  */
 
 import (
@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/internal/tlog"
@@ -372,11 +372,7 @@ func TestServer_Debug(t *testing.T) {
 		)
 
 		/* Banner-grab it. */
-		c, err := net.DialTimeout(
-			"tcp",
-			s.l.Addr().String(),
-			time.Second,
-		)
+		c, err := net.Dial("tcp", s.l.Addr().String())
 		if nil != err {
 			t.Fatalf("Error connecting to server: %v", err)
 		}
@@ -397,14 +393,21 @@ func TestServer_Debug(t *testing.T) {
 				),
 			})
 		}
-
 	}
 
 	/* Try with debug messages. */
-	t.Run("with_debug", func(t *testing.T) { try(t, true) })
+	t.Run("with_debug", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			try(t, true)
+		})
+	})
 
 	/* And try without debug messages. */
-	t.Run("no_debug", func(t *testing.T) { try(t, false) })
+	t.Run("no_debug", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			try(t, false)
+		})
+	})
 }
 
 // Make sure we set ourselves up to debug-log paths correctly.

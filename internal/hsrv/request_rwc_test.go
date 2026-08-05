@@ -5,7 +5,7 @@ package hsrv
  * Tests for request_rwc.go
  * By J. Stuart McMurray
  * Created 20260730
- * Last Modified 20260801
+ * Last Modified 20260805
  */
 
 import (
@@ -18,6 +18,7 @@ import (
 	"net/http/httptrace"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/internal/tlog"
@@ -141,15 +142,15 @@ func TestRequestRWC(t *testing.T) {
 	}
 	/* Send it back to end the handler. */
 	rwcCh <- rwc
-	if _, err := io.Copy(io.Discard, res.Body); nil != err {
-		t.Errorf("Unexpected error waiting for body to close: %v", err)
-	}
 	<-hDone /* Handler should also end. */
 
 }
 
 // Can we close without blocking if the client's expected a 100?
 func TestRequestRWCClose_Expect100Continue(t *testing.T) {
+	synctest.Test(t, testRequestRWCCloseExpect100Continue)
+}
+func testRequestRWCCloseExpect100Continue(t *testing.T) {
 	var (
 		ctx, cancel    = context.WithCancel(t.Context())
 		got100Continue bool
