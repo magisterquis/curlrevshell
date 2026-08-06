@@ -5,20 +5,20 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260804
+ * Last Modified 20260806
  */
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
-
-	"golang.org/x/net/websocket"
 )
 
 const (
@@ -36,9 +36,6 @@ type (
 	// testCloseFileBeforeStatKey causes fileHandler to close the file it
 	// has open before calling Stat on it, for error injection.
 	testCloseFileBeforeStatKey struct{}
-	// testRemoteAddrKey points to a channel in a context on which the
-	// websocket handler sends the requests's remote address.
-	testWSRemoteAddrKey struct{}
 )
 
 // newMux returns a new ServeMux, ready to serve.
@@ -56,10 +53,6 @@ func (s *Server) newMux() *http.ServeMux {
 	mux.HandleFunc("/"+p.URLPaths.In+"/{"+idParam+"}", s.inputHandler)
 	/* Shell output handler. */
 	mux.HandleFunc("/"+p.URLPaths.Out+"/{"+idParam+"}", s.outputHandler)
-	/* Shell over websockets handler. */
-	mux.HandleFunc("/"+p.URLPaths.Websocket, s.websocketHandler)
-	mux.HandleFunc("/"+p.URLPaths.Websocket+"/", s.websocketHandler)
-	mux.HandleFunc("/"+p.URLPaths.Websocket+"/{"+idParam+"}", s.websocketHandler)
 	/* Callback script handler. */
 	mux.HandleFunc("/"+p.URLPaths.Script, s.scriptHandler)
 	mux.HandleFunc("/"+p.URLPaths.Script+"/", s.scriptHandler)
@@ -135,74 +128,61 @@ func (s *Server) fileHandler(w http.ResponseWriter, r *http.Request) {
 
 // inputHandler sends input to a shell.
 func (s *Server) inputHandler(w http.ResponseWriter, r *http.Request) {
-	s.iob.HandleInput(
-		r.Context(),
-		s.requestLogger(r),
-		r.PathValue(idParam),
-		remoteHost(r),
-		w,
+	var (
+		ctx, cancel = context.WithCancelCause(r.Context())
+		iw          = io.Writer(w)
+		sl          = s.requestLogger(r)
+		wg          sync.WaitGroup
+
+		ws = maybeWS(ctx, sl, w, r)
 	)
+	defer cancel(nil)
+	if nil != ws {
+		wg.Go(func() { _, err := io.Copy(io.Discard, ws); cancel(err) })
+		iw = ws
+	}
+	s.iob.HandleInput(ctx, sl, r.PathValue(idParam), remoteHost(r), iw)
 }
 
 // outputHandler receives output from a shell.
 func (s *Server) outputHandler(w http.ResponseWriter, r *http.Request) {
-	s.iob.HandleOutput(
-		r.Context(),
-		s.requestLogger(r),
-		r.PathValue(idParam),
-		remoteHost(r),
-		r.Body,
+	var (
+		ctx = r.Context()
+		irc = io.ReadCloser(r.Body)
+		sl  = s.requestLogger(r)
+
+		ws = maybeWS(ctx, sl, w, r)
 	)
+	if nil != ws {
+		irc = ws
+	}
+	s.iob.HandleOutput(ctx, sl, r.PathValue(idParam), remoteHost(r), irc)
 }
 
 // inOutHandler handles both input and output for a shell.
 func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
-	if err := StartFullDuplex(w, r); nil != err {
-		s.rErrorLogf(r, "Error starting duplex comms: %s", err)
-		return
-	}
-	s.iob.HandleBidirectional(
-		r.Context(),
-		s.requestLogger(r),
-		r.PathValue(idParam),
-		remoteHost(r),
-		newRequestRWC(w, r),
-	)
-}
+	var (
+		ctx = r.Context()
+		rwc = io.ReadWriteCloser(newRequestRWC(w, r))
+		sl  = s.requestLogger(r)
 
-// websocketHandler upgrades to a websocket and handles both input and output
-// for a shell.
-func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
-	/* Send a test r.RemoteAddr if asked. */
-	if testing.Testing() {
-		if ch, ok := r.Context().Value(
-			testWSRemoteAddrKey{},
-		).(chan string); ok {
-			ch <- r.RemoteAddr
+		ws = maybeWS(ctx, sl, w, r)
+	)
+	if nil != ws {
+		rwc = ws
+	} else {
+		if err := StartFullDuplex(w, r); nil != err {
+			s.rErrorLogf(r, "Error starting duplex comms: %s", err)
+			return
 		}
 	}
-	websocket.Server{
-		// Handshake makes sure that conf.Origin is set so we don't
-		// end up with a nil pointer derefence if someone calls
-		// RemoteAddr.
-		Handshake: func(
-			conf *websocket.Config,
-			r *http.Request,
-		) error {
-			conf.Origin = &url.URL{Host: r.RemoteAddr}
-			return nil
-		},
-		// Handler hooks up the websocket and the I/O Broker. */
-		Handler: func(c *websocket.Conn) {
-			s.iob.HandleBidirectional(
-				r.Context(),
-				s.requestLogger(r),
-				r.PathValue(idParam),
-				remoteHost(r),
-				c,
-			)
-		},
-	}.ServeHTTP(w, r)
+	s.iob.HandleBidirectional(
+		ctx,
+		sl,
+		r.PathValue(idParam),
+		remoteHost(r),
+		rwc,
+	)
 }
 
 // StartFullDuplex enables full duplex mode on w, if possible.  This is

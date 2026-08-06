@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250804
+ * Last Modified 20250807
  */
 
 import (
@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/lib/crstemplate/tmplfuncs"
+	"golang.org/x/net/websocket"
 )
 
 var (
@@ -36,11 +37,10 @@ func newTestParamsWithoutRequest(t *testing.T) Params {
 		PubkeyFP:          "testFPtestFPtestFPtestFPtestFPtestFPtestFPx=",
 		CallbackAddresses: []string{"example.com:6", "7.8.9.0:1"},
 		URLPaths: URLPaths{
-			In:        "testI",
-			InOut:     "testIO",
-			Out:       "testO",
-			Script:    "testC",
-			Websocket: "testW",
+			In:     "testI",
+			InOut:  "testIO",
+			Out:    "testO",
+			Script: "testC",
 		},
 		StaticFilesDir: t.TempDir(),
 	}
@@ -462,5 +462,77 @@ func TestC2Addr(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// Do we set the Protocol correctly if it's a websocket request?
+func TestAddRequest_Websocket(t *testing.T) {
+	var p Params
+	/* Something like curlrevshell.  Kinda. */
+	svr := httptest.NewServer(http.HandlerFunc(func(
+		_ http.ResponseWriter,
+		r *http.Request,
+	) {
+		var err error
+		if p, err = AddRequest(
+			newTestParamsWithoutRequest(t),
+			r,
+		); nil != err {
+			t.Errorf("Error adding request: %v", err)
+		}
+	}))
+	defer svr.Close()
+
+	/* Make a websocket connection. */
+	u := "ws://" + strings.TrimPrefix(svr.URL, "http://")
+	c, err := websocket.Dial(u, "", u)
+	if nil == err {
+		c.Close()
+		t.Errorf("Websocket connected, but shouldn't have")
+	} else if got, want := err.Error(),
+		fmt.Sprintf("websocket.Dial %s: bad status", u); got != want {
+		t.Errorf(
+			"Unexpected error making websocket connection\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+
+	/* Protocol correct? */
+	if got, want := p.Protocol, "wss"; got != want {
+		t.Errorf("Protocol incorrect\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// Do we set the Protocol correctly if it's an https request?
+func TestAddRequest_HTTPS(t *testing.T) {
+	var p Params
+	/* Something like curlrevshell.  Kinda. */
+	svr := httptest.NewServer(http.HandlerFunc(func(
+		_ http.ResponseWriter,
+		r *http.Request,
+	) {
+		var err error
+		if p, err = AddRequest(
+			newTestParamsWithoutRequest(t),
+			r,
+		); nil != err {
+			t.Errorf("Error adding request: %v", err)
+		}
+	}))
+	defer svr.Close()
+
+	/* Make an HTTPS(ish) connection. */
+	res, err := svr.Client().Get(svr.URL)
+	if nil != err {
+		t.Fatalf("Error making GET request: %v", err)
+	}
+	defer res.Body.Close()
+
+	/* Protocol correct? */
+	if got, want := p.Protocol, "https"; got != want {
+		t.Errorf("Protocol incorrect\n got: %v\nwant: %v", got, want)
 	}
 }

@@ -3,17 +3,16 @@
 # websocket.t
 # Can we connect via a websocket?
 # By J. Stuart McMurray
-# Created 20260814
-# Last Modified 20260814
+# Created 20260804
+# Last Modified 20260807
 
 set -euo pipefail
 
 . t/shmore.subr
 . t/t.subr
 
-tap_plan 12
+tap_plan 13
 
-CCLOSED=false
 gorun |&
 RET=$?
 tap_is "$RET" "$?" "Go run started ok" "$0" $LINENO
@@ -59,6 +58,17 @@ argv_is 2 "^--pinnedpubkey$"             "pubkey flag"  $LINENO
 argv_is 3 "^sha256//[A-Za-z0-9+/]{43}=$" "pubkey hash"  $LINENO
 argv_is 4 '^https://127\.0\.0\.1:\d+/c$' "HTTP address" $LINENO
 
+# But make the URL a wss:// URL.
+TGASV[4]=wss://${TGASV[4]#https://}
+
+# Does our script have wss:// in it?
+GOT=$(${TGASV[0]} ${TGASV[1]} ${TGASV[2]} ${TGASV[3]} ${TGASV[4]})
+tap_like \
+        "$GOT" \
+        'wss:\/\/' \
+        "Script requested with wss:// has wss://" \
+        "$0" $LINENO
+
 # Queue up a line for our websocket "shell" to get.
 SHELL_INPUT="shell-input-$RANDOM"
 print -r -u4 "$SHELL_INPUT"
@@ -71,8 +81,7 @@ while read -r -u5; do
 done
 
 # Prep to connect via a websocket.
-ADDR=${TGASV[4]%/c}/w         # Correct path
-ADDR="wss://${ADDR#https://}" # Correct scheme
+ADDR=${TGASV[4]%/c}           # Correct path
 
 # Connect the shell via websockets, send "output" and get "input."
 ID=id-$RANDOM
@@ -83,6 +92,7 @@ curl \
         --pinnedpubkey "${TGASV[3]}" \
         --silent \
         --upload-file . \
+        ${TGASV[4]%/c}/io/$ID \
         "$ADDR/$ID" |&
 CPID=$!
 

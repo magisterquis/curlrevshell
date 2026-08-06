@@ -5,7 +5,7 @@ package hsrv
  * Error types and values
  * By J. Stuart McMurray
  * Created 20260801
- * Last Modified 20260801
+ * Last Modified 20260806
  */
 
 import (

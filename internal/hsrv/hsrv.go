@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260804
+ * Last Modified 20260806
  */
 
 import (
@@ -31,12 +31,12 @@ import (
 
 // Log messages and keys.
 const (
-	LMFileRequested           = "File requested"
-	LMListenerStarted         = "Listener started"
-	LMOneShellClosingListener = "Got one shell, closing listener"
-	LMURLPaths                = "Non-Default URL Paths"
+	LMFileRequested            = "File requested"
+	LMListenerStarted          = "Listener started"
+	LMURLPaths                 = "Non-Default URL Paths"
+	LMUpgradeToWebsocketFailed = "Upgrade to websocket failed"
+	LMUpgradedToWebsocket      = "Upgraded to websocket"
 
-	LKError          = "error"
 	LKFingerprint    = "fingerprint"
 	LKListenAddr     = "listen_address"
 	LKRequestInfo    = "http_request"

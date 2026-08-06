@@ -9,8 +9,9 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@websockets
 ```
-- Added `/w`, like `/io` plus the
-  [Websocket song and dance](https://datatracker.ietf.org/doc/html/rfc6455).
+- Added websocket support to `/i`, `/io`, `/o`, and `/c` and changed the
+  default `/c` template to `wss://` instead of `https://` when `/c` `/c`'s
+  `wss`.
 - `make test` now builds all the test prerequisities (probably).
 - Updated dependencies.
 

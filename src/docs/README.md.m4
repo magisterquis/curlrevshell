@@ -69,7 +69,7 @@ Endpoint          | Description
 ------------------|------------
 `/c`              | Serves up a little script that takes the place of `bash >/dev/tcp...` and makes you appreciate admins not using `ps awwwfux`.
 `/i/{id}`         | Long-lived connection for input from you to the shell.
-`/io`             | A bidirectional connection between you and the shell, kinda `/i` and `/o` at the same time.
+`/io[/{id}]`      | A bidirectional connection between you and the shell, kinda `/i` and `/o` at the same time.
 `/o/{id}`         | Output from the shell to you, one line at a time.  The `{id}` has to match `/i`'s.
 `/w               | Like `/io` but expects the [websocket song and dance](https://datatracker.ietf.org/doc/html/rfc6455)
 `/{anythingelse}` | Either serves up files or 404's if nobody gave it `-serve-files-from` (which doesn't actually have to be a directory).
@@ -141,6 +141,12 @@ TLS is all via a pinned self-signed certificate.  By default, the certificate
 is cached in a file, mostly to keep from having to copy/paste a new fingerprint
 every time a ragey double-Ctrl+C kills the current shell.  Caching can be
 disabled with `-tls-certificate-cache ""`.
+
+Websockets
+----------
+All of the non-fileserving HTTPS endpoints will happily upgrade to a websocket
+connection.  `/c`'s script even switches from `https://` to `wss://` if all
+the cool kids are doing it.
 
 File Insertion
 --------------

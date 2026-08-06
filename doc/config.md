@@ -34,7 +34,6 @@ Setting                      | Default | Description
 `main.URLPathIn`             | `i`     | URL path for shell input connection
 `main.URLPathOut`            | `o`     | URL path for shell output connection
 `main.URLPathScript`         | `c`     | URL path for callback script generation
-`main.URLPathWebsocket`      | `w`     | URL path for bidirectional shell-over-websocket connection
 
 ### Reasonably Ok Setup
 Something like the following is a reasonably ok way to get set up quickly:

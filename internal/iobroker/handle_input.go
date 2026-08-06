@@ -5,7 +5,7 @@ package iobroker
  * Hook up shell input streams to ich
  * By J. Stuart McMurray
  * Created 20260628
- * Last Modified 20260804
+ * Last Modified 20260806
  */
 
 import (
@@ -71,7 +71,7 @@ func proxyInput(
 	} else if f, ok := in.(interface{ Flush() error }); ok {
 		flush = f.Flush
 	} else if _, ok := in.(*websocket.Conn); ok {
-		/* Doesn't need a flush. */
+		/* No need for flush. */
 		flush = func() error { return nil }
 	} else if testing.Testing() {
 		switch in.(type) {

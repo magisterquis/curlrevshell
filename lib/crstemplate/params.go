@@ -5,7 +5,7 @@ package crstemplate
  * Parameters passed to -template templates
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20260803
+ * Last Modified 20260807
  */
 
 import "net/http"
@@ -46,6 +46,10 @@ type Params struct {
 	// which the request was received.
 	C2Addr string
 
+	// Protocol is normally "https", but will be set to "wss" in the script
+	// subtemplate (/c) if the connection arrives over a websocket.
+	Protocol string
+
 	/* Parameters only set for the script subtemplate (/c). */
 
 	// ID is a random ID string consisting of a base36-encoded uint64.
@@ -70,11 +74,10 @@ type Params struct {
 // URLPaths contain the parts of the URL paths indicating what an HTTPS
 // request is for.
 type URLPaths struct {
-	In        string /* Default: i */
-	InOut     string /* Default: io */
-	Out       string /* Default: o */
-	Websocket string /* Default: w */
-	Script    string /* Default: c */
+	In     string /* Default: i */
+	InOut  string /* Default: io */
+	Out    string /* Default: o */
+	Script string /* Default: c */
 }
 
 // BasicAuth contains the Basic Auth credentials sent in a request.

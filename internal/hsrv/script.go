@@ -5,7 +5,7 @@ package hsrv
  * Callback script generator
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260801
+ * Last Modified 20260806
  */
 
 import (
@@ -85,8 +85,14 @@ func (s *Server) scriptHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	/* Figure out how we're sending the result back. */
+	iw := io.Writer(w)
+	if ws := maybeWS(r.Context(), s.requestLogger(r), w, r); nil != ws {
+		iw = ws
+	}
+
 	/* And send it back. */
-	if _, err := io.WriteString(w, b); nil != err {
+	if _, err := io.WriteString(iw, b); nil != err {
 		s.rErrorLogf(r, "Error sending script: %s", err)
 		return
 	}

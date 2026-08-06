@@ -7,7 +7,7 @@ package crstemplate
  * Curlrevshell template things
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20260803
+ * Last Modified 20260805
  */
 
 import (
@@ -24,11 +24,10 @@ import (
 
 // Default URL paths for comms with shells.
 const (
-	DefaultURLPathIn        = "i"  /* Shell input */
-	DefaultURLPathInOut     = "io" /* Shell bidirectional stream */
-	DefaultURLPathOut       = "o"  /* Shell output */
-	DefaultURLPathWebsocket = "w"  /* Shell over a websocket. */
-	DefaultURLPathScript    = "c"  /* Script generation. */
+	DefaultURLPathIn     = "i"  /* Shell input */
+	DefaultURLPathInOut  = "io" /* Shell bidirectional stream */
+	DefaultURLPathOut    = "o"  /* Shell output */
+	DefaultURLPathScript = "c"  /* Script generation. */
 )
 
 // SubtemplateName prevents inadvertently passing random strings where a

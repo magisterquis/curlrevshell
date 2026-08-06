@@ -502,6 +502,7 @@ func TestServer_SetScriptURLPath(t *testing.T) {
 		false, /* printIPv6 */
 		true,  /* printDebug */
 		crstemplate.Params{
+			Protocol: "https",
 			URLPaths: crstemplate.URLPaths{
 				Script: want,
 			},

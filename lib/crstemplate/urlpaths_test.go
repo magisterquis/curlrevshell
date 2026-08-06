@@ -5,7 +5,7 @@ package crstemplate
  * Tests for urlpaths.go
  * By J. Stuart McMurray
  * Created 20250215
- * Last Modified 20260804
+ * Last Modified 20260805
  */
 
 import (
@@ -17,11 +17,10 @@ import (
 func TestCleanURLPaths_UnsetField(t *testing.T) {
 	var (
 		full = reflect.ValueOf(URLPaths{
-			In:        "dummyIn",
-			InOut:     "dummyInOut",
-			Out:       "dummyOut",
-			Script:    "dummyScript",
-			Websocket: "dummyWebsocket",
+			In:     "dummyIn",
+			InOut:  "dummyInOut",
+			Out:    "dummyOut",
+			Script: "dummyScript",
 		})
 		defUPV = reflect.ValueOf(DefaultURLPaths)
 		cases  = make([]reflect.Value, full.NumField())
@@ -86,18 +85,16 @@ func TestCleanURLPaths_Trim(t *testing.T) {
 	/* Make sure slash-removal works. */
 	t.Run("remove_slashes", func(t *testing.T) {
 		have := URLPaths{
-			In:        "in/",
-			InOut:     "/in_out",
-			Out:       "out/",
-			Script:    "/////script/////",
-			Websocket: "/websocket/",
+			In:     "in/",
+			InOut:  "/in_out",
+			Out:    "out/",
+			Script: "/////script/////",
 		}
 		want := URLPaths{
-			In:        "in",
-			InOut:     "in_out",
-			Out:       "out",
-			Script:    "script",
-			Websocket: "websocket",
+			In:     "in",
+			InOut:  "in_out",
+			Out:    "out",
+			Script: "script",
 		}
 		got := have
 		CleanURLPaths(&got)
@@ -115,11 +112,10 @@ func TestCleanURLPaths_Trim(t *testing.T) {
 	/* Make sure a field with just slashes is treated as empty. */
 	t.Run("only_slashes", func(t *testing.T) {
 		got := URLPaths{
-			In:        "///",
-			InOut:     "///",
-			Out:       "///",
-			Script:    "///",
-			Websocket: "///",
+			In:     "///",
+			InOut:  "///",
+			Out:    "///",
+			Script: "///",
 		}
 		if n := firstEmptyField(got, ""); "" != n {
 			t.Fatalf("Empty field %s", n)

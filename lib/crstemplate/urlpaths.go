@@ -16,11 +16,10 @@ import (
 // DefaultURLPaths are the URL paths we use if we don't have any others.  This
 // should not be modified.
 var DefaultURLPaths = URLPaths{
-	In:        DefaultURLPathIn,
-	InOut:     DefaultURLPathInOut,
-	Out:       DefaultURLPathOut,
-	Websocket: DefaultURLPathWebsocket,
-	Script:    DefaultURLPathScript,
+	In:     DefaultURLPathIn,
+	InOut:  DefaultURLPathInOut,
+	Out:    DefaultURLPathOut,
+	Script: DefaultURLPathScript,
 }
 
 // CleanURLPaths removes leading and trailing slashes from the fields in p.

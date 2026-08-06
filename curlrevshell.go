@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20270803
+ * Last Modified 20270806
  */
 
 import (
@@ -48,11 +48,10 @@ var (
 // URL Paths, which may be set at compile-time to change from /i and /o and
 // so on.
 var (
-	URLPathIn        = crstemplate.DefaultURLPathIn
-	URLPathInOut     = crstemplate.DefaultURLPathInOut
-	URLPathOut       = crstemplate.DefaultURLPathOut
-	URLPathWebsocket = crstemplate.DefaultURLPathWebsocket
-	URLPathScript    = crstemplate.DefaultURLPathScript
+	URLPathIn     = crstemplate.DefaultURLPathIn
+	URLPathInOut  = crstemplate.DefaultURLPathInOut
+	URLPathOut    = crstemplate.DefaultURLPathOut
+	URLPathScript = crstemplate.DefaultURLPathScript
 )
 
 // Default file paths.  ./crs/... is a reasonable choice.  They correspond to
@@ -397,12 +396,12 @@ Options:
 		crstemplate.Params{
 			StaticFilesDir: *fdir,
 			URLPaths: crstemplate.URLPaths{
-				In:        URLPathIn,
-				InOut:     URLPathInOut,
-				Out:       URLPathOut,
-				Websocket: URLPathWebsocket,
-				Script:    URLPathScript,
+				In:     URLPathIn,
+				InOut:  URLPathInOut,
+				Out:    URLPathOut,
+				Script: URLPathScript,
 			},
+			Protocol: "https",
 		},
 	)
 	if nil != err {
@@ -450,7 +449,7 @@ Options:
 		!errors.Is(err, iobroker.ErrInputClosed) &&
 		!errors.Is(err, opshell.ErrInputDone) {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
-		sl.Info(LMTerminating, hsrv.LKError, err)
+		sl.Info(LMTerminating, iobroker.LKError, err)
 		return 1
 	}
 	shell.Logf(opshell.ColorGreen, false, "Goodbye.")

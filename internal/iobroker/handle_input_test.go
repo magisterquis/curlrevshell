@@ -16,13 +16,11 @@ import (
 	"net"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
-	"golang.org/x/net/websocket"
 )
 
 // What happens if we send input to a closed channel?
@@ -240,83 +238,4 @@ func TestProxyInput_NotAFlusher(t *testing.T) {
 		)
 	}
 
-}
-
-// Can we hook up a websocket as input?
-func TestBrokerHandleInput_Websocket(t *testing.T) {
-	var (
-		ctx, cancel = context.WithCancel(t.Context())
-		id, tag     = tlog.S("id"), tlog.S("tag")
-		msg         = tlog.S("msg")
-
-		b, ich, och, done, tb, sl = newTestBroker(t, ctx, nil)
-		m                         = tlog.M.
-						With(LKDirection, LVInput).
-						With(LKID, id)
-	)
-	defer cancel()
-
-	/* Accept a websocket connection to send to the broker. */
-	svr := httptest.NewServer(websocket.Handler(func(c *websocket.Conn) {
-		defer cancel()
-		if err := b.HandleInput(
-			t.Context(),
-			sl,
-			id,
-			tag,
-			c,
-		); nil != err {
-			t.Errorf("Error handling input: %v", err)
-		}
-	}))
-	defer svr.Close()
-
-	/* Connect up a websocket. */
-	u := "ws://" + strings.TrimPrefix(svr.URL, "http://")
-	ws, err := websocket.Dial(u, "", u)
-	if nil != err {
-		t.Fatalf("Error connecting to server: %v", err)
-	}
-	defer ws.Close()
-
-	/* Did it connect? */
-	opshell.ExpectShellMessages(t, och, opshell.CLine{
-		Color: LogColor,
-		Line:  taggedString(tag, "Input connected: ID %s", id),
-	})
-	tb.Expect(t.Context(), t,
-		m.
-			Info(LMNewConnection),
-	)
-
-	/* Can we send and receive a message? */
-	ich <- msg
-	buf := make([]byte, len(msg))
-	if _, err := io.ReadFull(ws, buf); nil != err {
-		t.Fatalf("Error reading from websocket: %v", err)
-	}
-	if got, want := string(buf), msg; got != want {
-		t.Errorf(
-			"Incorrect message from websocket\n got: %q\nwant: %q",
-			got,
-			want,
-		)
-	}
-	tb.Expect(t.Context(), t,
-		m.
-			With(LKData, msg+"\n").
-			Info(LMShellIO),
-	)
-
-	/* All done. */
-	cancel()
-	<-done
-	opshell.ExpectShellMessages(t, och, opshell.CLine{
-		Color: ErrColor,
-		Line:  taggedString(tag, "Input connection closed"),
-	})
-	tb.Expect(t.Context(), t,
-		m.
-			Info(LMConnectionClosed),
-	)
 }
