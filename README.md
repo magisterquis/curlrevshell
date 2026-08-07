@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260805210920-6b6c135d52b5+dirty (websockets branch)
+Version v0.0.1-beta.8.0.20260806234107-0ff3dfefd9ea+dirty (websockets branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i

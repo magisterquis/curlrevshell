@@ -20,8 +20,8 @@ import (
 
 // Can we work out if an HTTP request asks for a websocket?
 func TestIsWebsocketUpgradeRequest_Yes(t *testing.T) {
-	verdict := make(chan bool, 2)
-	svr := httptest.NewServer(http.HandlerFunc(func(
+	verdict := make(chan bool, 1)
+	svr := httptest.NewTLSServer(http.HandlerFunc(func(
 		_ http.ResponseWriter,
 		r *http.Request,
 	) {
@@ -30,10 +30,19 @@ func TestIsWebsocketUpgradeRequest_Yes(t *testing.T) {
 	}))
 	defer svr.Close()
 
-	/* Make a websocket connection. */
-	u := "ws://" + strings.TrimPrefix(svr.URL, "http://")
-	c, err := websocket.Dial(u, "", u)
-	if nil == err {
+	/* Make a websocket config. */
+	u := "wss://" + strings.TrimPrefix(svr.URL, "https://")
+	conf, err := websocket.NewConfig(u, u)
+	if nil != err {
+		t.Fatalf("Error generating config: %v", err)
+	}
+	conf.TlsConfig = svr.
+		Client().
+		Transport.(*http.Transport).
+		TLSClientConfig
+
+	/* Connect to the server, not expecting a websocket. */
+	if c, err := conf.DialContext(t.Context()); nil == err {
 		c.Close()
 		t.Errorf("Websocket connected, but shouldn't have")
 	} else if got, want := err.Error(),
@@ -56,8 +65,8 @@ func TestIsWebsocketUpgradeRequest_Yes(t *testing.T) {
 
 // Can we work out if an HTTP request doesn't ask for a websocket?
 func TestIsWebsocketUpgradeRequest_No(t *testing.T) {
-	verdict := make(chan bool, 2)
-	svr := httptest.NewServer(http.HandlerFunc(func(
+	verdict := make(chan bool, 1)
+	svr := httptest.NewTLSServer(http.HandlerFunc(func(
 		_ http.ResponseWriter,
 		r *http.Request,
 	) {
@@ -67,7 +76,7 @@ func TestIsWebsocketUpgradeRequest_No(t *testing.T) {
 	defer svr.Close()
 
 	/* Make a non-websocket connection. */
-	res, err := http.Get(svr.URL)
+	res, err := svr.Client().Get(svr.URL)
 	if nil != err {
 		t.Errorf("Error making GET request: %v", err)
 	}

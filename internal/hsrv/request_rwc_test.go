@@ -5,14 +5,13 @@ package hsrv
  * Tests for request_rwc.go
  * By J. Stuart McMurray
  * Created 20260730
- * Last Modified 20260805
+ * Last Modified 20260807
  */
 
 import (
 	"bytes"
 	"context"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httptrace"
@@ -29,32 +28,67 @@ import (
 // Can we wrap both sides of an HTTP handler into a single io.ReadWriteCloser?
 func TestRequestRWC(t *testing.T) {
 	var (
-		c2sMsg      = tlog.S("c2s")
-		ctx, cancel = context.WithCancel(t.Context())
-		hDone       = make(chan struct{})   /* Handler's exiting. */
-		pr, pw      = io.Pipe()             /* Client side. */
-		rwcCh       = make(chan requestRWC) /* From handler. */
-		s2cMsg      = tlog.S("s2c")
+		c2sMsg = tlog.S("c2s")
+		pr, pw = io.Pipe() /* Client side. */
+		s2cMsg = tlog.S("s2c")
+		done   = make(chan struct{})
 	)
-	defer cancel()
-	defer pr.Close()
 	defer pw.Close()
 
-	/* Server which accepts a connection and sends it back as a
-	requestRWC. */
+	/* Handler to send and receive on the rwc. */
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		defer close(hDone)
+		defer close(done)
+		/* Upgrade to rwc. */
+		defer r.Body.Close()
 		if err := StartFullDuplex(w, r); nil != err {
 			t.Errorf("Error starting duplex comms: %v", err)
 		}
-		rwcCh <- newRequestRWC(w, r)
-		<-rwcCh
+		rwc := newRequestRWC(w, r)
+		/* Send and receive. */
+		eg, ctx := ctxerrgroup.WithContext(r.Context())
+		eg.GoTag(ctx, "client->server read", func(
+			ctx context.Context,
+		) error {
+			buf := make([]byte, len(c2sMsg))
+			n, err := io.ReadFull(rwc, buf)
+			if nil != err {
+				t.Errorf(
+					"Error reading message from "+
+						"client: %v",
+					err,
+				)
+			}
+			if got, want := string(buf[:n]), c2sMsg; got != want {
+				t.Errorf(
+					"Incorrect message from client\n"+
+						" got: %q\n"+
+						"want: %q",
+					got,
+					want,
+				)
+			}
+			return err
+		})
+		eg.GoTag(ctx, "server->client write", func(
+			ctx context.Context,
+		) error {
+			if _, err := rwc.Write([]byte(s2cMsg)); nil != err {
+				t.Errorf("Error sending message to client: %v", err)
+				return err
+			}
+			if err := rwc.Flush(); nil != err {
+				t.Errorf("Flush error: %v", err)
+				return err
+			}
+			return nil
+		})
+		if err := eg.Wait(); nil != err {
+			t.Errorf("Handler error: %v", err)
+		}
 	}
-	svr := httptest.NewUnstartedServer(http.HandlerFunc(handler))
-	svr.Config.BaseContext = func(net.Listener) context.Context {
-		return ctx
-	}
-	svr.Start()
+
+	/* Server which sends and receives via a requestRWC. */
+	svr := httptest.NewServer(http.HandlerFunc(handler))
 	defer svr.Close()
 
 	/* Connect(ish) to the server. */
@@ -67,47 +101,16 @@ func TestRequestRWC(t *testing.T) {
 		t.Fatalf("Non-OK response status: %s", res.Status)
 	}
 
-	/* Get the server side of the connection. */
-	rwc := <-rwcCh
-
 	/* Send and receive. */
-	eg, ectx := ctxerrgroup.WithContext(t.Context())
-	eg.GoTag(ectx, "client->server write", func(ctx context.Context) error {
+	eg, ctx := ctxerrgroup.WithContext(t.Context())
+	eg.GoTag(ctx, "client->server write", func(ctx context.Context) error {
 		_, err := pw.Write([]byte(c2sMsg))
 		if nil != err {
 			t.Errorf("Error sending message to server: %v", err)
 		}
 		return err
 	})
-	eg.GoTag(ectx, "client->server read", func(ctx context.Context) error {
-		buf := make([]byte, len(c2sMsg))
-		n, err := io.ReadFull(rwc, buf)
-		if nil != err {
-			t.Errorf("Error reading message from client: %v", err)
-		}
-		if got, want := string(buf[:n]), c2sMsg; got != want {
-			t.Errorf(
-				"Incorrect message from client\n"+
-					" got: %q\n"+
-					"want: %q",
-				got,
-				want,
-			)
-		}
-		return err
-	})
-	eg.GoTag(ectx, "server->client write", func(ctx context.Context) error {
-		if _, err := rwc.Write([]byte(s2cMsg)); nil != err {
-			t.Errorf("Error sending message to client: %v", err)
-			return err
-		}
-		if err := rwc.Flush(); nil != err {
-			t.Errorf("Flush error: %v", err)
-			return err
-		}
-		return nil
-	})
-	eg.GoTag(ectx, "server->client read", func(ctx context.Context) error {
+	eg.GoTag(ctx, "server->client read", func(ctx context.Context) error {
 		buf := make([]byte, len(s2cMsg))
 		n, err := io.ReadFull(res.Body, buf)
 		if nil != err {
@@ -128,22 +131,9 @@ func TestRequestRWC(t *testing.T) {
 		t.Fatalf("Error: %v", err)
 	}
 
-	/* One-sided Close methods are all no-ops, but for just in case. */
-	if err := rwc.CloseRead(); nil != err {
-		t.Errorf("CloseRead returned error: %v", err)
-	}
-	if err := rwc.CloseWrite(); nil != err {
-		t.Errorf("CloseWrite returned error: %v", err)
-	}
-
-	/* Close should close the handler, ideally. */
-	if err := rwc.Close(); nil != err {
-		t.Errorf("Closer eturned error: %v", err)
-	}
-	/* Send it back to end the handler. */
-	rwcCh <- rwc
-	<-hDone /* Handler should also end. */
-
+	/* Wait for the handler to exit. */
+	pw.Close()
+	<-done
 }
 
 // Can we close without blocking if the client's expected a 100?

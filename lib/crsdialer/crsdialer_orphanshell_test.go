@@ -5,7 +5,7 @@ package crsdialer
  * Make sure we don't leave a shell orphaned
  * By J. Stuart McMurray
  * Created 20250924
- * Last Modified 20260802
+ * Last Modified 20260807
  */
 
 import (
@@ -47,6 +47,7 @@ func TestDial_OrphanShell(t *testing.T) {
 		defer close(hDone) /* Ditto. */
 
 		/* Enable duplex comms. */
+		defer r.Body.Close()
 		if err := hsrv.StartFullDuplex(w, r); nil != err {
 			t.Errorf("Error starting full duplex: %v", err)
 			return

@@ -5,7 +5,7 @@ package hsrv
  * HTTP handlers
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260806
+ * Last Modified 20260807
  */
 
 import (
@@ -171,6 +171,7 @@ func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
 	if nil != ws {
 		rwc = ws
 	} else {
+		defer r.Body.Close()
 		if err := StartFullDuplex(w, r); nil != err {
 			s.rErrorLogf(r, "Error starting duplex comms: %s", err)
 			return
@@ -187,6 +188,8 @@ func (s *Server) inOutHandler(w http.ResponseWriter, r *http.Request) {
 
 // StartFullDuplex enables full duplex mode on w, if possible.  This is
 // necessary for some clients which are waiting on a go-ahead.
+// This must also be paired with a deferred call to r.Body.Close:
+// https://github.com/golang/go/issues/68560#issuecomment-2246622568
 func StartFullDuplex(w http.ResponseWriter, r *http.Request) error {
 	rc := http.NewResponseController(w)
 

@@ -49,6 +49,7 @@ func testWebsocketDial(
 	if nil != err {
 		t.Fatalf("Error making websocket connection to %s: %v", u, err)
 	}
+	t.Cleanup(func() { ws.Close() })
 	return ws
 }
 
@@ -78,6 +79,7 @@ func TestServerInputHandler_Websocket(t *testing.T) {
 		s.params.URLPaths.In,
 		id,
 	)
+	defer ws.Close()
 	opshell.ExpectShellMessages(t, och,
 		testWSCLine(
 			t,
@@ -154,6 +156,7 @@ func TestServerOutputHandler_Websocket(t *testing.T) {
 		s.params.URLPaths.Out,
 		id,
 	)
+	defer ws.Close()
 	opshell.ExpectShellMessages(t, och,
 		testWSCLine(
 			t,
@@ -228,6 +231,7 @@ func TestServerInOutHandler_Websocket(t *testing.T) {
 		s.params.URLPaths.InOut,
 		id,
 	)
+	defer ws.Close()
 	opshell.ExpectShellMessages(t, och,
 		testWSCLine(
 			t,
@@ -330,6 +334,7 @@ func TestServerScriptHandler_Websocket(t *testing.T) {
 		s.params.URLPaths.Script,
 		"",
 	)
+	defer ws.Close()
 	b, err := io.ReadAll(ws)
 	if nil != err {
 		t.Fatalf("Error reading script: %v", err)

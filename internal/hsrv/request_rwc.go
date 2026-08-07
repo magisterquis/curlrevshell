@@ -5,7 +5,7 @@ package hsrv
  * Turn an http.ResponseWriter and http.Request into an io.ReadWriteCloser
  * By J. Stuart McMurray
  * Created 20260729
- * Last Modified 20260801
+ * Last Modified 20260807
  */
 
 import (

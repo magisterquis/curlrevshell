@@ -5,7 +5,7 @@ package hsrv
  * Tests for handlers.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260802
+ * Last Modified 20260807
  */
 
 import (
@@ -870,6 +870,40 @@ func TestServerRequestLogger(t *testing.T) {
 			With(LKStaticFilesDir, s.params.StaticFilesDir).
 			Info(LMFileRequested),
 	)
+}
+
+// Can we start full duplex mode on a real network connection?
+// Meant to be run 10k+ times.
+func TestStartFullDuplex_RealNetwork(t *testing.T) {
+	var (
+		done   = make(chan struct{})
+		pr, pw = io.Pipe()
+	)
+	defer pw.Close()
+	defer pr.Close()
+
+	/* Server which starts full duplex on one connection. */
+	svr := httptest.NewServer(http.HandlerFunc(func(
+		w http.ResponseWriter,
+		r *http.Request,
+	) {
+		close(done)
+		defer r.Body.Close()
+		if err := StartFullDuplex(w, r); nil != err {
+			t.Errorf("Error starting full duplex: %v", err)
+		}
+	}))
+	defer svr.Close()
+
+	pw.Close()
+	res, err := svr.Client().Post(svr.URL, "", pr)
+	if nil != err {
+		t.Fatalf("Error making POST request: %v", err)
+	}
+	defer res.Body.Close()
+
+	/* Give the handler time to report the error. */
+	<-done
 }
 
 // Do we handle failures to enable duplex mode properly?
