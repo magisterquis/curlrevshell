@@ -9,6 +9,8 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertests
 ```
+- [`t/extract_templates.t`](./t/extract_templates.t) now reports how many TAP
+  lines it'll emit.
 - Updated dependencies.
 
 `dev`
