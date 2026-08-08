@@ -22,7 +22,7 @@ import (
 // streamDir is the direction of a stream connection, input or output.
 type streamDir string
 
-// Shell messages and Log messages, keys, and values. */
+// Shell messages and Log messages, keys, and values.
 const (
 	LMAlreadyConnected = "Connection already established"
 	LMConnectionClosed = "Connection closed"
