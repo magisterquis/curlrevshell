@@ -5,7 +5,7 @@ package iobroker
  * Input side of Broker.Run.
  * By J. Stuart McMurray
  * Created 20260627
- * Last Modified 20260803
+ * Last Modified 20260808
  */
 
 import (
@@ -23,8 +23,6 @@ type inputStreamInfo struct {
 // runInput runs the input side of b.Run.
 // runInput will not return if an input stream has ich.
 func (b *Broker) runInput(ctx context.Context, ich <-chan string) {
-	defer context.AfterFunc(ctx, func() {
-	})
 	/* Send ich to an input stream. */
 	if !b.sendIch(ctx, ich) {
 		/* Nope, we still have it, time to give up. */

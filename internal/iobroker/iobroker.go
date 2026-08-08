@@ -6,7 +6,7 @@ package iobroker
  * Hook up io.Read/Writers to opshell channels
  * By J. Stuart McMurray
  * Created 20260620
- * Last Modified 20260803
+ * Last Modified 20260808
  */
 
 import (
@@ -140,9 +140,6 @@ func (b *Broker) Run(
 			close(ch)
 		}
 	}
-
-	/* Input's also done when we're shutting down. */
-	defer context.AfterFunc(ctx, b.closeInputDone)
 
 	/* Guiding principle: We only do things when we own ich/och; no exiting
 	on context done if we don't have ich/och. */
