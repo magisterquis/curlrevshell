@@ -2,19 +2,13 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`bettertests`
--------------
+`dev`
+-----
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@bettertests
+go install github.com/magisterquis/curlrevshell@dev
 ```
-- [`t/extract_templates.t`](./t/extract_templates.t) now reports how many TAP
-  lines it'll emit.
-- Updated dependencies.
-
-`dev`
------
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
   vulnerability.
 - Automate updates to [`README.md`](./README.md) and
@@ -32,6 +26,8 @@ go install github.com/magisterquis/curlrevshell@bettertests
   less likely.
 - [`sstls`](./lib/sstls) - Overwriting an archive now overwrites the whole
   archive and leaves no survivors.
+- [`t/extract_templates.t`](./t/extract_templates.t) now reports how many TAP
+  lines it'll emit.
 - Tests are a little better.
 - Updated dependencies.
 
