@@ -5,7 +5,7 @@ package iobroker
  * Hook up shell input streams to ich
  * By J. Stuart McMurray
  * Created 20260628
- * Last Modified 20260721
+ * Last Modified 20260809
  */
 
 import (
@@ -18,7 +18,11 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
+	"github.com/magisterquis/curlrevshell/internal/jsonstream"
 )
+
+// nopEF is an function that returns a nil error.
+var nopEF = func() error { return nil }
 
 // HandleInput proxies from b's input channel (ich)  to the connected shell
 // input stream in, ensuring that
@@ -69,10 +73,12 @@ func proxyInput(
 		flush = rc.Flush
 	} else if f, ok := in.(interface{ Flush() error }); ok {
 		flush = f.Flush
+	} else if _, ok := in.(*jsonstream.Stream); ok {
+		flush = nopEF
 	} else if testing.Testing() {
 		switch in.(type) {
 		case *io.PipeWriter, bidirpipe.Pipe:
-			flush = func() error { return nil }
+			flush = nopEF
 		}
 	}
 	if nil == flush {
@@ -80,7 +86,7 @@ func proxyInput(
 			LMUnknownInputType,
 			LKType, reflect.TypeOf(in).String(),
 		)
-		flush = func() error { return nil }
+		flush = nopEF
 	}
 
 	/* send sends a line to in.  If send returns an error, it will have

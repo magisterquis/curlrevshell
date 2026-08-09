@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260801
+ * Last Modified 20260809
  */
 
 import (
@@ -160,9 +160,6 @@ func newTestServer(ctx context.Context, t *testing.T, conf *testServerConfig) (
 	})
 
 	/* Server started? */
-	opshell.ExpectShellMessages(t, och, opshell.CLine{
-		Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
-	})
 	tb.Expect(t.Context(), t,
 		tlog.M.
 			With(LKFingerprint, s.l.Fingerprint).
@@ -639,4 +636,16 @@ func TestServerDo_ServeError(t *testing.T) {
 		t.Errorf("Error closing listener: %v", err)
 	}
 	<-done
+}
+
+// Do we report our own address properly?
+func TestServerAddr(t *testing.T) {
+	_, _, _, _, _, s := newTestServer(t.Context(), t, nil)
+	if got, want := s.Addr().String(), s.l.Addr().String(); got != want {
+		t.Errorf(
+			"Incorrect listen address\n got: %v\nwant: %v",
+			got,
+			want,
+		)
+	}
 }

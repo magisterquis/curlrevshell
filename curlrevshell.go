@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20270802
+ * Last Modified 20270809
  */
 
 import (
@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/magisterquis/curlrevshell/internal/adsrv"
 	"github.com/magisterquis/curlrevshell/internal/currentversion"
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
@@ -73,7 +74,9 @@ const (
 
 func main() { os.Exit(rmain()) }
 func rmain() int {
-	pledgeunveil.MustPledge("cpath flock inet rpath stdio tty unveil wpath")
+	pledgeunveil.MustPledge(
+		"cpath flock inet rpath stdio tty unix unveil wpath",
+	)
 	/* Command-line flags. */
 	var cbAddrs []string
 	var (
@@ -81,6 +84,11 @@ func rmain() int {
 			"listen-address",
 			"0.0.0.0:4444",
 			"Listen `address`",
+		)
+		adapterPath = flag.String(
+			"adapter-socket",
+			"",
+			"Unix socket `path` for adapters",
 		)
 		fdir = flag.String(
 			"serve-files-from",
@@ -219,6 +227,7 @@ Options:
 
 	/* If we're just printing it, life's easy. */
 	if *printCtrlI {
+		pledgeunveil.MustPledge("rpath stdio unveil")
 		if err := pledgeunveil.MultiUnveil(
 			[][2]string{{*insertFile, "r"}},
 		); nil != err {
@@ -267,13 +276,18 @@ Options:
 		{*insertFile, "r"},
 		{*logFile, "cw"},
 		{*tmplf, "r"},
+		{*adapterPath, "cw"},
 	}); errors.Is(err, syscall.ENOENT) {
 		log.Printf("Unveil error: %s", err)
 		return 4
 	} else if nil != err {
 		panic("unveil: " + err.Error())
 	}
-	pledgeunveil.MustPledge("cpath flock inet rpath stdio tty wpath")
+	pledges := "cpath flock inet rpath stdio tty wpath"
+	if "" != *adapterPath {
+		pledges += " unix"
+	}
+	pledgeunveil.MustPledge(pledges)
 
 	/* Channels for comms between subsystems. */
 	var (
@@ -384,7 +398,7 @@ Options:
 	}
 
 	/* HTTPS Server */
-	svr, err := hsrv.New(
+	hServer, err := hsrv.New(
 		sl,
 		*addr,
 		*tmplf,
@@ -412,17 +426,51 @@ Options:
 		)
 		return 2
 	}
+	shell.Logf(
+		opshell.ColorNone,
+		false,
+		"Listening on %s",
+		hServer.Addr(),
+	)
+
+	/* Adapter server. */
+	var adServer *adsrv.Server
+	if "" != *adapterPath {
+		var err error
+		if adServer, err = adsrv.New(
+			sl,
+			*adapterPath,
+			iob,
+		); nil != err {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Error setting Adapter service: %s",
+				err,
+			)
+			return 7
+		}
+		shell.Logf(
+			opshell.ColorNone,
+			false,
+			"Listening for adapters on %s",
+			adServer.Addr(),
+		)
+	}
 
 	/* Print helpful help messages. */
-	svr.RegisterOneLiners()
+	hServer.RegisterOneLiners()
 
 	/* Start ALL the things. */
 	eg, ectx := ctxerrgroup.WithContext(context.Background())
 	eg.GoTag(ectx, "shell", shell.Do)
-	eg.GoTag(ectx, "server", svr.Do)
+	eg.GoTag(ectx, "server", hServer.Do)
 	eg.GoTag(ectx, "i/o broker", func(ctx context.Context) error {
 		return iob.Run(ctx, ich, *oneShell)
 	})
+	if nil != adServer {
+		eg.GoTag(ectx, "adapter", adServer.Run)
+	}
 
 	/* SIGUSR1 is equivalent to Ctrl+I. */
 	eg.GoContext(ectx, func(ctx context.Context) error {

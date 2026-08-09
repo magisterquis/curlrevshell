@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260803194756-2461bf013b92+dirty (adapters branch)
+Version v0.0.1-beta.8.0.20260808092229-fc99f4fa5989+dirty (adapters branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
@@ -76,6 +76,8 @@ Ctrl+S - Print locally what Ctrl+I would send
 Tab    - Same as Ctrl+I
 
 Options:
+  -adapter-socket path
+    	Unix socket path for adapters
   -callback-address address
     	Additional callback address or domain, for one-liner printing (may be repeated)
   -ctrl-i source

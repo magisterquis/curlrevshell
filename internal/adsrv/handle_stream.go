@@ -1,0 +1,75 @@
+package adsrv
+
+/*
+ * handle_stream.go
+ * Handle stream connections
+ * By J. Stuart McMurray
+ * Created 20260808
+ * Last Modified 20260808
+ */
+
+import (
+	"context"
+	"encoding/json"
+	"encoding/json/jsontext"
+	"log/slog"
+
+	"github.com/magisterquis/curlrevshell/internal/jsonstream"
+)
+
+// HandleStream handles a connection from an adapter requesting connection to
+// a stream (i.e. /i, /io, or /o).
+// cr.ConnType must be ConnTypeShellInput, ConnTypeShellInOut, or
+// ConnTypeShellOutput.
+func (s *Server) handleStream(
+	ctx context.Context,
+	sl *slog.Logger,
+	ct ConnType,
+	jv jsontext.Value, /* Args, unparsed. */
+	js *jsonstream.Stream,
+) error {
+	/* Parse the info we'll need. */
+	var ssa ConnTypeShellStreamArgs
+	if err := json.Unmarshal(jv, &ssa); nil != err {
+		sl.Warn(
+			LMConnRequestArgsError,
+			LKError, err,
+		)
+		sendConnResponse(sl, js, err)
+		return nil
+	}
+	if nil != ssa.LogInfo {
+		sl = sl.With(LKAdapterInfo, ssa.LogInfo)
+	}
+
+	/* Work out how to handle the request.  Weren't generics supposed to
+	have this solved? */
+	var handle func()
+	switch ssa.Direction {
+	case ShellStreamDirectionInput:
+		handle = func() {
+			s.iob.HandleInput(ctx, sl, ssa.ID, ssa.Tag, js)
+		}
+	case ShellStreamDirectionInOut:
+		handle = func() {
+			s.iob.HandleBidirectional(ctx, sl, ssa.ID, ssa.Tag, js)
+		}
+	case ShellStreamDirectionOutput:
+		handle = func() {
+			s.iob.HandleOutput(ctx, sl, ssa.ID, ssa.Tag, js)
+		}
+	default:
+		sendConnResponse(sl, js, UnknownShellStreamDirectionError{
+			Direction: ssa.Direction,
+		})
+		return nil
+	}
+
+	/* Looks like we're all set. */
+	if !sendConnResponse(sl, js, nil) {
+		return nil
+	}
+	handle()
+
+	return nil
+}

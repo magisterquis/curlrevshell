@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260801
+ * Last Modified 20260809
  */
 
 import (
@@ -25,7 +25,6 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
-	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/sstls"
 )
 
@@ -119,7 +118,6 @@ func New(
 	}
 
 	/* Tell everybody we're listening. */
-	s.logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
 	sl.Info(
 		LMListenerStarted,
 		LKListenAddr, l.Addr().String(),
@@ -194,6 +192,9 @@ func (s *Server) Do(ctx context.Context) error {
 		return hsvr.Shutdown(toctx)
 	}
 }
+
+// Addr returns s's listener's address.
+func (s *Server) Addr() net.Addr { return s.l.Addr() }
 
 // slogAttrsFromURLPaths turns p.URLPaths into Attrs suitable for sending to
 // one of slog.Logger's methods.
