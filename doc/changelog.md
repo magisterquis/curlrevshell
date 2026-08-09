@@ -31,6 +31,8 @@ go install github.com/magisterquis/curlrevshell@adapters
   less likely.
 - [`sstls`](./lib/sstls) - Overwriting an archive now overwrites the whole
   archive and leaves no survivors.
+- [`t/extract_templates.t`](./t/extract_templates.t) now reports how many TAP
+  lines it'll emit.
 - Tests are a little better.
 - Updated dependencies.
 
