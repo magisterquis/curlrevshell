@@ -1,5 +1,5 @@
-// Package jsonstream - Bidirectional stream of JSON objects.
-package jsonstream
+// Package crsadapter - Bidirectional stream of JSON objects.
+package crsadapter
 
 /*
  * jsonstream.go
@@ -23,7 +23,8 @@ var ErrDecodeAfterRead = errors.New(
 	"attempt to decode JSON value after reading raw bytes",
 )
 
-// Streamer is the interface Stream wraps.
+// Streamer is the interface Stream wraps.  In particular, [net.UnixConn]
+// satisfies Streamer.
 type Streamer interface {
 	io.ReadWriteCloser
 	CloseRead() error
@@ -44,8 +45,8 @@ type Stream struct {
 	enc *jsontext.Encoder
 }
 
-// New returns a new jsonStream wrapping c.
-func New(b Streamer) *Stream {
+// NewStream returns a new Stream wrapping s.
+func NewStream(b Streamer) *Stream {
 	decCh := make(chan *jsontext.Decoder, 1)
 	decCh <- jsontext.NewDecoder(b)
 	return &Stream{

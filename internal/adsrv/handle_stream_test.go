@@ -20,8 +20,8 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/internal/jsonstream"
 	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
@@ -50,11 +50,11 @@ func testServerHandleStreamSeparateInputAndOutput(t *testing.T) {
 	defer close(pch)
 
 	/* Existing connection is shell input. */
-	shellInput := jsonstream.New(c)
-	cReq := ConnRequest{
-		ConnType: ConnTypeShellStream,
-		Args: ConnTypeShellStreamArgs{
-			Direction: ShellStreamDirectionInput,
+	shellInput := crsadapter.NewStream(c)
+	cReq := crsadapter.ConnRequest{
+		ConnType: crsadapter.ConnTypeShellStream,
+		Args: crsadapter.ConnTypeShellStreamArgs{
+			Direction: crsadapter.ShellStreamDirectionInput,
 			ID:        id,
 			Tag:       tag,
 			LogInfo:   inLogInfo,
@@ -63,7 +63,7 @@ func testServerHandleStreamSeparateInputAndOutput(t *testing.T) {
 	if err := shellInput.Send(cReq); nil != err {
 		t.Fatalf("Error requesting input connection: %v", err)
 	}
-	var cRes ConnResponse
+	var cRes crsadapter.ConnResponse
 	if err := shellInput.DecodeNext(&cRes); nil != err {
 		t.Fatalf("Error decoding response to input request: %v", err)
 	} else if "" != cRes.Error {
@@ -95,11 +95,11 @@ func testServerHandleStreamSeparateInputAndOutput(t *testing.T) {
 
 	/* New connection for shell output. */
 	pch <- pr
-	shellOutput := jsonstream.New(pl)
-	cReq = ConnRequest{
-		ConnType: ConnTypeShellStream,
-		Args: ConnTypeShellStreamArgs{
-			Direction: ShellStreamDirectionOutput,
+	shellOutput := crsadapter.NewStream(pl)
+	cReq = crsadapter.ConnRequest{
+		ConnType: crsadapter.ConnTypeShellStream,
+		Args: crsadapter.ConnTypeShellStreamArgs{
+			Direction: crsadapter.ShellStreamDirectionOutput,
 			ID:        id,
 			Tag:       tag,
 			LogInfo:   outLogInfo,
@@ -108,7 +108,7 @@ func testServerHandleStreamSeparateInputAndOutput(t *testing.T) {
 	if err := shellOutput.Send(cReq); nil != err {
 		t.Fatalf("Error requesting input connection: %v", err)
 	}
-	cRes = ConnResponse{}
+	cRes = crsadapter.ConnResponse{}
 	if err := shellOutput.DecodeNext(&cRes); nil != err {
 		t.Fatalf("Error decoding response to input request: %v", err)
 	} else if "" != cRes.Error {
@@ -268,11 +268,11 @@ func testServerHandleStreamBidirectional(t *testing.T) {
 	)
 
 	/* Upgrade to a shell. */
-	js := jsonstream.New(c)
-	cReq := ConnRequest{
-		ConnType: ConnTypeShellStream,
-		Args: ConnTypeShellStreamArgs{
-			Direction: ShellStreamDirectionInOut,
+	js := crsadapter.NewStream(c)
+	cReq := crsadapter.ConnRequest{
+		ConnType: crsadapter.ConnTypeShellStream,
+		Args: crsadapter.ConnTypeShellStreamArgs{
+			Direction: crsadapter.ShellStreamDirectionInOut,
 			ID:        id,
 			Tag:       tag,
 			LogInfo:   logInfo,
@@ -281,7 +281,7 @@ func testServerHandleStreamBidirectional(t *testing.T) {
 	if err := js.Send(cReq); nil != err {
 		t.Fatalf("Error requesting in/out connection: %v", err)
 	}
-	var cRes ConnResponse
+	var cRes crsadapter.ConnResponse
 	if err := js.DecodeNext(&cRes); nil != err {
 		t.Fatalf("Error decoding response to in/out request: %v", err)
 	} else if "" != cRes.Error {
@@ -446,7 +446,7 @@ func testServerHandleStreamArgsParseError(t *testing.T) {
 	})
 	/* Error on the connection correct? */
 	wg.Go(func() {
-		var cRes ConnResponse
+		var cRes crsadapter.ConnResponse
 		if err := sc.DecodeNext(&cRes); nil != err {
 			t.Errorf("Error decoding response: %v", err)
 			return
@@ -471,7 +471,7 @@ func testServerHandleStreamArgsParseError(t *testing.T) {
 		tlog.M.
 			With(
 				LKConnResponse,
-				ConnResponse{Error: wantErr},
+				crsadapter.ConnResponse{Error: wantErr},
 			).
 			Debug(LMConnResponseSent),
 	)
@@ -486,7 +486,7 @@ func testServerHandleStreamUnknownDirection(t *testing.T) {
 		id, tag           = tlog.S("id"), tlog.S("tag")
 		logInfo           = tlog.S("log-info")
 		m, tb, _, _, c, _ = newTestServer(t, nil)
-		dir               = ShellStreamDirection(
+		dir               = crsadapter.ShellStreamDirection(
 			tlog.S("invalid-direction"),
 		)
 
@@ -494,11 +494,11 @@ func testServerHandleStreamUnknownDirection(t *testing.T) {
 	)
 
 	/* Upgrade to a shell. */
-	js := jsonstream.New(c)
-	cReq := ConnRequest{
-		ConnType: ConnTypeShellStream,
-		Args: ConnTypeShellStreamArgs{
-			Direction: ShellStreamDirection(dir),
+	js := crsadapter.NewStream(c)
+	cReq := crsadapter.ConnRequest{
+		ConnType: crsadapter.ConnTypeShellStream,
+		Args: crsadapter.ConnTypeShellStreamArgs{
+			Direction: crsadapter.ShellStreamDirection(dir),
 			ID:        id,
 			Tag:       tag,
 			LogInfo:   logInfo,
@@ -507,7 +507,7 @@ func testServerHandleStreamUnknownDirection(t *testing.T) {
 	if err := js.Send(cReq); nil != err {
 		t.Fatalf("Error requesting input connection: %v", err)
 	}
-	var cRes ConnResponse
+	var cRes crsadapter.ConnResponse
 	if err := js.DecodeNext(&cRes); nil != err {
 		t.Fatalf("Error decoding response to input request: %v", err)
 	}
@@ -541,11 +541,11 @@ func testServerHandleStreamReplyError(t *testing.T) {
 	)
 
 	/* Upgrade to a shell. */
-	js := jsonstream.New(c)
-	cReq := ConnRequest{
-		ConnType: ConnTypeShellStream,
-		Args: ConnTypeShellStreamArgs{
-			Direction: ShellStreamDirectionInput,
+	js := crsadapter.NewStream(c)
+	cReq := crsadapter.ConnRequest{
+		ConnType: crsadapter.ConnTypeShellStream,
+		Args: crsadapter.ConnTypeShellStreamArgs{
+			Direction: crsadapter.ShellStreamDirectionInput,
 			ID:        id,
 			Tag:       tag,
 			LogInfo:   logInfo,

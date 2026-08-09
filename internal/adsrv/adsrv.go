@@ -55,6 +55,7 @@ type Server struct {
 // testClientsChannelContextKey extracts a channel from a context on which are
 // sent what would be connected clients without the need for unix socket
 // syscalls.
+// It should only be used for testing.
 type testClientsChannelContextKey struct{}
 
 // New listens on the unix socket lPath, unlinking it if it exists, and returns

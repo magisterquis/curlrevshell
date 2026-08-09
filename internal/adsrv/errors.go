@@ -10,6 +10,8 @@ package adsrv
 
 import (
 	"fmt"
+
+	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
 
 // ErrUnspecifiedConnType indicates an adapter requested a connection without
@@ -22,7 +24,7 @@ var ErrConnRequestTimeout = fmt.Errorf("timeout reading conection request")
 // UnknownConnTypeError indicates an adapter requested a connection with an
 // unknown ConnType.
 type UnknownConnTypeError struct {
-	ConnType ConnType
+	ConnType crsadapter.ConnType
 }
 
 // Error implements the error interface.
@@ -33,7 +35,7 @@ func (err UnknownConnTypeError) Error() string {
 // UnknownShellStreamDirectionError indicates an adapter requested a shell
 // stream with an unknown direction.
 type UnknownShellStreamDirectionError struct {
-	Direction ShellStreamDirection
+	Direction crsadapter.ShellStreamDirection
 }
 
 // Error implements the error interface.
@@ -43,7 +45,7 @@ func (err UnknownShellStreamDirectionError) Error() string {
 
 // ConnResponseError is an error type wrapping a ConnResponse.
 type ConnResponseError struct {
-	ConnResponse
+	crsadapter.ConnResponse
 }
 
 // Error returns err's underlying string, which may be the empty string.

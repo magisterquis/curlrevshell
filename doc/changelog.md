@@ -10,6 +10,8 @@ the next tagged version.  Get them with
 go install github.com/magisterquis/curlrevshell@adapters
 ```
 - Logfile locking should work better with non-file files.
+- Preliminary support for comms adapters, for things like C2 over CW.
+- [`crsadapter`](../lib/crsadapter) - New library for adaptering.
 - Updated dependencies.
 
 `dev`

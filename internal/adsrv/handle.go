@@ -5,7 +5,7 @@ package adsrv
  * Handle connected adapters
  * By J. Stuart McMurray
  * Created 20260808
- * Last Modified 20260808
+ * Last Modified 20260809
  */
 
 import (
@@ -16,7 +16,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/magisterquis/curlrevshell/internal/jsonstream"
+	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
 
 // ConnRequestMaxWait is the maximum time [Server] will wait for a
@@ -36,9 +36,9 @@ type bidirIO interface {
 type handlerFunc func(
 	ctx context.Context,
 	sl *slog.Logger,
-	ct ConnType,
+	ct crsadapter.ConnType,
 	jv jsontext.Value, /* Args, unparsed. */
-	js *jsonstream.Stream,
+	js *crsadapter.Stream,
 ) error
 
 // Handle handles a connection from an adapter.  If an error is returned, it
@@ -52,7 +52,7 @@ func (s *Server) handle(
 	defer c.Close()
 
 	/* JSON stream reader. */
-	js := jsonstream.New(c)
+	js := crsadapter.NewStream(c)
 
 	/* Work out what this thing is. */
 	toCtx, cancel := context.WithTimeoutCause(
@@ -64,7 +64,7 @@ func (s *Server) handle(
 	stop := context.AfterFunc(toCtx, func() { c.Close() })
 	defer stop()
 	args := new(jsontext.Value)
-	cr := ConnRequest{Args: args}
+	cr := crsadapter.ConnRequest{Args: args}
 	if err := js.DecodeNext(&cr); nil != err {
 		if cause := context.Cause(toCtx); errors.Is(
 			cause,
@@ -92,10 +92,10 @@ func (s *Server) handle(
 		err error
 	)
 	switch cr.ConnType {
-	case ConnTypeUnspecified:
+	case crsadapter.ConnTypeUnspecified:
 		/* Empty */
 		err = ErrUnspecifiedConnType
-	case ConnTypeShellStream:
+	case crsadapter.ConnTypeShellStream:
 		/* Shell i/o. */
 		h = s.handleStream
 	default:
@@ -119,9 +119,9 @@ func (s *Server) handle(
 // before sending anything else on js.  If the request was accepted, rErr
 // should be nil.
 // On send error, a message is logged and Reply returns false.
-func sendConnResponse(sl *slog.Logger, js *jsonstream.Stream, rErr error) bool {
+func sendConnResponse(sl *slog.Logger, js *crsadapter.Stream, rErr error) bool {
 	/* Roll a response. */
-	cr := new(ConnResponse)
+	cr := new(crsadapter.ConnResponse)
 	if nil != rErr {
 		cr.Error = rErr.Error()
 	}

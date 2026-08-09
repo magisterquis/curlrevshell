@@ -14,7 +14,7 @@ import (
 	"encoding/json/jsontext"
 	"log/slog"
 
-	"github.com/magisterquis/curlrevshell/internal/jsonstream"
+	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
 
 // HandleStream handles a connection from an adapter requesting connection to
@@ -24,12 +24,12 @@ import (
 func (s *Server) handleStream(
 	ctx context.Context,
 	sl *slog.Logger,
-	ct ConnType,
+	ct crsadapter.ConnType,
 	jv jsontext.Value, /* Args, unparsed. */
-	js *jsonstream.Stream,
+	js *crsadapter.Stream,
 ) error {
 	/* Parse the info we'll need. */
-	var ssa ConnTypeShellStreamArgs
+	var ssa crsadapter.ConnTypeShellStreamArgs
 	if err := json.Unmarshal(jv, &ssa); nil != err {
 		sl.Warn(
 			LMConnRequestArgsError,
@@ -46,15 +46,15 @@ func (s *Server) handleStream(
 	have this solved? */
 	var handle func()
 	switch ssa.Direction {
-	case ShellStreamDirectionInput:
+	case crsadapter.ShellStreamDirectionInput:
 		handle = func() {
 			s.iob.HandleInput(ctx, sl, ssa.ID, ssa.Tag, js)
 		}
-	case ShellStreamDirectionInOut:
+	case crsadapter.ShellStreamDirectionInOut:
 		handle = func() {
 			s.iob.HandleBidirectional(ctx, sl, ssa.ID, ssa.Tag, js)
 		}
-	case ShellStreamDirectionOutput:
+	case crsadapter.ShellStreamDirectionOutput:
 		handle = func() {
 			s.iob.HandleOutput(ctx, sl, ssa.ID, ssa.Tag, js)
 		}

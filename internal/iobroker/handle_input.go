@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
-	"github.com/magisterquis/curlrevshell/internal/jsonstream"
+	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
 
 // nopEF is an function that returns a nil error.
@@ -73,7 +73,7 @@ func proxyInput(
 		flush = rc.Flush
 	} else if f, ok := in.(interface{ Flush() error }); ok {
 		flush = f.Flush
-	} else if _, ok := in.(*jsonstream.Stream); ok {
+	} else if _, ok := in.(*crsadapter.Stream); ok {
 		flush = nopEF
 	} else if testing.Testing() {
 		switch in.(type) {

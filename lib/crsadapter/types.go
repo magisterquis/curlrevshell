@@ -1,8 +1,8 @@
-package adsrv
+package crsadapter
 
 /*
  * types.go
- * JSON message types
+ * Adapter JSON message types
  * By J. Stuart McMurray
  * Created 20260808
  * Last Modified 20260809

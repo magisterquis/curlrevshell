@@ -17,15 +17,15 @@ import (
 	"testing/synctest"
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
-	"github.com/magisterquis/curlrevshell/internal/jsonstream"
 	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
 
 // newTestJSONStreamPair returns two connected jsonstreams.
-func newTestJSONStreamPair(t *testing.T) (a, b *jsonstream.Stream) {
+func newTestJSONStreamPair(t *testing.T) (a, b *crsadapter.Stream) {
 	l, r := bidirpipe.New()
 	t.Cleanup(func() { l.Close(); r.Close() })
-	return jsonstream.New(l), jsonstream.New(r)
+	return crsadapter.NewStream(l), crsadapter.NewStream(r)
 }
 
 // Can we send ConnResponses?
@@ -35,7 +35,7 @@ func TestSendConnResponse(t *testing.T) {
 		var (
 			want   string
 			c, s   = newTestJSONStreamPair(t)
-			cr     ConnResponse
+			cr     crsadapter.ConnResponse
 			tb, sl = tlog.NewBuffer()
 			wg     sync.WaitGroup
 		)
@@ -88,7 +88,7 @@ func TestSendConnResponse_Error(t *testing.T) {
 	var (
 		rErr   = syscall.ENOMEM
 		c, s   = newTestJSONStreamPair(t)
-		cr     = ConnResponse{Error: rErr.Error()}
+		cr     = crsadapter.ConnResponse{Error: rErr.Error()}
 		tb, sl = tlog.NewBuffer()
 	)
 	/* Won't actually get the response. */
@@ -135,17 +135,19 @@ func testServerHandleConnRequestTimeout(t *testing.T) {
 // Do we timeout connections that don't send a request fast enough?
 func TestServerHandle_IncorrectConnType(t *testing.T) {
 	/* Try sends a request for a ConnType and expects wantErr. */
-	try := func(t *testing.T, ct ConnType, wantErr error) {
+	try := func(t *testing.T, ct crsadapter.ConnType, wantErr error) {
 		m, tb, _, _, c, _ := newTestServer(t, nil)
 
 		/* Send a connection request. */
-		js := jsonstream.New(c)
-		if err := js.Send(ConnRequest{ConnType: ct}); nil != err {
+		js := crsadapter.NewStream(c)
+		if err := js.Send(crsadapter.ConnRequest{
+			ConnType: ct,
+		}); nil != err {
 			t.Fatalf("Error sending ConnRequest: %v", err)
 		}
 
 		/* Should get a response, a newline, and a disconnect. */
-		var cr ConnResponse
+		var cr crsadapter.ConnResponse
 		if err := js.DecodeNext(&cr); nil != err {
 			t.Fatalf("Error getting ConnResponse")
 		}
@@ -172,7 +174,10 @@ func TestServerHandle_IncorrectConnType(t *testing.T) {
 
 		/* Get a warning? */
 		rm := m.
-			With(LKConnRequest, ConnRequest{ConnType: ct})
+			With(
+				LKConnRequest,
+				crsadapter.ConnRequest{ConnType: ct},
+			)
 		tb.WithExpectEmpty().Expect(t.Context(), t,
 			rm.
 				Debug(LMConnRequestReceived),
@@ -182,21 +187,23 @@ func TestServerHandle_IncorrectConnType(t *testing.T) {
 			m.
 				With(
 					LKConnResponse,
-					ConnResponse{Error: wantErr.Error()},
+					crsadapter.ConnResponse{
+						Error: wantErr.Error(),
+					},
 				).
 				Debug(LMConnResponseSent),
 		)
 	}
-	sTry := func(t *testing.T, ct ConnType, wantErr error) {
+	sTry := func(t *testing.T, ct crsadapter.ConnType, wantErr error) {
 		synctest.Test(t, func(t *testing.T) {
 			try(t, ct, wantErr)
 		})
 	}
 	t.Run("empty", func(t *testing.T) {
-		sTry(t, ConnTypeUnspecified, ErrUnspecifiedConnType)
+		sTry(t, crsadapter.ConnTypeUnspecified, ErrUnspecifiedConnType)
 	})
 	t.Run("invalid", func(t *testing.T) {
-		ct := ConnType(tlog.S("invalid"))
+		ct := crsadapter.ConnType(tlog.S("invalid"))
 		sTry(t, ct, UnknownConnTypeError{ct})
 	})
 }

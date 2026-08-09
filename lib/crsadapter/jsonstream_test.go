@@ -1,4 +1,4 @@
-package jsonstream
+package crsadapter
 
 /*
  * jsonstream_test.go
@@ -13,6 +13,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net"
 	"path/filepath"
@@ -28,7 +29,7 @@ import (
 func newTestJSONStreamPair(t *testing.T) (*Stream, *Stream) {
 	l, r := bidirpipe.New()
 	t.Cleanup(func() { l.Close(); r.Close() })
-	return New(l), New(r)
+	return NewStream(l), NewStream(r)
 }
 
 // newTestJSONStream returns a jsonStream and the pipe connected to the other
@@ -36,7 +37,7 @@ func newTestJSONStreamPair(t *testing.T) (*Stream, *Stream) {
 func newTestJSONStream(t *testing.T) (bidirpipe.Pipe, *Stream) {
 	pr, pj := bidirpipe.New()
 	t.Cleanup(func() { pr.Close(); pj.Close() })
-	return pr, New(pj)
+	return pr, NewStream(pj)
 }
 
 // Can we make a new stream?
@@ -44,29 +45,13 @@ func TestJSONStream_Smoketest(t *testing.T) {
 	t.Run("connected_pair", func(t *testing.T) { newTestJSONStreamPair(t) })
 	t.Run("bidirpipe", func(t *testing.T) { newTestJSONStream(t) })
 	t.Run("unix", func(t *testing.T) {
-		/* Unix listener. */
-		ua := &net.UnixAddr{
-			Name: filepath.Join(t.TempDir(), "l"),
-			Net:  "unix",
-		}
-		l, err := net.ListenUnix("unix", ua)
-		if nil != err {
-			t.Fatalf("Listen error: %v", err)
-		}
-		defer l.Close()
-		/* Unix connection. */
-		c, err := net.DialUnix("unix", nil, ua)
-		if nil != err {
-			t.Fatalf("Dial error: %v", err)
-		}
-		defer c.Close()
-		/* Smoketest? */
-		New(c)
+		c, _ := testUnixPair(t)
+		NewStream(c)
 	})
 }
 
-// Can we send and receive JSON?
-func TestJSONStream_JSON(t *testing.T) {
+// Can we send and receive JSON and then bytes?
+func TestJSONStream(t *testing.T) {
 	/* Message type we'll send via JSON. */
 	type msgT struct {
 		S string
@@ -119,7 +104,7 @@ func TestJSONStream_JSON(t *testing.T) {
 
 	/* Wait for it to all be done. */
 	if err := eg.Wait(); nil != err {
-		t.Fatalf("Error: %v", err)
+		t.Fatalf("JSON tx/rx error: %v", err)
 	}
 
 	/* Did we get them all? */
@@ -134,6 +119,33 @@ func TestJSONStream_JSON(t *testing.T) {
 				want,
 			)
 		}
+	}
+
+	/* Can we send bytes? */
+	var (
+		plainBytes = tlog.S("plain-bytes")
+	)
+	eg, ctx = ctxerrgroup.WithContext(t.Context())
+	eg.GoTag(ctx, "write", func(ctx context.Context) error {
+		_, err := io.WriteString(src, plainBytes)
+		return err
+	})
+	eg.GoTag(ctx, "read", func(ctx context.Context) error {
+		buf := make([]byte, len(plainBytes))
+		n, err := io.ReadFull(dst, buf)
+		if got, want := string(buf[:n]), plainBytes; got != want {
+			t.Errorf(
+				"Read incorrect plain bytes\n"+
+					" got: %q\n"+
+					"want: %q",
+				got,
+				want,
+			)
+		}
+		return err
+	})
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Plain bytes tx/rx error: %v", err)
 	}
 }
 
@@ -211,4 +223,67 @@ func TestJSONStreamRead(t *testing.T) {
 			)
 		}
 	})
+}
+
+// testUnixPair returns a pair of connected Unix sockets.
+func testUnixPair(t *testing.T) (c, s *net.UnixConn) {
+	t.Helper()
+
+	var (
+		eg, ctx = ctxerrgroup.WithContext(t.Context())
+		td      = t.TempDir()
+	)
+
+	/* Unix listener. */
+	l, err := net.ListenUnix("unix", &net.UnixAddr{
+		Name: filepath.Join(td, "s"),
+		Net:  "unix",
+	})
+	if nil != err {
+		t.Fatalf("Listen error: %v", err)
+	}
+	defer l.Close()
+
+	/* Connect as a client. */
+	eg.GoTag(ctx, "client", func(ctx context.Context) error {
+		var err error
+		if c, err = (&net.Dialer{}).DialUnix(
+			ctx,
+			l.Addr().Network(),
+			&net.UnixAddr{
+				Name: filepath.Join(td, "c"),
+				Net:  "unix",
+			},
+			l.Addr().(*net.UnixAddr),
+		); nil != err {
+			t.Errorf("Dial error: %v", err)
+		}
+		return err
+	})
+	/* Accept as the server. */
+	eg.GoTag(ctx, "server", func(ctx context.Context) error {
+		var err error
+		if s, err = l.AcceptUnix(); nil != err {
+			t.Errorf("Accept error: %v", err)
+		}
+		return err
+	})
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Errar making pair of sockets: %v", err)
+	}
+	/* Don't keep going if something went wrong. */
+	if t.Failed() {
+		if nil != c {
+			c.Close()
+		}
+		if nil != s {
+			s.Close()
+		}
+		t.FailNow()
+	}
+
+	/* Don't leak file descriptors. */
+	t.Cleanup(func() { c.Close(); s.Close() })
+
+	return c, s
 }

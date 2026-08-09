@@ -1,44 +1,18 @@
-package adsrv
+package crsadapter
 
 /*
  * errors_test.go
  * Tests for errors.go
  * By J. Stuart McMurray
- * Created 20260808
- * Last Modified 20260808
+ * Created 20260809
+ * Last Modified 20260809
  */
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/tlog"
-	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
-
-// Can we whine about an unknown ConnType?
-func TestUnknownConnTypeError(t *testing.T) {
-	var (
-		haveT = crsadapter.ConnType(tlog.S("unk"))
-		haveE = UnknownConnTypeError{haveT}
-		want  = "unknown connection type: " + string(haveT)
-	)
-
-	/* Stringification work? */
-	if got := haveE.Error(); got != want {
-		t.Errorf(
-			"Incorrect string representation\n got: %v\nwant: %v",
-			got,
-			want,
-		)
-	}
-
-	/* Can we compare easy enough? */
-	haveN := UnknownConnTypeError{haveT}
-	if !errors.Is(haveN, haveE) {
-		t.Errorf("Do actually need an Is method")
-	}
-}
 
 // Can we stringify properly?
 func TestConnResponseError_Error(t *testing.T) {
@@ -50,7 +24,7 @@ func TestConnResponseError_Error(t *testing.T) {
 		have: new(ConnResponseError),
 		want: "",
 	}, "error string": {
-		have: &ConnResponseError{ConnResponse: crsadapter.ConnResponse{Error: es}},
+		have: &ConnResponseError{ConnResponse: ConnResponse{Error: es}},
 		want: es,
 	}} {
 		t.Run(n, func(t *testing.T) {
@@ -80,28 +54,28 @@ func TestConnResponseError_Is(t *testing.T) {
 		target error
 		want   bool
 	}{"same/string": {
-		err:    ConnResponseError{crsadapter.ConnResponse{Error: errS}},
-		target: ConnResponseError{crsadapter.ConnResponse{Error: errS}},
+		err:    ConnResponseError{ConnResponse{Error: errS}},
+		target: ConnResponseError{ConnResponse{Error: errS}},
 		want:   true,
 	}, "different/string": {
-		err:    ConnResponseError{crsadapter.ConnResponse{Error: errS}},
-		target: ConnResponseError{crsadapter.ConnResponse{Error: targetS}},
+		err:    ConnResponseError{ConnResponse{Error: errS}},
+		target: ConnResponseError{ConnResponse{Error: targetS}},
 		want:   false,
 	}, "same/nil": {
-		err:    ConnResponseError{crsadapter.ConnResponse{Error: ""}},
+		err:    ConnResponseError{ConnResponse{Error: ""}},
 		target: nil,
 		want:   true,
 	}, "different/nil": {
-		err:    ConnResponseError{crsadapter.ConnResponse{Error: errS}},
+		err:    ConnResponseError{ConnResponse{Error: errS}},
 		target: nil,
 		want:   false,
 	}, "same/empty_string": {
-		err:    ConnResponseError{crsadapter.ConnResponse{}},
-		target: ConnResponseError{crsadapter.ConnResponse{}},
+		err:    ConnResponseError{ConnResponse{}},
+		target: ConnResponseError{ConnResponse{}},
 		want:   true,
 	}, "different/empty_string": {
-		err:    ConnResponseError{crsadapter.ConnResponse{Error: errS}},
-		target: ConnResponseError{crsadapter.ConnResponse{}},
+		err:    ConnResponseError{ConnResponse{Error: errS}},
+		target: ConnResponseError{ConnResponse{}},
 		want:   false,
 	}} {
 		t.Run(n, func(t *testing.T) {
