@@ -4,7 +4,7 @@
 # Can we connect via an adapter?
 # By J. Stuart McMurray
 # Created 20260809
-# Last Modified 20260809
+# Last Modified 20260812
 
 use autodie;
 use strict;
@@ -26,7 +26,6 @@ my $spath = "$tdir/s";
 # Spawn curlrevshell.
 my $pid = open2 my $crs_out, my $crs_in, 
         "go", "run", ".",
-        "-log", "log.json",
                 "-adapter-socket", $spath,
                 "-listen-address", "127.0.0.1:0",
                 "-no-timestamps",
