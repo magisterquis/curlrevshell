@@ -5,7 +5,7 @@ package adsrv
  * Tests for handle_stream.go
  * By J. Stuart McMurray
  * Created 20260808
- * Last Modified 20260809
+ * Last Modified 20260812
  */
 
 import (
@@ -570,5 +570,74 @@ func testServerHandleStreamReplyError(t *testing.T) {
 				io.ErrClosedPipe,
 			)).
 			Warn(LMConnResponseError),
+	)
+}
+
+// Do we cancel the context passed to iobroker when an input stream
+// disconnects?
+func TestServerHandleStream_InputDisconnect(t *testing.T) {
+	var (
+		id, tag   = tlog.S("id"), tlog.S("tag")
+		inLogInfo = tlog.S("in-log-info")
+
+		m, tb, _, och, c, _ = newTestServer(t, nil)
+	)
+
+	/* Turn connection into shell input. */
+	shellInput := crsadapter.NewStream(c)
+	cReq := crsadapter.ConnRequest{
+		ConnType: crsadapter.ConnTypeShellStream,
+		Args: crsadapter.ConnTypeShellStreamArgs{
+			Direction: crsadapter.ShellStreamDirectionInput,
+			ID:        id,
+			Tag:       tag,
+			LogInfo:   inLogInfo,
+		},
+	}
+	if err := shellInput.Send(cReq); nil != err {
+		t.Fatalf("Error requesting input connection: %v", err)
+	}
+	var cRes crsadapter.ConnResponse
+	if err := shellInput.DecodeNext(&cRes); nil != err {
+		t.Fatalf("Error decoding response to input request: %v", err)
+	} else if "" != cRes.Error {
+		t.Fatalf("Unhappy response to input request: %v", cRes)
+	}
+
+	/* Logs and shell messages look ok? */
+	md := m.
+		With(LKAdapterInfo, inLogInfo).
+		With(iobroker.LKDirection, iobroker.LVInput).
+		With(iobroker.LKID, id)
+	tb.WithExpectEmpty().Expect(t.Context(), t,
+		m.
+			With(LKConnRequest, cReq).
+			Debug(LMConnRequestReceived),
+		m.
+			With(LKAdapterInfo, inLogInfo).
+			With(LKConnResponse, cRes).
+			Debug(LMConnResponseSent),
+		md.
+			Info(iobroker.LMNewConnection),
+	)
+	opshell.ExpectShellMessages(t, och, opshell.CLine{
+		Color: iobroker.LogColor,
+		Line:  fmt.Sprintf("[%s] Input connected: ID %s", tag, id),
+	})
+
+	/* Close our side of the connection.  Shell should tell the user that
+	input closed. */
+	if err := shellInput.Close(); nil != err {
+		t.Fatalf("Error closing shell input: %v", err)
+	}
+
+	/* Close happily? */
+	opshell.ExpectShellMessages(t, och, opshell.CLine{
+		Color: iobroker.ErrColor,
+		Line:  fmt.Sprintf("[%s] Input connection closed", tag),
+	})
+	tb.WithExpectEmpty().Expect(t.Context(), t,
+		md.
+			Info(iobroker.LMConnectionClosed),
 	)
 }

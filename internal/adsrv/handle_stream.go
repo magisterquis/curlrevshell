@@ -5,14 +5,16 @@ package adsrv
  * Handle stream connections
  * By J. Stuart McMurray
  * Created 20260808
- * Last Modified 20260808
+ * Last Modified 20260812
  */
 
 import (
 	"context"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"io"
 	"log/slog"
+	"sync"
 
 	"github.com/magisterquis/curlrevshell/lib/crsadapter"
 )
@@ -47,8 +49,14 @@ func (s *Server) handleStream(
 	var handle func()
 	switch ssa.Direction {
 	case crsadapter.ShellStreamDirectionInput:
+		/* Context'll need a bit of help to know when to stop. */
+		ctx, cancel := context.WithCancel(ctx)
+		var wg sync.WaitGroup
+		wg.Go(func() { io.Copy(io.Discard, js); cancel() })
 		handle = func() {
 			s.iob.HandleInput(ctx, sl, ssa.ID, ssa.Tag, js)
+			js.Close() /* For just in case. */
+			wg.Wait()
 		}
 	case crsadapter.ShellStreamDirectionInOut:
 		handle = func() {
