@@ -2,13 +2,18 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`adapters`
-----------
+`wgetrevshell`
+--------------
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@adapters
+go install github.com/magisterquis/curlrevshell@wgetrevshell
 ```
+- [`wgetrevshell`](../lib/crsadapter/cmd/wgetrevshell) First whack at getting
+  adapted at adaptering.
+
+`adapters`
+----------
 - Logfile locking should work better with non-file files.
 - Preliminary support for comms adapters, for things like C2 over CW.
 - [`crsadapter`](../lib/crsadapter) - New library for adaptering.

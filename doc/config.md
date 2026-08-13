@@ -19,7 +19,7 @@ Linker Flags
 Compile-time config is done with Go's `-X` linker flag.  This usually look a
 bit like
 ```sh
-go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@adapters
+go install -ldflags '-X main.Foo=bar' github.com/magisterquis/curlrevshell@wgetrevshell
 ```
 
 The available settings are as follows:
@@ -45,7 +45,7 @@ go install -v -trimpath -ldflags "
     -X main.DefaultLog=$HOME/crs/log.json
     -X main.DefaultServeFilesFrom=$HOME/crs/files
     -X main.DefaultTemplate=$HOME/crs/crs.tmpl
-" github.com/magisterquis/curlrevshell@adapters
+" github.com/magisterquis/curlrevshell@wgetrevshell
 # ^ Install, setting defaults to $HOME/crs
 touch $HOME/crs/crs.tmpl                                 # Default template, to prevent whining
 curlrevshell -h                                          # For just in case
@@ -53,5 +53,5 @@ curlrevshell                                             # Ready to go :)
 ```
 Or, more succintly:
 ```sh
-mkdir -p $HOME/crs/{ctrl-i,files} && go install -v -trimpath -ldflags "-w -s -X main.DefaultCtrlI=$HOME/crs/ctrl-i -X main.DefaultLog=$HOME/crs/log.json -X main.DefaultServeFilesFrom=$HOME/crs/files -X main.DefaultTemplate=$HOME/crs/crs.tmpl" github.com/magisterquis/curlrevshell@adapters && touch $HOME/crs/crs.tmpl
+mkdir -p $HOME/crs/{ctrl-i,files} && go install -v -trimpath -ldflags "-w -s -X main.DefaultCtrlI=$HOME/crs/ctrl-i -X main.DefaultLog=$HOME/crs/log.json -X main.DefaultServeFilesFrom=$HOME/crs/files -X main.DefaultTemplate=$HOME/crs/crs.tmpl" github.com/magisterquis/curlrevshell@wgetrevshell && touch $HOME/crs/crs.tmpl
 ```

@@ -6,7 +6,7 @@ package iobroker
  * Hook up io.Read/Writers to opshell channels
  * By J. Stuart McMurray
  * Created 20260620
- * Last Modified 20260803
+ * Last Modified 20260812
  */
 
 import (
@@ -19,8 +19,8 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 )
 
-// streamDir is the direction of a stream connection, input or output.
-type streamDir string
+// StreamDir is the direction of a stream connection, input or output.
+type StreamDir string
 
 // Shell messages and Log messages, keys, and values. */
 const (
@@ -40,9 +40,9 @@ const (
 	LKID        = "id"
 	LKType      = "type"
 
-	LVBidir  streamDir = "bidirectional"
-	LVInput  streamDir = "input"
-	LVOutput streamDir = "output"
+	LVBidir  StreamDir = "bidirectional"
+	LVInput  StreamDir = "input"
+	LVOutput StreamDir = "output"
 
 	SMBufferingInput   = "Buffering input until a shell connects..."
 	SMConnectionClosed = "Connection closed"

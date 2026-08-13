@@ -5,7 +5,7 @@ package iobroker
  * Things common to handling input, output, and both at once
  * By J. Stuart McMurray
  * Created 20260630
- * Last Modified 20260803
+ * Last Modified 20260812
  */
 
 import (
@@ -43,7 +43,7 @@ func handleCommon[
 	id string, /* Stream ID, to match output stream. */
 	tag string, /* For messages to the user, shell's IP is good. */
 	tsiCh chan streamInfoT, /* b.isiCh/osiCh. */
-	dir streamDir, /* LVInput/Output. */
+	dir StreamDir, /* LVInput/Output. */
 	ourID *string, /* b.in/outStreamID. */
 	otherID *string, /* Ditto. */
 	stream streamT, /* io.Writer/ReadCloser To/From shell. */
@@ -133,7 +133,7 @@ func connectStreamCommon[
 	id string, /* Stream ID, to match output stream. */
 	tag string, /* For messages to the user, shell's IP is good. */
 	tsiCh chan streamInfoT, /* b.isiCh/osiCh. */
-	dir streamDir, /* LVInput/Output. */
+	dir StreamDir, /* LVInput/Output. */
 	cDir string, /* dir, capitalized. */
 	ourID *string, /* b.in/outStreamID. */
 	otherID *string, /* Ditto. */

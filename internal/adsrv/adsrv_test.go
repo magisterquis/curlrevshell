@@ -5,7 +5,7 @@ package adsrv
  * Tests for adsrv.go
  * By J. Stuart McMurray
  * Created 20260803
- * Last Modified 20260809
+ * Last Modified 20260812
  */
 
 import (
@@ -33,7 +33,7 @@ const (
 
 	// firstAdapterName is the name we expect to be given to the first
 	// adapter connection, i.e. the one returned from newTestServer.
-	firstAdapterName = adapterConnPrefix + "1"
+	firstAdapterName = AdapterConnPrefix + "1"
 )
 
 // testServerConfig is passed to newTestServer.

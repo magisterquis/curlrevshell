@@ -42,8 +42,8 @@ var (
 	LKSocketPath     = "socket_path"
 )
 
-// adapterConnPrefix is used in naming adapters with no unix path.
-const adapterConnPrefix = "adapter-conn-"
+// AdapterConnPrefix is used in naming adapters with no unix path.
+const AdapterConnPrefix = "adapter-conn-"
 
 // Server serves requests from adapters and other such things.
 type Server struct {
@@ -152,7 +152,7 @@ func (s *Server) Run(
 				name = ra.RemoteAddr().String()
 			}
 			if "" == name || "@" == name {
-				name = adapterConnPrefix + strconv.Itoa(n)
+				name = AdapterConnPrefix + strconv.Itoa(n)
 			}
 			/* Handle this client. */
 			eg.GoTag(ctx, name, func(ctx context.Context) error {

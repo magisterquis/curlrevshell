@@ -276,7 +276,7 @@ Options:
 		{*insertFile, "r"},
 		{*logFile, "cw"},
 		{*tmplf, "r"},
-		{*adapterPath, "cw"},
+		{*adapterPath, "crw"},
 	}); errors.Is(err, syscall.ENOENT) {
 		log.Printf("Unveil error: %s", err)
 		return 4
