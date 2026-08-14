@@ -10,6 +10,8 @@ the next tagged version.  Get them with
 go install github.com/magisterquis/curlrevshell@betterlogging
 ```
 - Logfile locking should work better with non-file files.
+- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
+  logging library.
 - Updated dependencies.
 
 `dev`

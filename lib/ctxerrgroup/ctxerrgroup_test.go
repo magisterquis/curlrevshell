@@ -5,7 +5,7 @@ package ctxerrgroup
  * Tests for ctxerrgroup.go
  * By J. Stuart McMurray
  * Created 20241226
- * Last Modified 20260605
+ * Last Modified 20260814
  */
 
 import (
@@ -19,7 +19,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Make sure it works if we don't use WithConetxt.

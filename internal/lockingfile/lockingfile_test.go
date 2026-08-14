@@ -5,7 +5,7 @@ package lockingfile
  * Tests for lockingfile.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260710
+ * Last Modified 20260814
  */
 
 import (
@@ -24,7 +24,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 func TestFile_Smoketest(t *testing.T) {
