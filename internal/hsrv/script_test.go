@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260103
+ * Last Modified 20260814
  */
 
 import (
@@ -22,9 +22,9 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // localAddrContext returns a context which sets http.LocalAddrContextKey to

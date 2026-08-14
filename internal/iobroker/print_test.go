@@ -5,7 +5,7 @@ package iobroker
  * Tests for print.go
  * By J. Stuart McMurray
  * Created 20260720
- * Last Modified 20260730
+ * Last Modified 20260814
  */
 
 import (
@@ -13,8 +13,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we make a string with a tag?

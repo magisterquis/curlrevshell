@@ -5,7 +5,7 @@ package crsadapter
  * Tests for crsadapter.go
  * By J. Stuart McMurray
  * Created 20260809
- * Last Modified 20260809
+ * Last Modified 20260814
  */
 
 import (
@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we dial curlrevshell ok?

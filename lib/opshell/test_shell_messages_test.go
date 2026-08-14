@@ -5,14 +5,14 @@ package opshell
  * Tests for test_shell_messages.go
  * By J. Stuart McMurray
  * Created 20260730
- * Last Modified 20260730
+ * Last Modified 20260814
  */
 
 import (
 	"io"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // does testTErrorf work?

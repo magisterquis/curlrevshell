@@ -5,7 +5,7 @@ package bidirpipe
  * Tests for bidirpipe.go
  * By J. Stuart McMurray
  * Created 20260626
- * Last Modified 20260627
+ * Last Modified 20260814
  */
 
 import (
@@ -15,7 +15,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we do normal pipe things?

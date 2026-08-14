@@ -5,14 +5,14 @@ package iobroker
  * Tests for handle_input.go
  * By J. Stuart McMurray
  * Created 20260802
- * Last Modified 20260802
+ * Last Modified 20260814
  */
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // type testFlusherBuffer is a wrapper around a bytes.Buffer with a flush

@@ -5,15 +5,15 @@ package adsrv
  * Tests for errors.go
  * By J. Stuart McMurray
  * Created 20260808
- * Last Modified 20260808
+ * Last Modified 20260814
  */
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/crsadapter"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we whine about an unknown ConnType?

@@ -5,7 +5,7 @@ package opshell
  * Tests for chanwriter.go
  * By J. Stuart McMurray
  * Created 20260730
- * Last Modified 20260730
+ * Last Modified 20260814
  */
 
 import (
@@ -13,7 +13,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Does a ChanWriter work as expected?

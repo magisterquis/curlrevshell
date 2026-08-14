@@ -5,7 +5,7 @@ package iobroker
  * Tests for handle_bidirectional.go
  * By J. Stuart McMurray
  * Created 20260723
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -19,9 +19,9 @@ import (
 	"testing/synctest"
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we handle a bidirectional stream?

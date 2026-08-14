@@ -5,7 +5,7 @@ package iobroker
  * Tests for run_input.go
  * By J. Stuart McMurray
  * Created 20260721
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -17,9 +17,9 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we buffer a line before input connects?

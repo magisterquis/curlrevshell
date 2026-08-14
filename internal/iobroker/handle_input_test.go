@@ -5,7 +5,7 @@ package iobroker
  * Tests for handle_input.go
  * By J. Stuart McMurray
  * Created 20260721
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -19,8 +19,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // What happens if we send input to a closed channel?

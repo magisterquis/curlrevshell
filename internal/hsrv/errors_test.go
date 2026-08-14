@@ -5,7 +5,7 @@ package hsrv
  * Error types and values
  * By J. Stuart McMurray
  * Created 20260801
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Does a listenError's error message look right?

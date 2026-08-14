@@ -5,7 +5,7 @@ package iobroker
  * Tests for help.go
  * By J. Stuart McMurray
  * Created 20260722
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -13,8 +13,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we register and print help messages?

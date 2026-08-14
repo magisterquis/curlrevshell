@@ -5,7 +5,7 @@ package adsrv
  * Tests for adsrv.go
  * By J. Stuart McMurray
  * Created 20260803
- * Last Modified 20260809
+ * Last Modified 20260814
  */
 
 import (
@@ -22,9 +22,9 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/bidirpipe"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 const (

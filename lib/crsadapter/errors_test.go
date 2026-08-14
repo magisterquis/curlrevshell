@@ -5,13 +5,13 @@ package crsadapter
  * Tests for errors.go
  * By J. Stuart McMurray
  * Created 20260809
- * Last Modified 20260809
+ * Last Modified 20260814
  */
 
 import (
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we stringify properly?

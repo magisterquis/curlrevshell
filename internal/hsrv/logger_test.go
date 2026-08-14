@@ -5,7 +5,7 @@ package hsrv
  * Tests for logger.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20270801
+ * Last Modified 20260814
  */
 
 import (
@@ -13,8 +13,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we return the hostname from an address without a port?

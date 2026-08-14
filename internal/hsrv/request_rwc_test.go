@@ -5,7 +5,7 @@ package hsrv
  * Tests for request_rwc.go
  * By J. Stuart McMurray
  * Created 20260730
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -20,9 +20,9 @@ import (
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we wrap both sides of an HTTP handler into a single io.ReadWriteCloser?

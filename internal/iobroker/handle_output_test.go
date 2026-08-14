@@ -5,7 +5,7 @@ package iobroker
  * Tests for handle_output.go
  * By J. Stuart McMurray
  * Created 20260721
- * Last Modified 20260801
+ * Last Modified 20260814
  */
 
 import (
@@ -16,8 +16,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Can we stop the output stream by stopping the broker while waiting on a
