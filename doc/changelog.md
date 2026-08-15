@@ -39,6 +39,8 @@ go install github.com/magisterquis/curlrevshell@adapters
   lines it'll emit.
 - Tests are a little better.
 - Relatived paths better in [this changelog](./changelog.md).
+- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
+  [`sstls`](../lib/sstls).
 - Updated dependencies.
 
 

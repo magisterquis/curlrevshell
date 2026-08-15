@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260814
+ * Last Modified 20260815
  */
 
 import (
@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
-	"github.com/magisterquis/curlrevshell/lib/crsdialer"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
@@ -168,7 +167,7 @@ func newTestServer(ctx context.Context, t *testing.T, conf *testServerConfig) (
 	)
 
 	/* And a client pre-configured for the server's TLS fingerprint. */
-	fpv, err := crsdialer.TLSFingerprintVerifier(s.l.Fingerprint)
+	fpv, err := sstls.TLSFingerprintVerifier(s.l.Fingerprint)
 	if nil != err {
 		t.Fatalf("Error setting up client TLS verification: %v", err)
 	}

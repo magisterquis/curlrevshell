@@ -5,7 +5,7 @@ package sstls
  * Generate a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20251011
+ * Last Modified 20260815
  */
 
 import (
@@ -113,20 +113,23 @@ func GenerateSelfSignedCertificate(subject string, dnsNames []string, ipAddresse
 		lifespan = DefaultSelfSignedCertLifespan
 	}
 	/* Generate it. */
+	now := time.Now()
 	return generateSelfSignedCert(
 		subject,
 		dnsNames,
 		ipAddresses,
-		time.Now().Add(lifespan),
+		now,
+		now.Add(lifespan),
 	)
 }
 
 // generateSelfSignedCert is like GenerateSelfSignedCert, but allows for an
-// explicit expiry time, useful for testing.
+// explicit begin and expiry time, useful for testing.
 func generateSelfSignedCert(
 	subject string,
 	dnsNames []string,
 	ipAddresses []net.IP,
+	notBefore time.Time,
 	notAfter time.Time,
 ) ([]byte, []byte, tls.Certificate, error) {
 	/*
@@ -150,7 +153,6 @@ func generateSelfSignedCert(
 
 	/* Gather all the important data for the cert. */
 	keyUsage := x509.KeyUsageDigitalSignature
-	notBefore := time.Now()
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
