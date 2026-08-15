@@ -21,10 +21,12 @@ import (
 )
 
 func TestGenerateSelfSignedCertificate(t *testing.T) {
+	now := time.Now().Round(time.Second)
 	for _, c := range []struct {
 		subject     string
 		dnsNames    []string
 		ipAddresses []net.IP
+		start       time.Time
 		expiry      time.Time
 	}{{
 		subject: "kittens",
@@ -39,14 +41,15 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 			net.ParseIP("::"),
 			net.ParseIP("a::b"),
 		},
-		expiry: time.Now().Add(time.Minute),
+		start:  now,
+		expiry: now.Add(time.Minute),
 	}} {
-		c := c /* :C */
 		t.Run(c.subject, func(t *testing.T) {
 			_, _, g, err := generateSelfSignedCert(
 				c.subject,
 				c.dnsNames,
 				c.ipAddresses,
+				c.start,
 				c.expiry,
 			)
 			if nil != err {
@@ -100,15 +103,27 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 				)
 			}
 
-			gt := g.Leaf.NotAfter.UTC()
-			wt := c.expiry.UTC().Truncate(time.Second)
-			if !gt.Equal(wt) {
+			/* Is the notBefore time correct? */
+			if got, want := g.Leaf.NotBefore.UTC(),
+				c.start.UTC(); !got.Equal(want) {
+				t.Errorf(
+					"Start time incorrect:\n"+
+						" got: %s\n"+
+						"want: %s",
+					got,
+					want,
+				)
+			}
+
+			/* Is the notAfter time correct? */
+			if got, want := g.Leaf.NotAfter.UTC(),
+				c.expiry.UTC(); !got.Equal(want) {
 				t.Errorf(
 					"Expiry incorrect:\n"+
-						"got: %s\n"+
+						" got: %s\n"+
 						"want: %s",
-					gt,
-					wt,
+					got,
+					want,
 				)
 			}
 		})

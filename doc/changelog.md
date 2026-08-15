@@ -2,16 +2,13 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`bettertls`
------------
+`dev`
+-----
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@bettertls
+go install github.com/magisterquis/curlrevshell@dev
 ```
-
-`dev`
------
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
   vulnerability.
 - Automate updates to [`README.md`](../README.md) and
@@ -33,6 +30,8 @@ go install github.com/magisterquis/curlrevshell@bettertls
   lines it'll emit.
 - Tests are a little better.
 - Relatived paths better in [this changelog](./changelog.md).
+- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
+  [`sstls`](../lib/sstls).
 - Updated dependencies.
 
 
