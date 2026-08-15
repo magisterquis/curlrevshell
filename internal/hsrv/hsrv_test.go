@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251009
+ * Last Modified 20260304
  */
 
 import (
@@ -441,7 +441,7 @@ func TestServer_OneShell(t *testing.T) {
 		}
 		if !maps.Equal(got, want) {
 			t.Fatalf(
-				"Incorrect logs:\ngot: %q\nwant: %q",
+				"Incorrect logs:\ngot: %v\nwant: %v",
 				got,
 				want,
 			)
