@@ -5,7 +5,7 @@ package sstls
  * Read and Save certs with an archive file
  * By J. Stuart McMurray
  * Created 20240327
- * Last Modified 20260815
+ * Last Modified 20260816
  */
 
 import (
@@ -107,10 +107,10 @@ func SaveCertificate(certFile string, certPEM, keyPEM []byte) error {
 
 	/* Save the cert itself. */
 	if _, err := f.Write(txtar.Format(&txtar.Archive{
-		Comment: []byte(fmt.Sprintf(
+		Comment: fmt.Appendf(nil,
 			"Generated %s",
 			time.Now().Format(time.RFC3339),
-		)),
+		),
 		Files: []txtar.File{{
 			Name: txtarCertFile,
 			Data: certPEM,
