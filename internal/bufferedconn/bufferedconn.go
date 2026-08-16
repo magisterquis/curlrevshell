@@ -44,8 +44,8 @@ type Conn struct {
 	readDone       chan struct{}
 	writeDone      chan struct{}
 
-	readDeadline  pipeDeadline
-	writeDeadline pipeDeadline
+	readDeadline  PipeDeadline
+	writeDeadline PipeDeadline
 }
 
 // NewPair return a pair of conns connected to each other.
@@ -74,8 +74,8 @@ func NewPair() (*Conn, *Conn) {
 			readDone:       lRDone,
 			writeDone:      lWDone,
 
-			readDeadline:  makePipeDeadline(),
-			writeDeadline: makePipeDeadline(),
+			readDeadline:  MakePipeDeadline(),
+			writeDeadline: MakePipeDeadline(),
 		}, &Conn{
 			localAddr:  ar,
 			remoteAddr: al,
@@ -91,8 +91,8 @@ func NewPair() (*Conn, *Conn) {
 			readDone:       rRDone,
 			writeDone:      rWDone,
 
-			readDeadline:  makePipeDeadline(),
-			writeDeadline: makePipeDeadline(),
+			readDeadline:  MakePipeDeadline(),
+			writeDeadline: MakePipeDeadline(),
 		}
 }
 
@@ -101,7 +101,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	select {
 	case <-c.readDone:
 		return 0, io.ErrClosedPipe
-	case <-c.readDeadline.wait():
+	case <-c.readDeadline.Wait():
 		return 0, os.ErrDeadlineExceeded
 	default:
 	}
@@ -121,7 +121,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			default:
 				return 0, io.EOF
 			}
-		case <-c.readDeadline.wait():
+		case <-c.readDeadline.Wait():
 			return 0, os.ErrDeadlineExceeded
 		}
 	}
@@ -139,7 +139,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	case <-c.peerReadDone:
 		return 0, io.EOF
-	case <-c.writeDeadline.wait():
+	case <-c.writeDeadline.Wait():
 		return 0, os.ErrDeadlineExceeded
 	default:
 	}
@@ -157,7 +157,7 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	case <-c.peerReadDone:
 		return 0, io.EOF
-	case <-c.writeDeadline.wait():
+	case <-c.writeDeadline.Wait():
 		return 0, os.ErrDeadlineExceeded
 	}
 }
@@ -183,7 +183,7 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 		return io.EOF
 	default:
 	}
-	c.readDeadline.set(t)
+	c.readDeadline.Set(t)
 	return nil
 }
 
@@ -195,7 +195,7 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 		return io.EOF
 	default:
 	}
-	c.writeDeadline.set(t)
+	c.writeDeadline.Set(t)
 	return nil
 }
 
