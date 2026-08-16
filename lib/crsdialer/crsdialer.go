@@ -6,7 +6,7 @@ package crsdialer
  * Easy dialer to connect to curlrevshell
  * By J. Stuart McMurray
  * Created 20250905
- * Last Modified 20260815
+ * Last Modified 20260816
  */
 
 import (
@@ -73,7 +73,7 @@ func Dial(ctx context.Context, serverURL, fingerprint string) (
 	}()
 
 	/* Roll an HTTP client. */
-	vfp, err := TLSFingerprintVerifier(fingerprint)
+	vfp, err := sstls.TLSFingerprintVerifier(fingerprint)
 	if nil != err {
 		return nil, fmt.Errorf(
 			"setting up TLS fingerprint verification: %w",
