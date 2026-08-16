@@ -142,19 +142,9 @@ func TestConn_CloseWriter(t *testing.T) {
 func TestConnWrite_CloseWhileBlocked(t *testing.T) {
 	try := func(t *testing.T, wc, cc *Conn, wantErr error) {
 		ech := make(chan error, 1)
-		/* Write until we've got the channel filled, then block. */
-		go func() {
-			var (
-				b   = make([]byte, 1)
-				err error
-				n   int
-			)
-			for nil == err {
-				n++
-				_, err = wc.Write(b)
-			}
-			ech <- err
-		}()
+		/* Fill the channel, next write should block. */
+		fillCh(wc.txCh)
+		go func() { _, err := wc.Write(make([]byte, 1)); ech <- err }()
 		/* Wait until we're blocking. */
 		synctest.Wait()
 		/* Close the conn, should get an error. */
@@ -354,11 +344,8 @@ func TestConnWrite_DeadlineWhileBlocked(t *testing.T) {
 		)
 		defer c1.Close()
 		/* Fill the buffer. */
-		for len(c1.txCh) < cap(c1.txCh) {
-			if _, err := c1.Write(buf); nil != err {
-				t.Fatalf("Error filling buffer: %v", err)
-			}
-		}
+		fillCh(c1.txCh)
+
 		/* Next one should block. */
 		wg.Go(func() { _, got = c1.Write(buf) })
 
@@ -430,5 +417,170 @@ func TestConn_Addrs(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// Can we close a conn for reading?
+func TestConnCloseRead(t *testing.T) {
+	/* Do we unblock a read when closing the read side? */
+	run := func(t *testing.T) {
+		/* Block on read. */
+		var (
+			cr, _ = NewPair()
+			ech   = make(chan error, 1)
+		)
+		go func() { _, err := io.ReadAll(cr); ech <- err }()
+		/* Wait until we (should be) blocked. */
+		synctest.Wait()
+		select {
+		case err := <-ech:
+			t.Fatalf("Got error instead of blocking: %v", err)
+		default: /* Good. */
+		}
+		/* Close for reading, should unblock. */
+		if err := cr.CloseRead(); nil != err {
+			t.Fatalf("CloseRead returned error: %v", err)
+		}
+		errorIs(t, "Read after unblock", <-ech, io.ErrClosedPipe)
+	}
+	t.Run("unblock/read", func(t *testing.T) { synctest.Test(t, run) })
+
+	/* Do we unblock a write when closing the read side? */
+	run = func(t *testing.T) {
+		/* Block on read. */
+		var (
+			cr, cw = NewPair()
+			ech    = make(chan error, 1)
+		)
+		fillCh(cw.txCh)
+		go func() { _, err := cw.Write(make([]byte, 1)); ech <- err }()
+		/* Wait until we (should be) blocked. */
+		synctest.Wait()
+		select {
+		case err := <-ech:
+			t.Fatalf("Got error instead of blocking: %v", err)
+		default: /* Good. */
+		}
+		/* Close for reading, should unblock. */
+		if err := cr.CloseRead(); nil != err {
+			t.Fatalf("CloseRead returned error: %v", err)
+		}
+		/* Writer should find out, too. */
+		errorIs(t, "Write after unblock", <-ech, io.EOF)
+	}
+	t.Run("unblock/write", func(t *testing.T) { synctest.Test(t, run) })
+
+	/* Does closing for reading also prevent future reads/writes? */
+	run = func(t *testing.T) {
+		var (
+			cr, cw = NewPair()
+			buf    = make([]byte, 1)
+			err    error
+		)
+
+		/* Close a conn for reading, other ops should fail. */
+		cr.CloseRead()
+
+		/* Future Reads and Writes should fail. */
+		_, err = cr.Read(buf)
+		errorIs(t, "Read after CloseRead", err, io.ErrClosedPipe)
+		_, err = cw.Write(buf)
+		errorIs(t, "Write after CloseRead", err, io.EOF)
+	}
+	t.Run("after_close", func(t *testing.T) { synctest.Test(t, run) })
+}
+
+// Can we close a conn for writing?
+func TestConnCloseWrite(t *testing.T) {
+	/* Do we unblock a read when closing the write side? */
+	run := func(t *testing.T) {
+		/* Block on read. */
+		var (
+			cr, cw = NewPair()
+			ech    = make(chan error, 1)
+		)
+		go func() { _, err := cr.Read(make([]byte, 1)); ech <- err }()
+		/* Wait until we (should be) blocked. */
+		synctest.Wait()
+		select {
+		case err := <-ech:
+			t.Fatalf("Got error instead of blocking: %v", err)
+		default: /* Good. */
+		}
+		/* Close for reading, should unblock. */
+		if err := cw.CloseWrite(); nil != err {
+			t.Fatalf("CloseWrite returned error: %v", err)
+		}
+		errorIs(t, "Read after unblock", <-ech, io.EOF)
+	}
+	t.Run("unblock/read", func(t *testing.T) { synctest.Test(t, run) })
+
+	/* Do we unblock a write when closing the write side? */
+	run = func(t *testing.T) {
+		/* Block on read. */
+		var (
+			_, cw = NewPair()
+			ech   = make(chan error, 1)
+		)
+		fillCh(cw.txCh)
+		go func() { _, err := cw.Write(make([]byte, 1)); ech <- err }()
+		/* Wait until we (should be) blocked. */
+		synctest.Wait()
+		select {
+		case err := <-ech:
+			t.Fatalf("Got error instead of blocking: %v", err)
+		default: /* Good. */
+		}
+		/* Close for writing, should unblock. */
+		if err := cw.CloseWrite(); nil != err {
+			t.Fatalf("CloseWrite returned error: %v", err)
+		}
+		/* Writer should find out, too. */
+		errorIs(t, "Write after unblock", <-ech, io.ErrClosedPipe)
+	}
+	t.Run("unblock/write", func(t *testing.T) { synctest.Test(t, run) })
+
+	/* Does closing for writing also prevent future reads/writes? */
+	run = func(t *testing.T) {
+		var (
+			cr, cw = NewPair()
+			buf    = make([]byte, 1)
+			err    error
+		)
+
+		/* Close a conn for write, other ops should fail. */
+		cw.CloseWrite()
+
+		/* Future Reads and Writes should fail. */
+		_, err = cr.Read(buf)
+		errorIs(t, "Read after CloseWrite", err, io.EOF)
+		_, err = cw.Write(buf)
+		errorIs(t, "Write after CloseWrite", err, io.ErrClosedPipe)
+	}
+	t.Run("after_close", func(t *testing.T) { synctest.Test(t, run) })
+}
+
+// fillCh fills ch with one-byte byte slices.
+func fillCh(ch chan<- []byte) {
+	for {
+		select {
+		case ch <- make([]byte, 1): /* Added a buffer. */
+		default: /* Full */
+			return
+		}
+	}
+}
+
+// errorIs calls t.Errorf if !errors.Is(got, want).  from is the source of the
+// error, and appended to "Unexpected error from".
+func errorIs(t *testing.T, from string, got, want error) {
+	t.Helper()
+	if !errors.Is(got, want) {
+		t.Errorf(
+			"Unexpected error from %s\n got: %v\nwant: %v",
+			from,
+			got,
+			want,
+		)
 	}
 }
