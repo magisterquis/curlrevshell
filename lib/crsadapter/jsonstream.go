@@ -6,7 +6,7 @@ package crsadapter
  * Bidirectional stream of JSON objects
  * By J. Stuart McMurray
  * Created 20260808
- * Last Modified 20260809
+ * Last Modified 20260816
  */
 
 import (
@@ -31,9 +31,13 @@ type Streamer interface {
 	CloseWrite() error
 }
 
-// Stream is a bidirectional stream of JSON objects.  Its methods are
-// generally not safe for concurrent use, with the exception that calls to
-// Write/Send may be called concurrently with calls to Read/DecodeNext.
+// Stream represents a connection to Curlrevshell's adapter interface.
+// It provides a bidirectional stream of JSON objects but may also be used for
+// Sending and receiving non-JSON data with the caveat that its built-in JSON
+// object decoder is no longer usable after the first non-JSON read.
+// Stream's methods are generally not safe for concurrent use, with the
+// exception that calls to Write/Send may be called concurrently with calls to
+// Read/DecodeNext.
 type Stream struct {
 	Streamer
 
