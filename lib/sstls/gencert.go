@@ -5,7 +5,7 @@ package sstls
  * Generate a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20260815
+ * Last Modified 20260817
  */
 
 import (
@@ -37,12 +37,6 @@ var (
 	CertCacheDir = "sstls"
 	// CertCacheFile is the file we stick in CertCacheDir.
 	CertCacheFile = "cert.txtar"
-)
-
-// Names of files in a txtar archive for the PEM-encoded cert and key.
-const (
-	txtarCertFile = "cert"
-	txtarKeyFile  = "key"
 )
 
 // GetCertificate gets a cert from the given file or generates if it doesn't
@@ -85,10 +79,20 @@ func GetCertificate(
 		)
 	}
 
+	/* And work out its fingerprint. */
+	fp, err := PubkeyFingerprintTLS(cert)
+	if nil != err {
+		return tls.Certificate{}, fmt.Errorf(
+			"calculating fingerprint: %w",
+			err,
+		)
+	}
+
 	/* Save it for next time. */
 	if "" != certFile {
-		if err := SaveCertificate(
+		if err := saveCertificateFingerprint(
 			certFile,
+			fp,
 			certPEM,
 			keyPEM,
 		); nil != err {

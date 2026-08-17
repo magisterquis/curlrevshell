@@ -9,6 +9,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertls
 ```
+- [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
 
 `dev`
 -----
