@@ -6,7 +6,7 @@ package bufferedconn
  * In-memory buffered net.Conn pair
  * By Stuart McMurray
  * Created 20260325
- * Last Modified 20260816
+ * Last Modified 20260817
  */
 
 import (
@@ -74,8 +74,8 @@ func NewPair() (*Conn, *Conn) {
 			readDone:       lRDone,
 			writeDone:      lWDone,
 
-			readDeadline:  MakePipeDeadline(),
-			writeDeadline: MakePipeDeadline(),
+			readDeadline:  NewPipeDeadline(),
+			writeDeadline: NewPipeDeadline(),
 		}, &Conn{
 			localAddr:  ar,
 			remoteAddr: al,
@@ -91,8 +91,8 @@ func NewPair() (*Conn, *Conn) {
 			readDone:       rRDone,
 			writeDone:      rWDone,
 
-			readDeadline:  MakePipeDeadline(),
-			writeDeadline: MakePipeDeadline(),
+			readDeadline:  NewPipeDeadline(),
+			writeDeadline: NewPipeDeadline(),
 		}
 }
 

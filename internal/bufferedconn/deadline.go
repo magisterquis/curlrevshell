@@ -5,7 +5,7 @@ package bufferedconn
  * Set pipe deadlines
  * By Stuart McMurray
  * Created 20260325
- * Last Modified 20260402
+ * Last Modified 20260817
  */
 
 import (
@@ -55,7 +55,7 @@ type PipeDeadline struct {
 	cancel chan struct{} // Must be non-nil
 }
 
-func MakePipeDeadline() PipeDeadline {
+func NewPipeDeadline() PipeDeadline {
 	return PipeDeadline{cancel: make(chan struct{})}
 }
 
