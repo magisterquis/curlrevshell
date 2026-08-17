@@ -14,6 +14,7 @@ go install github.com/magisterquis/curlrevshell@adapters
 - [`crsadapter`](../lib/crsadapter) - New library for adaptering.
 - [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
   logging library.
+- [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
 - Updated dependencies.
 
 `dev`
