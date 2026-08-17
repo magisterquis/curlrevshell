@@ -9,8 +9,6 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertls
 ```
-- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
-  [`sstls`](../lib/sstls).
 
 `dev`
 -----
@@ -35,6 +33,8 @@ go install github.com/magisterquis/curlrevshell@bettertls
   lines it'll emit.
 - Tests are a little better.
 - Relatived paths better in [this changelog](./changelog.md).
+- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
+  [`sstls`](../lib/sstls).
 - Updated dependencies.
 
 
