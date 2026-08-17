@@ -5,7 +5,7 @@ package sstls
  * Error types and values
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260815
+ * Last Modified 20260817
  */
 
 import (
@@ -29,6 +29,10 @@ var ErrLeafCertificateNotSet = errors.New("unset leaf certificate")
 var ErrNoMatchingCertificate = errors.New(
 	"no certificate with correct fingerprint found",
 )
+
+// ErrMissingLeafCertificate indicates a leaf certificate was expected but not
+// present.
+var ErrMissingLeafCertificate = errors.New("missing leaf x509 certificate")
 
 // InvalidFingerprintSizeError indicates that a decoded fingerprint was an
 // invalid size.
