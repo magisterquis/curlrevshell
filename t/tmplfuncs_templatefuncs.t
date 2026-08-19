@@ -4,7 +4,7 @@
 # Make sure we got all of the template functions in the functions map.
 # By J. Stuart McMurray
 # Created 20251011
-# Last Modified 20251011
+# Last Modified 20260819
 
 use autodie;
 use strict;
@@ -12,10 +12,11 @@ use warnings;
 
 use Test::More;
 
-my $godoc = "go doc -short ./lib/crstemplate/tmplfuncs"; # Get docs
+# Package with the template functions.
+my $pkg = "./lib/crstemplate/tmplfuncs";
 
 # Get the list of defined functions.
-my @def_funcs = map {/^func ([A-Z][^\[\(]+).*/ ? $1 : ()} `$godoc`;
+my @def_funcs = map {/^func ([A-Z][^\[\(]+).*/ ? $1 : ()} `go doc -short $pkg`;
 
 # Four tests, plus one for each function.
 plan tests => 4+@def_funcs;
@@ -24,10 +25,15 @@ plan tests => 4+@def_funcs;
 isnt 0+@def_funcs, 0, "Got list of exported functions";
 
 # Work out what's in the map.
-chomp(my @fmap = `$godoc.TemplateFuncs`);
-# First line should be the declaration.
+chomp(my @fmap = `go doc $pkg.TemplateFuncs`);
+
+# First line is package name, second is blank.
+@fmap = @fmap[2..$#fmap];
+
+# Third line should be the declaration.
 is shift(@fmap), "var TemplateFuncs = template.FuncMap{",
         "Got map declaration";
+
 # Next several should be the contents.
 my @map_funcs;
 my $line;

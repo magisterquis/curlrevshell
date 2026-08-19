@@ -42,6 +42,8 @@ go install github.com/magisterquis/curlrevshell@adapters
 - Relatived paths better in [this changelog](./changelog.md).
 - [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
   [`sstls`](../lib/sstls).
+- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
+  for passing arbitrary key/value pairs about.
 - Updated dependencies.
 
 

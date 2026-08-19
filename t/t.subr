@@ -1,8 +1,10 @@
+#!/bin/ksh
+#
 # t.subr
 # Handy test subroutines and other things
 # By J. Stuart McMurray
 # Created 20250615
-# Last Modified 20251025
+# Last Modified 20260819
 
 set -euo pipefail
 
@@ -14,7 +16,17 @@ function current_git_branch {
 
 # gorun runs with a safe(ish) listen address and no cert file
 function gorun {
-        go run . \
+        go run  . \
+                -listen-address 127.0.0.1:0 \
+                -no-timestamps \
+                -tls-certificate-cache "" \
+                "$@"
+}
+
+# gorun_pid is like gorun but causes curlrevshell's PID to be printed before
+# execing curlrevshell.
+function gorun_pid {
+        go run -exec ./t/print_pid_and_exec.sh . \
                 -listen-address 127.0.0.1:0 \
                 -no-timestamps \
                 -tls-certificate-cache "" \
