@@ -5,7 +5,7 @@ package crstemplate
  * Parameters passed to -template templates
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20260124
+ * Last Modified 20260819
  */
 
 import (
@@ -70,7 +70,7 @@ type Params struct {
 	LocalAddress string
 
 	// M may be used to set arbitrary key/value pairs during template
-	// execution using Params' Set method.
+	// execution using Params' With method.
 	// It is initially empty.
 	M map[string]any
 }
