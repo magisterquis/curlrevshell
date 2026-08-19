@@ -5,7 +5,7 @@ package uu
  * Tests for uu.go
  * By J. Stuart McMurray
  * Created 20240928
- * Last Modified 20240928
+ * Last Modified 20260819
  */
 
 import (
@@ -83,7 +83,7 @@ func Test(t *testing.T) {
 				return nil
 			}
 			/* Parse directives. */
-			for _, d := range strings.Split(
+			for d := range strings.SplitSeq(
 				string(a.Comment),
 				"\n",
 			) {
