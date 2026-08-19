@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260124145616-f8e9b2d407fd+dirty (bettertemplates branch)
+Version v0.0.1-beta.8.0.20260819190615-c6d0a8380514+dirty (bettertemplates branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i

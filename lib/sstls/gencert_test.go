@@ -5,11 +5,13 @@ package sstls
  * Tests for gencert.go
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20251008
+ * Last Modified 20260111
  */
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -19,10 +21,12 @@ import (
 )
 
 func TestGenerateSelfSignedCertificate(t *testing.T) {
+	now := time.Now().Round(time.Second)
 	for _, c := range []struct {
 		subject     string
 		dnsNames    []string
 		ipAddresses []net.IP
+		start       time.Time
 		expiry      time.Time
 	}{{
 		subject: "kittens",
@@ -37,14 +41,15 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 			net.ParseIP("::"),
 			net.ParseIP("a::b"),
 		},
-		expiry: time.Now().Add(time.Minute),
+		start:  now,
+		expiry: now.Add(time.Minute),
 	}} {
-		c := c /* :C */
 		t.Run(c.subject, func(t *testing.T) {
 			_, _, g, err := generateSelfSignedCert(
 				c.subject,
 				c.dnsNames,
 				c.ipAddresses,
+				c.start,
 				c.expiry,
 			)
 			if nil != err {
@@ -98,15 +103,27 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 				)
 			}
 
-			gt := g.Leaf.NotAfter.UTC()
-			wt := c.expiry.UTC().Truncate(time.Second)
-			if !gt.Equal(wt) {
+			/* Is the notBefore time correct? */
+			if got, want := g.Leaf.NotBefore.UTC(),
+				c.start.UTC(); !got.Equal(want) {
+				t.Errorf(
+					"Start time incorrect:\n"+
+						" got: %s\n"+
+						"want: %s",
+					got,
+					want,
+				)
+			}
+
+			/* Is the notAfter time correct? */
+			if got, want := g.Leaf.NotAfter.UTC(),
+				c.expiry.UTC(); !got.Equal(want) {
 				t.Errorf(
 					"Expiry incorrect:\n"+
-						"got: %s\n"+
+						" got: %s\n"+
 						"want: %s",
-					gt,
-					wt,
+					got,
+					want,
 				)
 			}
 		})
@@ -178,5 +195,78 @@ func TestGetCertificate(t *testing.T) {
 	/* Make sure it's the same certificate. */
 	if !readC.Leaf.Equal(genC.Leaf) {
 		t.Errorf("Generated and Read leaves not equal")
+	}
+}
+
+// If the cert cache file isn't usable, can we overwrite properly?
+func TestGetCertificate_OverwriteOldCert(t *testing.T) {
+	/* Generate a valid archive file, for size. */
+	fn := filepath.Join(t.TempDir(), "c.txtar")
+	if _, err := GetCertificate(
+		SelfSignedSubject,
+		nil,
+		nil,
+		DefaultSelfSignedCertLifespan,
+		fn,
+	); nil != err {
+		t.Fatalf("Error generating new archive: %s", err)
+	}
+
+	/* Turn it into invalid data. */
+	b, err := os.ReadFile(fn)
+	if nil != err {
+		t.Fatalf("Error reading new archive: %s", err)
+	} else if 0 == len(b) {
+		t.Fatalf("New archive is empty")
+	}
+	aLen := len(b)
+	f, err := os.Create(fn)
+	if nil != err {
+		t.Fatalf("Error opening new archive for writing")
+	}
+	defer f.Close()
+	nw := 0
+	for nw < aLen*2 {
+		n, err := fmt.Fprintf(f, "%d\n", nw)
+		if nil != err {
+			t.Fatalf("Error writing to archive: %s", err)
+		}
+		nw += n
+	}
+	f.Close()
+
+	/* Did write enough? */
+	if b, err = os.ReadFile(fn); nil != err {
+		t.Fatalf("Error reading archive after write: %s", err)
+	} else if got, want := len(b), aLen*2; got < want {
+		t.Fatalf(
+			"Did not write enough junk data\n got: %d\nwant: >=%d",
+			got,
+			want,
+		)
+	}
+
+	/* Read/Update again, should overwrite with a valid archive. */
+	if _, err = GetCertificate(
+		SelfSignedSubject,
+		nil,
+		nil,
+		DefaultSelfSignedCertLifespan,
+		fn,
+	); nil != err {
+		t.Fatalf("Error getting certificate after write: %s", err)
+	}
+
+	/* Did it shrink and have a cert? */
+	if b, err := os.ReadFile(fn); nil != err {
+		t.Fatalf("Error reading archive after rewrite: %s", err)
+	} else if got, want := len(b), nw; got >= want {
+		t.Fatalf(
+			"Archive did not shrink after rewrite\n"+
+				" got: %d\n"+
+				"want: <%d",
+			got,
+			want,
+		)
 	}
 }
