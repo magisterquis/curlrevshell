@@ -11,6 +11,7 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
 - [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
   for passing arbitrary key/value pairs about.
+- Updated dependencies.
 
 `dev`
 =====
