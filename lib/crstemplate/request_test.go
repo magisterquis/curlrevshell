@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250613
+ * Last Modified 20260124
  */
 
 import (
@@ -43,6 +43,7 @@ func newTestParamsWithoutRequest(t *testing.T) Params {
 			Script: "testC",
 		},
 		StaticFilesDir: t.TempDir(),
+		M:              make(map[string]any),
 	}
 }
 
@@ -99,6 +100,8 @@ func newTestRequest(t *testing.T) *http.Request {
 	return <-rch
 }
 
+// NewTestParams return a Params with the the request set to a request from
+// newTestRequest.
 func newTestParams(t *testing.T) Params {
 	p := newTestParamsWithoutRequest(t)
 	p.ID = testID
