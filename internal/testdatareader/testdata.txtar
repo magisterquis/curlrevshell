@@ -1,0 +1,8 @@
+-- testdata/TestReader/txtar_archive_no_path/fn --
+txtar, no path :)
+-- testdata/TestReader/txtar_archive/path/pfn --
+txtar, path :)
+-- TestReader/base_dir/dot/fn --
+Base directory is a dot. :)
+-- TestReader/base_dir/slash/fn --
+Base directory is a dot. :)

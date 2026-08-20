@@ -1,6 +1,6 @@
 module github.com/magisterquis/curlrevshell
 
-go 1.26.6
+go 1.27.0
 
 require (
 	github.com/magisterquis/goxterm v0.0.1-beta.4
