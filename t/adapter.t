@@ -4,7 +4,7 @@
 # Can we connect via an adapter?
 # By J. Stuart McMurray
 # Created 20260809
-# Last Modified 20260812
+# Last Modified 20260821
 
 use autodie;
 use strict;
@@ -24,7 +24,7 @@ my $tdir  = File::Temp->newdir();# or die "newdir: $!";
 my $spath = "$tdir/s";
 
 # Spawn curlrevshell.
-my $pid = open2 my $crs_out, my $crs_in, 
+my $pid = open2 my $crs_out, my $crs_in,
         "go", "run", ".",
                 "-adapter-socket", $spath,
                 "-listen-address", "127.0.0.1:0",
