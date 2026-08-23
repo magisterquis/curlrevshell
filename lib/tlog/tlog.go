@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260803
+ * Last Modified 20260823
  */
 
 import (
@@ -15,7 +15,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -23,9 +22,6 @@ import (
 
 // BufLen is the size of Buffer's internal buffers.
 const BufLen = 10240
-
-// cbufPool is an attempt to reduce memory usage when allocating channels.
-var cBufPool = &sync.Pool{New: func() any { return make(chan string, BufLen) }}
 
 // Buffer holds log messages received from the [slog.Logger] returned by
 // New.
@@ -55,11 +51,6 @@ type Buffer struct {
 // Logs will be written at level DEBUG.
 // The buffer will have space for BufLen log entries.
 func NewBuffer() (*Buffer, *slog.Logger) {
-	/* New channel from the pool, drained. */
-	cBuf := cBufPool.Get().(chan string)
-	for 0 != len(cBuf) { /* Sholud be fast. */
-		<-cBuf
-	}
 	/* Buffer for logs. */
 	lb := &Buffer{
 		mu:     new(sync.RWMutex),
@@ -67,6 +58,8 @@ func NewBuffer() (*Buffer, *slog.Logger) {
 		closed: new(bool),
 		cBuf:   make(chan string, BufLen),
 	}
+
+	/* Slogger for logs. */
 	sl := slog.New(slog.NewJSONHandler(lb, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 		/* Remove the timestamp. */
@@ -78,15 +71,7 @@ func NewBuffer() (*Buffer, *slog.Logger) {
 
 		},
 	}))
-	/* Put cBuf back when we're done. */
-	runtime.AddCleanup(lb, func(chan string) {
-		/* Drain before we put it back. */
-		for 0 != len(cBuf) { /* Sholud be fast. */
-			<-cBuf
-		}
-		/* Stick it back. */
-		cBufPool.Put(cBuf)
-	}, cBuf)
+
 	return lb, sl
 }
 
