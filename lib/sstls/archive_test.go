@@ -180,6 +180,7 @@ func TestParseCachedCertificate_Errors(t *testing.T) {
 	for n, want := range map[string]error{
 		"empty_cert": ErrCacheFileEmpty,
 		"empty_key":  ErrPrivateKeyPEMEmpty,
+		"empty_file": ErrCacheFileEmpty,
 	} {
 		t.Run(n, func(t *testing.T) {
 			if _, got := ParseCachedCertificate(
@@ -210,4 +211,17 @@ func TestParseCachedCertificate_ParseError(t *testing.T) {
 		)
 	}
 
+}
+
+// Do we get the right sort of error if we have a nil slice?
+func TestParseCcahedCertificate_NilSlice(t *testing.T) {
+	_, err := ParseCachedCertificate(nil)
+	/* tls library gives us a string :( */
+	if got, want := err, ErrCacheFileEmpty; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect parse error\n got: %v\nwant: %v",
+			got,
+			want,
+		)
+	}
 }
