@@ -5,7 +5,7 @@ package sstls
  * Error types and values
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260817
+ * Last Modified 20260823
  */
 
 import (
@@ -14,9 +14,14 @@ import (
 	"fmt"
 )
 
-// ErrCacheFileEmpty indicates the the file passed to LoadCachedCertificate was
-// empty.
+// ErrCacheFileEmpty indicates the the file passed to [LoadCachedCertificate]
+// or the slice passed to [ParseCachedCertificate] was missing the certificate.
 var ErrCacheFileEmpty = errors.New("cache file empty")
+
+// ErrPrivateKeyPEMEmpty indicates the the file passed to
+// [LoadCachedCertificate] or the slice passed to [ParseCachedCertificate] was
+// missing the private key or the private key was empty.
+var ErrPrivateKeyPEMEmpty = errors.New("PEM-encoded key missing or empty")
 
 // ErrLeafCertificateNotSet is returned by [LoadCachedCertificate] if the
 // [tls.Certificate] it would have returned has a nil

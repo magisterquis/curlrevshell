@@ -5,13 +5,12 @@ package sstls
  * Verify a TLS peer's fingerprint
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260815
+ * Last Modified 20260823
  */
 
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -20,23 +19,14 @@ import (
 	"testing/synctest"
 
 	"github.com/magisterquis/curlrevshell/internal/bufferedconn"
-	"github.com/magisterquis/curlrevshell/internal/testdatareader"
 	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
-
-// testdataFS contains the testdata directory.
-//
-//go:embed testdata
-var testdataFS embed.FS
-
-// mustTDFile gets a test-specific file from testdataFS.
-var mustTDFile = testdatareader.Reader{FS: testdataFS}.MustReadFile
 
 // testCertAndFP returns an embedded test TLS certificate and its fingerprint.
 var newTestCertAndFP = sync.OnceValues(func() (tls.Certificate, string) {
 	/* Load the certificate. */
 	fn := "test_cert.txtar"
-	cert, err := loadCachedCertificate(fn, []byte(mustTDFile(nil, fn)))
+	cert, err := ParseCachedCertificate([]byte(mustTDFile(nil, fn)))
 	if nil != err {
 		panic(fmt.Errorf("loading test certificate: %w", err))
 	}

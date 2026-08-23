@@ -15,6 +15,8 @@ go install github.com/magisterquis/curlrevshell@adapters
 - [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
   logging library.
 - [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
+- [`sstls`](../lib/sstls): Add `ParseCachedCertificate` a parser of (in-memory)
+  cached certificates.
 - Updated dependencies.
 
 `dev`
