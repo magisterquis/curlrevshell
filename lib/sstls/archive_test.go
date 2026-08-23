@@ -198,7 +198,7 @@ func TestParseCachedCertificate_Errors(t *testing.T) {
 }
 
 // Do we get the right sort of error if we can't parse the cert's PEM?
-func TestParseCcahedCertificate_ParseError(t *testing.T) {
+func TestParseCachedCertificate_ParseError(t *testing.T) {
 	_, err := ParseCachedCertificate([]byte(mustTDFile(t)))
 	/* tls library gives us a string :( */
 	if got, want := err.Error(), "parsing certificate: tls: failed to "+
