@@ -2,37 +2,38 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`bettertests`
--------------
+`dev`
+-----
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@bettertests
+go install github.com/magisterquis/curlrevshell@dev
 ```
-- [`t/extract_templates.t`](./t/extract_templates.t) now reports how many TAP
-  lines it'll emit.
-- Updated dependencies.
-
-`dev`
------
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
   vulnerability.
-- Automate updates to [`README.md`](./README.md) and
-  [`config.md`](./doc/config.md).
-- Split the [Makefile](./Makefile) into [smaller parts](./src/mk).
+- Automate updates to [`README.md`](../README.md) and
+  [`config.md`](./config.md).
+- Split the [Makefile](../Makefile) into [smaller parts](../src/mk).
 - `-h` makes it that much easier to see the current version.
-- [`config.md`](./doc/config.md): Add a quick copy/paste-friendly one-liner for
+- [`config.md`](./config.md): Add a quick copy/paste-friendly one-liner for
   a quick setup with quick defaults.
 - [`crstemplate`](../lib/crstemplate): Turns out some targets don't like using
   `</dev/null` with `2>&0` so we'll open it twice.
 - Get rid of tests' dependencies on [`jq`](https://jqlang.org).
-- [`ctxerrgroup`](./lib/ctxerrgroup): Tags and tag lineage now available
+- [`ctxerrgroup`](../lib/ctxerrgroup): Tags and tag lineage now available
   in GoTag'd goroutines.
 - Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
   less likely.
-- [`sstls`](./lib/sstls) - Overwriting an archive now overwrites the whole
+- [`sstls`](../lib/sstls) - Overwriting an archive now overwrites the whole
   archive and leaves no survivors.
+- [`t/extract_templates.t`](../t/extract_templates.t) now reports how many TAP
+  lines it'll emit.
 - Tests are a little better.
+- Relatived paths better in [this changelog](./changelog.md).
+- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
+  [`sstls`](../lib/sstls).
+- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
+  for passing arbitrary key/value pairs about.
 - Updated dependencies.
 
 
@@ -58,7 +59,7 @@ go install github.com/magisterquis/curlrevshell@bettertests
   startup with the PID, to make it easier to use
   [fwa](https://github.com/PeterHajdu/fwa) and `kill(1)` to send
   hot-off-the-press `-ctrl-i` functions to a connected shell.
-- [`Makefile`](./Makefile): Make `make help` make help.  Make `make update`
+- [`Makefile`](../Makefile): Make `make help` make help.  Make `make update`
   make updates.
 - Somewhat less fragile tests in [`t/`](../t/).
 - If [`-template`](./flags.md#-template) names a missing template file, the
@@ -75,7 +76,7 @@ go install github.com/magisterquis/curlrevshell@bettertests
   should save several seconds of copy/pasting a `go install` line.
 - Better checks for stray `DEBUG`/`TODO`/`TAP_TODO` comments and outdated
   package versions.
-- Added [`crsdialer`](./lib/crsdialer) to somewhat simplify
+- Added [`crsdialer`](../lib/crsdialer) to somewhat simplify
   curlrevshell-dialing.
 - `-h`: Invisible changes to print help a bit more nicely in strange
   conditions.
@@ -109,9 +110,9 @@ go install github.com/magisterquis/curlrevshell@bettertests
 - [`-debug`](./flags.md#-debug): Debugged DEBUG messages with -debug.
 - [`-log`](./flags.md#-log): Log the TLS fingerprint as well.
 - Long invocations and excessive horizontal scrolling finally led to
-  [compile-time defaults](./doc/config.md#linker-flags) for flags.
+  [compile-time defaults](./config.md#linker-flags) for flags.
 - [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Go -> Perl, less test panic
-- [`t/template.t`](./t/template.t): Quite a bit less flakey in slow (read:
+- [`t/template.t`](../t/template.t): Quite a bit less flakey in slow (read:
   OpenBSD in a VM) situations.
 - [`pledgeunveil`](../lib/pledgeunveil): Thin wrapper around OpenBSD's
   [`pledge(2)`](https://man.openbsd.org/pledge.2) and
@@ -161,10 +162,10 @@ go install github.com/magisterquis/curlrevshell@bettertests
   It's also an easier way to test logging.
 - [`/io`]: Added an HTTP endpoint for when you'd kinda prefer a single
   connection over two parallel connections.
-- [`simpleshell`](./lib/simpleshell): A small library for connecting up a shell
+- [`simpleshell`](../lib/simpleshell): A small library for connecting up a shell
   or other such thing with minimal effort.
-- [`simpleshell` the program](./lib/simpleshell/cmd/simpleshell): A wrapper
-  around [`simpleshell` the library](./lib/simpleshell/) which can be built as
+- [`simpleshell` the program](../lib/simpleshell/cmd/simpleshell): A wrapper
+  around [`simpleshell` the library](../lib/simpleshell/) which can be built as
   a standalone binary or an injectable shared object file.
   It's about the closest thing there is to a proper Curlrevshell implant.
 

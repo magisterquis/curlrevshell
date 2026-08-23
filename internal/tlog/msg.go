@@ -5,7 +5,7 @@ package tlog
  * UnJSON'd log message
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260406
+ * Last Modified 20260819
  */
 
 import (
@@ -40,11 +40,9 @@ type msg struct {
 func NewMsg() Msg {
 	m := make(Group)
 	return Msg{
-		msg: msg{
-			Root: m,
-			cur:  m,
-			Path: []string{},
-		},
+		Root: m,
+		cur:  m,
+		Path: []string{},
 	}
 }
 

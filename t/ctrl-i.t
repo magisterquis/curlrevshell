@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20260304
+# Last Modified 20260819
 
 set -euo pipefail
 
@@ -18,13 +18,6 @@ tap_plan $((5+$NFS))
 
 # Make sure we actually have test files
 tap_isnt "$NFS" 0 "Have test files" "$0" $LINENO
-
-# Temporary files
-LOGF="$(mktemp -t curlrevshell.ctrl-i.log.XXXXXXXX)"
-GOTF="$(mktemp -t curlrevshell.ctrl-i.out.XXXXXXXX)"
-CRTF=$(mktemp)
-if [[ -f "$CRTF" ]]; then rm "$CRTF"; fi
-trap 'rm -f "$LOGF" "$GOTF" "$CRTF"; tap_done_testing' EXIT
 
 # start_curlrevshell starts curlrevshell in a coprocess with the -ctrl-i file
 # $1.
@@ -41,7 +34,7 @@ start_curlrevshell() {
                 -listen-address 127.0.0.1:0 \
                 -no-timestamps \
                 -prompt '' \
-                -tls-certificate-cache "$CRTF" |
+                -tls-certificate-cache "" |
         perl -pE '$|=1;s/\r\n$/\n/' ) |&
 }
 
@@ -124,67 +117,94 @@ tap_is \
 
 # check_ctrl_i spawns curlrevshell -ctrl-i set to $1,
 # connects curl to it, sends it a SIGUSR1 to get the -ctrl-i output, and
-# make sure it's $1.want.  Uses $LOGF and $GOTF.
+# make sure it's $1.want.
 #
 # Arguments
 # $1 - A Ctrl+I file
 function check_ctrl_i {
         set -euo pipefail
-        tap_plan 4
+        tap_plan 8
 
         # If we don't have the want file, not much we can do
         HAVEF="$1"
         WANTF="$1.want"
         if ! [[ -f "$WANTF" ]]; then
                 tap_fail "Don't have want file $WANTF" "$0" $LINENO
-                tap_skip "Missing want file" 3
+                tap_skip "Missing want file" 7
                 return
         fi
 
-        # Reset the logfile
-        > "$LOGF"
+        # Work out what we expect to get.
+        WANTSIZE=$(($(wc -c <$WANTF)))
+        tap_cmp_ok \
+                "$WANTSIZE" -gt 0 \
+                "Expected output size greater than 0" \
+                "$0" $LINENO
 
         # Start curlrevshell going.
-        gorun -ctrl-i "$1" -log "$LOGF" |&
+        gorun_pid -ctrl-i "$1" |&
+
+        # First line's the PID
+        read -pr CRSPID
+        tap_like "$CRSPID" '^\d+$' "Curl's pid is numeric" "$0" $LINENO
+
         # Skip past the welcome messages.
         while read -pr; do if [[ -z "$REPLY" ]]; then break; fi; done
 
-        # Connect up curl to get the Ctrl+I output after a SIGUSR1.
+        # Get the curl one-liner.
         read -pr CURL;
-        CURL=${CURL%/c*}/io
-        <&p $CURL -T. --no-progress-meter --output $GOTF 2>&1 &
-        while read -pr; do
-                if [[ "$REPLY" == *"Shell is ready to go"* ]]; then
+        ID=id-$RANDOM
+        CURL=${CURL%/c*}/i/$ID
+        tap_like \
+                "$CURL" \
+                "^curl " \
+                "Curl one-liner starts with curl" \
+                "$0" $LINENO
+
+        # We'll want to stick curl in a co-process, so hook up curl to
+        # different file descriptors.
+        exec 4>&p # Input
+        exec 5<&p # Output
+
+        # Connect up curl to get the Ctrl+I output after a SIGUSR1.
+        $CURL --silent -T- --no-progress-meter |&
+        while read -r -u5; do
+                if [[ "$REPLY" == \
+                        *"[127.0.0.1] Input connected: ID \"$ID\""* ]]; then
                         break
                 fi
         done
 
         # Get curlrevshell's pid and send a SIGUSR1.
-        CRSPID="$(perl -MJSON::PP -ne '
-                my $j = decode_json $_ or die "decode_json: $!";
-                print $j->{PID};
-                last;
-        ' "$LOGF")"
         kill -s USR1 $CRSPID
-        tap_ok "$?" "Sent SIGUSR1 to $CRSPID" "$0" $LINENO
-
-        # Work out what we expect to get.
-        WANTSIZE=$(($(wc -c <$WANTF)))
+        tap_ok "$?" "Sent SIGUSR1 to curlrevshell (pid $CRSPID)" "$0" $LINENO
 
         # Work out how much we think we sent.
-        for i in `jot 2`; do read -pr; done
-        CRSSIZE=$(($(echo "$REPLY" | cut -f 2 -d ' ')))
+        for i in `jot 2`; do read -r -u5; done
+        CRSSIZE=$(($(print -r "$REPLY" | cut -f 2 -d ' ')))
         tap_is "$CRSSIZE" "$WANTSIZE" "Reported size correct" "$0" $LINENO
 
-        # Kill curlrevshell and wait for curl to finish writing.
-        exec 9>&p; exec 9>&-
+        # Kill curlrevshell and get whatever curl's got buffered.
+        exec 4>&-
+        GOT=$(cat <&p)
         wait
+        tap_pass "All child processes exited"
 
         # Make sure the output is correct.
-        GOTSIZE=$(($(wc -c <$GOTF)))
-        tap_is "$GOTSIZE" "$CRSSIZE" "Reported and received sizes consistent" \
+        GOTSIZE=$(($(print -r "$GOT" | wc -c)))
+        tap_is \
+                "$GOTSIZE" \
+                "$CRSSIZE" \
+                "Reported and received sizes consistent" \
                 "$0" $LINENO
-        GOT="$(diff -u "$WANTF" "$GOTF" ||:)"
+        GOT=$(diff \
+                -u \
+                -L "$WANTF" -L "curl" \
+                /dev/stdin /dev/fd/3 \
+                <"$WANTF" 3<<_eof ||:
+$GOT
+_eof
+)
         tap_is "$GOT" "" "Template output correct" "$0" $LINENO
 }
 
