@@ -4,7 +4,7 @@
 # Can we connect via an adapter?
 # By J. Stuart McMurray
 # Created 20260809
-# Last Modified 20260821
+# Last Modified 20260823
 
 use autodie;
 use strict;
@@ -56,7 +56,7 @@ my $req = encode_json {
                 Tag       => $0,
         },
 };
-print $s $req or die "sending shell request: $!";
+print $s "$req\n" or die "sending shell request: $!";
 
 # Get a response.
 defined(my $res = <$s>) or die "reading response: $!";

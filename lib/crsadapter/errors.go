@@ -5,8 +5,14 @@ package crsadapter
  * Error types and values
  * By J. Stuart McMurray
  * Created 20260809
- * Last Modified 20260809
+ * Last Modified 20260823
  */
+
+import "errors"
+
+// ErrNoBufferedNewline is returned by [Stream.Read] when it detects the last
+// JSON object sent to the stream did not have a trailing newline.
+var ErrNoBufferedNewline = errors.New("stream did not have a newline after the last JSON object")
 
 // ConnResponseError is an error type wrapping a ConnResponse.
 type ConnResponseError struct {

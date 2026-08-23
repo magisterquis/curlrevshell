@@ -6,7 +6,7 @@ package crsadapter
  * Bidirectional stream of JSON objects
  * By J. Stuart McMurray
  * Created 20260808
- * Last Modified 20260816
+ * Last Modified 20260823
  */
 
 import (
@@ -15,6 +15,8 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"io"
+
+	"github.com/magisterquis/curlrevshell/internal/chanmutex"
 )
 
 // ErrDecodeAfterRead is returned by [Stream.DecodeNext] if called after a
@@ -38,12 +40,15 @@ type Streamer interface {
 // Stream's methods are generally not safe for concurrent use, with the
 // exception that calls to Write/Send may be called concurrently with calls to
 // Read/DecodeNext.
+// JSON objects are expected to be newline-terminated.
 type Stream struct {
 	Streamer
 
 	/* Read side. */
-	r     io.Reader                /* UnixConn plus unread buffer. */
-	decCh chan (*jsontext.Decoder) /* Mutex and synctest don't get along. */
+	mu   chanmutex.Mutex /* For synctesting. */
+	dec  *jsontext.Decoder
+	r    io.Reader /* UnixConn plus unread buffer. */
+	rErr error     /* When switching to read left us in a funny state. */
 
 	/* Write side. */
 	enc *jsontext.Encoder
@@ -51,11 +56,10 @@ type Stream struct {
 
 // NewStream returns a new Stream wrapping s.
 func NewStream(b Streamer) *Stream {
-	decCh := make(chan *jsontext.Decoder, 1)
-	decCh <- jsontext.NewDecoder(b)
 	return &Stream{
 		Streamer: b,
-		decCh:    decCh,
+		mu:       chanmutex.New(),
+		dec:      jsontext.NewDecoder(b),
 		enc: jsontext.NewEncoder(
 			b,
 			jsontext.ReorderRawObjects(true),
@@ -66,15 +70,16 @@ func NewStream(b Streamer) *Stream {
 // DecodeNext attempts to decode the next JSON message into v.  Do not call
 // DecodeNext after the first call to Read.
 func (j Stream) DecodeNext(v any) error {
-	/* Get the decoder and make sure to put it back. */
-	dec := <-j.decCh
-	defer func() { j.decCh <- dec }()
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
 	/* Make sure nobody called Read. */
-	if nil == dec {
+	if nil != j.r {
 		return ErrDecodeAfterRead
 	}
+
 	/* Decode. */
-	return json.UnmarshalDecode(dec, v)
+	return json.UnmarshalDecode(j.dec, v)
 }
 
 // Read reads plain bytes from j, bypassing JSON decoding.  Do not call
@@ -82,25 +87,49 @@ func (j Stream) DecodeNext(v any) error {
 // As Stream is indended for newline-separated messages, if a newline was sent
 // after the last JSON message, it will not be returned.
 func (j *Stream) Read(b []byte) (int, error) {
-	/* Get the decoder. */
-	dec := <-j.decCh
-	defer func() { j.decCh <- dec }()
-	/* If this is our first read, turn off JSON and make the reamining
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	/* IF this has already failed, easy day. */
+	if nil != j.rErr {
+		return 0, j.rErr
+	}
+
+	/* If this is our first read, turn off JSON and make the remaining
 	unbuffered bytes available. */
-	if nil != dec {
+	if nil == j.r {
 		/* Buffered data, but maybe remove the initial newline. */
-		buf := dec.UnreadBuffer()
-		if 0 != len(buf) && '\n' == buf[0] {
+		buf := j.dec.UnreadBuffer()
+		if 0 != j.dec.InputOffset() && 0 == len(buf) {
+			/* We've already read a JSON object but its trailing
+			newline hasn't shown up yet so we'll wait for it. */
+			b := make([]byte, 1)
+			n, err := io.ReadFull(j.Streamer, b)
+			if nil != err { /* Probably closed. */
+				j.rErr = err
+				return n, j.rErr
+			} else if '\n' != b[0] {
+				j.rErr = ErrNoBufferedNewline
+				return 0, j.rErr
+			}
+		} else if 0 != j.dec.InputOffset() &&
+			0 != len(buf) && '\n' == buf[0] {
+			/* Buffered after the last object and got a newline. */
 			buf = buf[1:]
 		}
 		/* Read from the buffer and then the stream. */
-		j.r = io.MultiReader(
-			bytes.NewReader(buf),
-			j.Streamer,
-		)
-		dec = nil
+		if 0 == len(buf) {
+			j.r = j.Streamer
+		} else {
+			j.r = io.MultiReader(
+				bytes.NewReader(buf),
+				j.Streamer,
+			)
+		}
+		j.dec = nil /* For just in case. */
 	}
 
+	/* Actual read itself is relatively easy. */
 	return j.r.Read(b)
 }
 
