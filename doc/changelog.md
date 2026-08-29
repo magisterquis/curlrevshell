@@ -46,6 +46,8 @@ go install github.com/magisterquis/curlrevshell@adapters
   [`sstls`](../lib/sstls).
 - [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
   for passing arbitrary key/value pairs about.
+- [`crstemplate`]: Key-p templates from being generated if they use
+  non-existent map keys.
 - Updated dependencies.
 
 
