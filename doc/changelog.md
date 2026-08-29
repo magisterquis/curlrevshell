@@ -10,6 +10,8 @@ the next tagged version.  Get them with
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
 - Updated dependencies.
+- [`crstemplate`]: Key-p templates from being generated if they use
+  non-existent map keys.
 
 `dev`
 -----
