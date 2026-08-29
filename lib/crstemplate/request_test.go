@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20260124
+ * Last Modified 20260819
  */
 
 import (
@@ -86,16 +86,14 @@ func newTestRequest(t *testing.T) *http.Request {
 
 	/* Grab the request. */
 	svr.StartTLS()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		res, rerr = svr.Client().Get(fmt.Sprintf(
 			"https://%s:%s@%s",
 			testUsername,
 			testPassword,
 			svr.Listener.Addr().String(),
 		))
-	}()
+	})
 
 	return <-rch
 }

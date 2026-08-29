@@ -9,9 +9,6 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
-- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
-  for passing arbitrary key/value pairs about.
-- Updated dependencies.
 
 `dev`
 -----
@@ -38,6 +35,8 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - Relatived paths better in [this changelog](./changelog.md).
 - [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
   [`sstls`](../lib/sstls).
+- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
+  for passing arbitrary key/value pairs about.
 - Updated dependencies.
 
 
