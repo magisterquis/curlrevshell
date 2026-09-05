@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20270809
+ * Last Modified 20270905
  */
 
 import (
@@ -86,7 +86,7 @@ func rmain() int {
 			"Listen `address`",
 		)
 		adapterPath = flag.String(
-			"adapter-socket",
+			"experimental-adapter-socket",
 			"",
 			"Unix socket `path` for adapters",
 		)
