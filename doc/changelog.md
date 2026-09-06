@@ -17,6 +17,8 @@ go install github.com/magisterquis/curlrevshell@adapters
 - [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
 - [`sstls`](../lib/sstls): Add `ParseCachedCertificate` a parser of (in-memory)
   cached certificates.
+- [`crsadapter`](../lib/crsadapter): Add `RandomID` to generate an ID,
+  randomly.
 - Updated dependencies.
 
 `dev`

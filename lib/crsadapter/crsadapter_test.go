@@ -5,7 +5,7 @@ package crsadapter
  * Tests for crsadapter.go
  * By J. Stuart McMurray
  * Created 20260809
- * Last Modified 20260814
+ * Last Modified 20260906
  */
 
 import (
@@ -281,5 +281,21 @@ func TestDial_Rejected(t *testing.T) {
 	}
 	if nil != s {
 		t.Errorf("Got non-nil client")
+	}
+}
+
+// Do RandomIDs look like random IDs?
+// In theory there could be a collision, but this is unlikely.
+func TestRandomID(t *testing.T) {
+	var (
+		nTry = 10240
+		seen = make(map[string]struct{})
+	)
+	for i := range nTry {
+		id := RandomID()
+		if _, ok := seen[id]; ok {
+			t.Fatalf("Duplicate id found after %d tries", i)
+		}
+		seen[id] = struct{}{}
 	}
 }

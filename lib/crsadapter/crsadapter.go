@@ -6,13 +6,15 @@ package crsadapter
  * Protocol adapter library for curlrevshell
  * By J. Stuart McMurray
  * Created 20260809
- * Last Modified 20260809
+ * Last Modified 20260906
  */
 
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"net"
+	"strconv"
 )
 
 // Dial connects to the curlrevshell adapter socket path and requests a
@@ -81,3 +83,7 @@ func Handshake(s Streamer, ct ConnType, args any) (*Stream, error) {
 
 	return js, nil
 }
+
+// RandomID returns a reasonably random ID, suitable for use as a
+// [ConnTypeShellStreamArgs.ID].
+func RandomID() string { return strconv.FormatUint(rand.Uint64(), 36) }
