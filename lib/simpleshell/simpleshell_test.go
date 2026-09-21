@@ -5,7 +5,7 @@ package simpleshell
  * Tests for simpleshell.go
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20250905
+ * Last Modified 20260802
  */
 
 import (
@@ -65,13 +65,14 @@ func TestGo(t *testing.T) {
 		mux = http.NewServeMux()
 		svr = http.Server{Handler: mux}
 	)
+	defer svr.Close()
 	mux.HandleFunc(IOPath, func(w http.ResponseWriter, r *http.Request) {
 		/* Don't double-handle */
 		if 1 != handleCalled.Add(1) {
 			return
 		}
 		defer cancel()
-		if err := hsrv.StartFullDuplex(w); nil != err {
+		if err := hsrv.StartFullDuplex(w, r); nil != err {
 			handleErr = fmt.Errorf("starting duplex: %w", err)
 		}
 		var eg errgroup.Group
@@ -123,12 +124,7 @@ func TestGo(t *testing.T) {
 	})
 	eg.Go(func() error {
 		<-ectx.Done()
-		ctx, cancel := context.WithTimeout(
-			context.Background(),
-			time.Second,
-		)
-		defer cancel()
-		if err := svr.Shutdown(ctx); nil != err {
+		if err := svr.Shutdown(context.Background()); nil != err {
 			return fmt.Errorf("shutdown: %w", err)
 		}
 		return nil

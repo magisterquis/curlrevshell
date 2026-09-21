@@ -35,12 +35,12 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@betterdocs
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
-go: downloading golang.org/x/exp v0.0.0-20260813180055-c1d0aacb2297
-go: downloading golang.org/x/net v0.58.0
-go: downloading golang.org/x/sync v0.22.0
-go: downloading golang.org/x/sys v0.47.0
-go: downloading golang.org/x/text v0.41.0
-go: downloading golang.org/x/tools v0.49.0
+go: downloading golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba
+go: downloading golang.org/x/net v0.59.0
+go: downloading golang.org/x/sync v0.23.0
+go: downloading golang.org/x/sys v0.48.0
+go: downloading golang.org/x/text v0.42.0
+go: downloading golang.org/x/tools v0.50.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (betterdocs branch)
 01:04:42.760 Listening on 0.0.0.0:4444
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20260815122100-014de92e9efb+dirty (betterdocs branch)
+Version v0.0.1-beta.8.0.20260815122212-dff31caeeb0f+dirty (betterdocs branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
@@ -82,6 +82,8 @@ Options:
     	Tab/Ctrl+I's insertion source file or directory
   -debug
     	Print debugging messages
+  -experimental-adapter-socket path
+    	Unix socket path for adapters
   -icanhazip
     	Query icanhazip.com for a callback address
   -ipv6-one-liners

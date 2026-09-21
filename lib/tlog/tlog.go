@@ -6,7 +6,7 @@ package tlog
  * Testing-friendly logger
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260613
+ * Last Modified 20260823
  */
 
 import (
@@ -21,7 +21,7 @@ import (
 )
 
 // BufLen is the size of Buffer's internal buffers.
-const BufLen = 1024
+const BufLen = 10240
 
 // Buffer holds log messages received from the [slog.Logger] returned by
 // New.
@@ -51,12 +51,15 @@ type Buffer struct {
 // Logs will be written at level DEBUG.
 // The buffer will have space for BufLen log entries.
 func NewBuffer() (*Buffer, *slog.Logger) {
+	/* Buffer for logs. */
 	lb := &Buffer{
 		mu:     new(sync.RWMutex),
 		buf:    make(chan string, BufLen),
 		closed: new(bool),
 		cBuf:   make(chan string, BufLen),
 	}
+
+	/* Slogger for logs. */
 	sl := slog.New(slog.NewJSONHandler(lb, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 		/* Remove the timestamp. */
@@ -68,6 +71,7 @@ func NewBuffer() (*Buffer, *slog.Logger) {
 
 		},
 	}))
+
 	return lb, sl
 }
 

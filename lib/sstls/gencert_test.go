@@ -5,15 +5,18 @@ package sstls
  * Tests for gencert.go
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20260111
+ * Last Modified 20260817
  */
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -21,10 +24,12 @@ import (
 )
 
 func TestGenerateSelfSignedCertificate(t *testing.T) {
+	now := time.Now().Round(time.Second)
 	for _, c := range []struct {
 		subject     string
 		dnsNames    []string
 		ipAddresses []net.IP
+		start       time.Time
 		expiry      time.Time
 	}{{
 		subject: "kittens",
@@ -39,14 +44,15 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 			net.ParseIP("::"),
 			net.ParseIP("a::b"),
 		},
-		expiry: time.Now().Add(time.Minute),
+		start:  now,
+		expiry: now.Add(time.Minute),
 	}} {
-		c := c /* :C */
 		t.Run(c.subject, func(t *testing.T) {
 			_, _, g, err := generateSelfSignedCert(
 				c.subject,
 				c.dnsNames,
 				c.ipAddresses,
+				c.start,
 				c.expiry,
 			)
 			if nil != err {
@@ -100,15 +106,27 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 				)
 			}
 
-			gt := g.Leaf.NotAfter.UTC()
-			wt := c.expiry.UTC().Truncate(time.Second)
-			if !gt.Equal(wt) {
+			/* Is the notBefore time correct? */
+			if got, want := g.Leaf.NotBefore.UTC(),
+				c.start.UTC(); !got.Equal(want) {
+				t.Errorf(
+					"Start time incorrect:\n"+
+						" got: %s\n"+
+						"want: %s",
+					got,
+					want,
+				)
+			}
+
+			/* Is the notAfter time correct? */
+			if got, want := g.Leaf.NotAfter.UTC(),
+				c.expiry.UTC(); !got.Equal(want) {
 				t.Errorf(
 					"Expiry incorrect:\n"+
-						"got: %s\n"+
+						" got: %s\n"+
 						"want: %s",
-					gt,
-					wt,
+					got,
+					want,
 				)
 			}
 		})
@@ -130,42 +148,25 @@ func TestGetCertificate(t *testing.T) {
 		t.Errorf("Leaf on generated certificate is nil")
 	}
 
-	/* Make sure the archive doesn't have too much in it. */
+	/* Make sure the archive has the files we expect. */
 	ar, err := txtar.ParseFile(certFile)
 	if nil != err {
 		t.Fatalf("Error parsing archive: %s", err)
 	}
-	if got := len(ar.Files); 2 != got {
-		t.Errorf("Got %d files, expected 2", got)
+	var gotNames []string
+	for _, f := range ar.Files {
+		gotNames = append(gotNames, f.Name)
 	}
-	var gotCertF, gotKeyF bool
-	for i, f := range ar.Files {
-		i++
-		switch n := f.Name; n {
-		case txtarCertFile:
-			if gotCertF {
-				t.Errorf("File %d is another cert file", i)
-				break
-			}
-			gotCertF = true
-		case txtarKeyFile:
-			if gotKeyF {
-				t.Errorf("File %d is another key file", i)
-				break
-			}
-			gotKeyF = true
-		default:
-			t.Errorf("File %d has unexpected name %s", i, n)
-		}
-	}
-	if !gotCertF {
-		t.Errorf("Cert file not found")
-	}
-	if !gotKeyF {
-		t.Errorf("Key file not found")
-	}
-	if t.Failed() {
-		t.FailNow()
+	if got, want := gotNames, []string{
+		txtarFingerprintFile,
+		txtarCertFile,
+		txtarKeyFile,
+	}; !slices.Equal(got, want) {
+		t.Fatalf(
+			"Archive has incorrect file names\n got: %v\nwant: %v",
+			got,
+			want,
+		)
 	}
 
 	/* Re-read the archive. */
@@ -180,6 +181,26 @@ func TestGetCertificate(t *testing.T) {
 	/* Make sure it's the same certificate. */
 	if !readC.Leaf.Equal(genC.Leaf) {
 		t.Errorf("Generated and Read leaves not equal")
+	}
+
+	/* Make sure the fingerprint is correct. */
+	genFP, err := PubkeyFingerprintTLS(genC)
+	if nil != err {
+		t.Fatalf(
+			"Error calculating generated certificate's "+
+				"fingerprint: %v",
+			err,
+		)
+	}
+	if got, want := strings.TrimRight(string(ar.Files[0].Data), "\n"),
+		genFP; got != want {
+		t.Fatalf(
+			"Archive had incorrect fingerprint\n"+
+				"got: %s\n"+
+				"want: %s",
+			got,
+			want,
+		)
 	}
 }
 
@@ -250,6 +271,41 @@ func TestGetCertificate_OverwriteOldCert(t *testing.T) {
 			"Archive did not shrink after rewrite\n"+
 				" got: %d\n"+
 				"want: <%d",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we barf if we try to read the certificate from a file that's actually a
+// directory?
+func TestGetCertificate_DirectoryPath(t *testing.T) {
+	td := t.TempDir()
+	_, err := GetCertificate("", nil, nil, 0, td)
+	if got, want := err, syscall.EISDIR; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error passing GetCertificate a directory\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we barf if we try to write to a read-only directory?
+func TestGetCertificate_ReadOnlyDirectory(t *testing.T) {
+	td := filepath.Join(t.TempDir(), "d")
+	if err := os.MkdirAll(td, 0500); nil != err {
+		t.Fatalf("Error changing directory permissions: %v", err)
+	}
+	fn := filepath.Join(td, "f")
+	_, err := GetCertificate("", nil, nil, 0, fn)
+	if got, want := err, syscall.EACCES; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error saving to a read-only file\n"+
+				" got: %v\n"+
+				"want: %v",
 			got,
 			want,
 		)

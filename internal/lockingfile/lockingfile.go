@@ -6,7 +6,7 @@ package lockingfile
  * os.File which locks during writes
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251212
+ * Last Modified 20260710
  */
 
 import (
@@ -15,6 +15,9 @@ import (
 	"os"
 	"syscall"
 )
+
+// errLock indicates an unknown error occurred trying to lock a file.
+var errLock = errors.New("unknown flock(2) error")
 
 // File wraps an os.File with a Write that flock(2)s the file during writes.
 type File struct {
@@ -30,13 +33,13 @@ func OpenFile(name string, flag int, perm os.FileMode) (*File, error) {
 	return &File{*f}, nil
 }
 
-// Write wraps [os.File.Write] but holds a lock with [syscall.Flock].  If the
-// file does not support flock-style locks (i.e. returns [syscall.EOPNOTSUPP])
-// the write will be attempted without the lock held.
+// Write wraps [os.File.Write] but attempts to hold a lock with
+// [syscall.Flock].  Write does not return an error if the file is unable to
+// be locked.
 func (f *File) Write(b []byte) (int, error) {
 	/* Lock the file. */
-	if err := lockFile(&f.File); nil != err {
-		return 0, fmt.Errorf("acquiring lock: %w", err)
+	if err := lockFile(&f.File); nil == err {
+		defer unlockFile(&f.File)
 	}
 
 	/* Write to it. */
@@ -46,13 +49,7 @@ func (f *File) Write(b []byte) (int, error) {
 	}
 	f.File.Sync()
 
-	/* Unlock. */
-	var uerr error
-	if uerr = unlockFile(&f.File); nil != uerr {
-		uerr = fmt.Errorf("releasing lock: %w", uerr)
-	}
-
-	return n, errors.Join(werr, uerr)
+	return n, werr
 }
 
 // lockFile locks f for writing.  It blocks until the lock is held. */
@@ -70,19 +67,13 @@ func flock(f *os.File, how int) error {
 	}
 
 	/* f the lock(2). */
-	var serr, lerr error
-	if serr = rc.Control(func(fd uintptr) {
-		if lerr = syscall.Flock(int(fd), how); errors.Is(
-			lerr,
-			syscall.EOPNOTSUPP,
-		) {
-			lerr = nil
-		} else if nil != lerr {
-			lerr = fmt.Errorf("changing lock: %w", lerr)
+	err = errLock
+	rc.Control(func(fd uintptr) {
+		/* If we're here, control worked. */
+		if err = syscall.Flock(int(fd), how); nil != err {
+			err = fmt.Errorf("changing lock: %w", err)
 		}
-	}); nil != serr {
-		serr = fmt.Errorf("calling flock: %w", serr)
-	}
+	})
 
-	return errors.Join(serr, lerr)
+	return err
 }

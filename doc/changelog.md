@@ -3,13 +3,25 @@ Changelog
 This lists the feature creep present in each tagged version.
 
 `betterdocs`
-------------
+----------
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterdocs
 ```
-- Relatived paths better in [this changelog](./changelog.md).
+
+`adapters`
+----------
+- Logfile locking should work better with non-file files.
+- Preliminary support for comms adapters, for things like C2 over CW.
+- [`crsadapter`](../lib/crsadapter) - New library for adaptering.
+- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
+  logging library.
+- [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
+- [`sstls`](../lib/sstls): Add `ParseCachedCertificate` a parser of (in-memory)
+  cached certificates.
+- [`crsadapter`](../lib/crsadapter): Add `RandomID` to generate an ID,
+  randomly.
 - Updated dependencies.
 
 `dev`
@@ -34,6 +46,13 @@ go install github.com/magisterquis/curlrevshell@betterdocs
 - [`t/extract_templates.t`](../t/extract_templates.t) now reports how many TAP
   lines it'll emit.
 - Tests are a little better.
+- Relatived paths better in [this changelog](./changelog.md).
+- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
+  [`sstls`](../lib/sstls).
+- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
+  for passing arbitrary key/value pairs about.
+- [`crstemplate`]: Key-p templates from being generated if they use
+  non-existent map keys.
 - Updated dependencies.
 
 

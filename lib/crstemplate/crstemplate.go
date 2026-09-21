@@ -7,7 +7,7 @@ package crstemplate
  * Curlrevshell template things
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20250613
+ * Last Modified 20260829
  */
 
 import (
@@ -98,7 +98,9 @@ func Execute(name SubtemplateName, file string, params Params) (string, error) {
 
 	/* Execute the template. */
 	b.Reset()
-	if err := tmpl.ExecuteTemplate(b, string(name), params); nil != err {
+	if err := tmpl.
+		Option("missingkey=error").
+		ExecuteTemplate(b, string(name), params); nil != err {
 		return "", fmt.Errorf("executing template: %w", err)
 	}
 

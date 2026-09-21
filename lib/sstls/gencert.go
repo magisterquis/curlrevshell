@@ -5,7 +5,7 @@ package sstls
  * Generate a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20251011
+ * Last Modified 20260817
  */
 
 import (
@@ -37,12 +37,6 @@ var (
 	CertCacheDir = "sstls"
 	// CertCacheFile is the file we stick in CertCacheDir.
 	CertCacheFile = "cert.txtar"
-)
-
-// Names of files in a txtar archive for the PEM-encoded cert and key.
-const (
-	txtarCertFile = "cert"
-	txtarKeyFile  = "key"
 )
 
 // GetCertificate gets a cert from the given file or generates if it doesn't
@@ -85,10 +79,20 @@ func GetCertificate(
 		)
 	}
 
+	/* And work out its fingerprint. */
+	fp, err := PubkeyFingerprintTLS(cert)
+	if nil != err {
+		return tls.Certificate{}, fmt.Errorf(
+			"calculating fingerprint: %w",
+			err,
+		)
+	}
+
 	/* Save it for next time. */
 	if "" != certFile {
-		if err := SaveCertificate(
+		if err := saveCertificateFingerprint(
 			certFile,
+			fp,
 			certPEM,
 			keyPEM,
 		); nil != err {
@@ -113,20 +117,23 @@ func GenerateSelfSignedCertificate(subject string, dnsNames []string, ipAddresse
 		lifespan = DefaultSelfSignedCertLifespan
 	}
 	/* Generate it. */
+	now := time.Now()
 	return generateSelfSignedCert(
 		subject,
 		dnsNames,
 		ipAddresses,
-		time.Now().Add(lifespan),
+		now,
+		now.Add(lifespan),
 	)
 }
 
 // generateSelfSignedCert is like GenerateSelfSignedCert, but allows for an
-// explicit expiry time, useful for testing.
+// explicit begin and expiry time, useful for testing.
 func generateSelfSignedCert(
 	subject string,
 	dnsNames []string,
 	ipAddresses []net.IP,
+	notBefore time.Time,
 	notAfter time.Time,
 ) ([]byte, []byte, tls.Certificate, error) {
 	/*
@@ -150,7 +157,6 @@ func generateSelfSignedCert(
 
 	/* Gather all the important data for the cert. */
 	keyUsage := x509.KeyUsageDigitalSignature
-	notBefore := time.Now()
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {

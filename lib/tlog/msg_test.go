@@ -5,7 +5,7 @@ package tlog
  * Tests for msg.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260406
+ * Last Modified 20260814
  */
 
 import (
@@ -580,6 +580,21 @@ func TestMsgUnmarshalJSON(t *testing.T) {
 			)
 		}
 	})
+}
+
+// Do we get an error if a message can't be marshalled?
+func TestMsgToJSON_Error(t *testing.T) {
+	j, err := M.With(testUnmarshallableKey, true).ToJSON()
+	if got, want := err, (&json.UnsupportedTypeError{
+		Type: reflect.TypeFor[func()](),
+	}); !strings.HasSuffix(got.Error(), want.Error()) {
+		/* Apparently json.UnsupportedTypeError doesn't play well
+		with errors.Is. */
+		t.Errorf("Incorrect error\n got: %s\nwant: %s", got, want)
+	}
+	if "" != j {
+		t.Errorf("Unexpected JSON: %q", j)
+	}
 }
 
 // unparseable marshals to valid JSON, but unmarshals to a number which causes

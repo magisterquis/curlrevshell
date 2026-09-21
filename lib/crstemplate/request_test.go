@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250613
+ * Last Modified 20260124
  */
 
 import (
@@ -17,7 +17,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/lib/crstemplate/tmplfuncs"
@@ -43,6 +42,7 @@ func newTestParamsWithoutRequest(t *testing.T) Params {
 			Script: "testC",
 		},
 		StaticFilesDir: t.TempDir(),
+		M:              make(map[string]any),
 	}
 }
 
@@ -52,53 +52,62 @@ func newTestParamsWithoutRequest(t *testing.T) Params {
 func newTestRequest(t *testing.T) *http.Request {
 	/* Server which returns its request. */
 	var (
-		ctx, cancel = context.WithCancel(context.Background())
-		rch         = make(chan *http.Request, 1)
-		wg          sync.WaitGroup
-		svr         = httptest.NewUnstartedServer(http.HandlerFunc(func(
-			_ http.ResponseWriter,
-			r *http.Request,
-		) {
-			rch <- r
-			<-ctx.Done()
-		}))
+		req  *http.Request
+		rch  = make(chan *http.Request, 1)
 		res  *http.Response
-		rerr error
+		err  error
+		done = make(chan struct{})
 	)
-	/* Shutdown the request and server when the test is done. */
-	t.Cleanup(func() {
-		cancel()
-		svr.Close()
-		wg.Wait()
-		if nil == rerr {
-			if http.StatusOK != res.StatusCode {
-				t.Fatalf(
-					"Non-OK status generating request: %s",
-					res.Status,
-				)
-			}
-			res.Body.Close()
-		} else {
-			t.Fatalf("Error generating request: %s", rerr)
-		}
-	})
 
-	/* Grab the request. */
-	svr.StartTLS()
-	wg.Add(1)
+	/* Server from which to get the request. */
+	svr := httptest.NewTLSServer(http.HandlerFunc(func(
+		_ http.ResponseWriter,
+		r *http.Request,
+	) {
+		/* Send away the request when we get it. */
+		func() {
+			defer close(rch)
+			select {
+			case <-t.Context().Done():
+			case rch <- r: /* Good .*/
+			}
+		}()
+		/* Hang out until the test is done. */
+		<-t.Context().Done()
+	}))
+	t.Cleanup(svr.Close)
+
+	/* Make a request happen. */
 	go func() {
-		defer wg.Done()
-		res, rerr = svr.Client().Get(fmt.Sprintf(
+		defer close(done)
+		res, err = svr.Client().Get(fmt.Sprintf(
 			"https://%s:%s@%s",
 			testUsername,
 			testPassword,
 			svr.Listener.Addr().String(),
 		))
 	}()
+	t.Cleanup(func() {
+		<-done
+		if nil != err {
+			t.Errorf("Error making request: %v", err)
+		}
+		if nil != res {
+			res.Body.Close()
+		}
+	})
 
-	return <-rch
+	/* Grab the request. */
+	req, ok := <-rch
+	if !ok {
+		t.Fatalf("Did not get request")
+	}
+
+	return req
 }
 
+// NewTestParams return a Params with the the request set to a request from
+// newTestRequest.
 func newTestParams(t *testing.T) Params {
 	p := newTestParamsWithoutRequest(t)
 	p.ID = testID

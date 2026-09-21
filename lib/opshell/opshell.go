@@ -60,10 +60,6 @@ const (
 	SecondCtrlCWarning = "Caught second Ctrl+C."
 )
 
-// ErrOutputClosed is returned by Shell.Do when it returns because someone
-// closed the output channel.
-var ErrOutputClosed = errors.New("output channel closed")
-
 // CLine is a line and a color to print.  If Prompt is not empty, it is set as
 // the prompt before printing the line.
 type CLine struct {
@@ -288,8 +284,9 @@ func (s *Shell) Do(ctx context.Context) error {
 
 	/* Read lines from stdin, send them out.  It'd be nice to do this in
 	the errgroup, but goxterm.Terminal.ReadLine doesn't let us stop it. */
-	eg.Go(func() error {
-		for nil == ectx.Err() {
+	eg.GoTag(ectx, "reading input", func(ctx context.Context) error {
+		defer close(s.ich)
+		for nil == ctx.Err() {
 			/* Get a line from the input. */
 			l, err := s.t.ReadLine()
 			if errors.As(err, &goxterm.CtrlC{}) &&
@@ -315,14 +312,19 @@ func (s *Shell) Do(ctx context.Context) error {
 				)
 				/* Second time we've got one. */
 				return err
-			}
-			if nil != err {
+			} else if errors.Is(err, io.EOF) { /* Normal end. */
+				return ErrInputDone
+			} else if nil != err { /* A real error. */
 				return fmt.Errorf("reading line: %w", err)
 			}
-			/* Send it out. */
-			s.ich <- l
+			/* Send the line out. */
+			select {
+			case s.ich <- l:
+			case <-ctx.Done():
+				return nil
+			}
 		}
-		return context.Cause(ectx)
+		return nil /* Context done. */
 	})
 
 	/* Send lines sent to us to the shell. */

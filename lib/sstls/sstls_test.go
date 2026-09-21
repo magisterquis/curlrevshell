@@ -5,14 +5,25 @@ package sstls
  * Tests for sstls.go
  * By J. Stuart McMurray
  * Created 20241003
- * Last Modified 20241003
+ * Last Modified 20260823
  */
 
 import (
+	"embed"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/internal/testdatareader"
 )
+
+// testdataFS contains the testdata directory.
+//
+//go:embed testdata
+var testdataFS embed.FS
+
+// mustTDFile gets a test-specific file from testdataFS.
+var mustTDFile = testdatareader.Reader{FS: testdataFS}.MustReadFile
 
 func TestPubkeyFingerprintTLS(t *testing.T) {
 	have := `Generated 2024-10-03T19:50:58+02:00
