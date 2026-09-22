@@ -1,0 +1,154 @@
+package sstls // import "github.com/magisterquis/curlrevshell/lib/sstls"
+
+Package sstls - TLS listener with a self-signed certificate
+
+CONSTANTS
+
+const SHA256Prefix = "sha256//"
+    SHA256Prefix is allowed but not required to be at the start of the
+    fingerprint passed to TLSFingerprintVerifier.
+
+
+VARIABLES
+
+var (
+	// DefaultSelfSignedCertLifespan is the amount of time self-signed
+	// certificates.
+	DefaultSelfSignedCertLifespan = time.Until(time.Now().AddDate(10, 0, 0))
+	// SelfSignedSubject is the subject name we use for self-signed
+	// certificates.
+	SelfSignedSubject = "sstls"
+	// CertFileDir is the base name of the cert cache file.
+	CertCacheDir = "sstls"
+	// CertCacheFile is the file we stick in CertCacheDir.
+	CertCacheFile = "cert.txtar"
+)
+var ErrCacheFileEmpty = errors.New("cache file empty")
+    ErrCacheFileEmpty indicates the the file passed to LoadCachedCertificate or
+    the slice passed to ParseCachedCertificate was missing the certificate.
+
+var ErrLeafCertificateNotSet = errors.New("unset leaf certificate")
+    ErrLeafCertificateNotSet is returned by LoadCachedCertificate
+    if the tls.Certificate it would have returned has a nil
+    [LoadCachedCertificate.Leaf], which should only happen if
+    "x509keypairleaf=0" is set in GODEBUG.
+
+var ErrMissingLeafCertificate = errors.New("missing leaf x509 certificate")
+    ErrMissingLeafCertificate indicates a leaf certificate was expected but not
+    present.
+
+var ErrNoMatchingCertificate = errors.New(
+	"no certificate with correct fingerprint found",
+)
+    ErrNoMatchingCertificate indicates a TLS connection's peer did not present a
+    certificate matching a configured fingerprint.
+
+var ErrPrivateKeyPEMEmpty = errors.New("PEM-encoded key missing or empty")
+    ErrPrivateKeyPEMEmpty indicates the the file passed to LoadCachedCertificate
+    or the slice passed to ParseCachedCertificate was missing the private key or
+    the private key was empty.
+
+
+FUNCTIONS
+
+func DefaultCertFile() string
+    DefaultCertFile returns a path for the default cert file. It tries the
+    system-specific user-specific cache, and failing that $HOME/ and then
+    current directory.
+
+func GenerateSelfSignedCertificate(subject string, dnsNames []string, ipAddresses []net.IP, lifespan time.Duration) (certPEM, keyPEM []byte, cert tls.Certificate, err error)
+    GenerateSelfSignedCertificate generates a bare-bones self-signed
+    certificate with the given subject, DNS and IP Address SANs, and lifespan.
+    The certificate's Leaf will be set. The certificate is also returned in PEM
+    form.
+
+func GetCertificate(
+	subject string,
+	dnsNames []string,
+	ipAddresses []net.IP,
+	lifespan time.Duration,
+	certFile string,
+) (tls.Certificate, error)
+    GetCertificate gets a cert from the given file or generates if it
+    doesn't exist. If certFile is the empty string, a certificate will
+    be generated and not stored. The other arguments are the same as for
+    GenerateSelfSignedCertificate.
+
+func LoadCachedCertificate(certFile string) (tls.Certificate, error)
+    LoadCachedCertificate loads the certificate from the named file, which
+    should have been created with SaveCertificate.
+
+func ParseCachedCertificate(b []byte) (tls.Certificate, error)
+    ParseCachedCertificate is like LoadCachedCertificate, but loads the
+    certificate from b, which should have been created with SaveCertificate.
+
+func PubkeyFingerprint(cert *x509.Certificate) (string, error)
+    PubkeyFingerprint returns the base64-encoded SHA256 hash of the public key
+    fingerprint for the cert, usable for curl's --pinnedpubkey. The returned
+    fingerprint does not start with sha256//.
+
+func PubkeyFingerprintTLS(cert tls.Certificate) (string, error)
+    PubkeyFingerprintTLS is like PubkeyFingerprint, but uses the public key of
+    the leaf x509 certificate in cert. If the certificate's Leaf isn't set,
+    an error is returned.
+
+func SaveCertificate(certFile string, certPEM, keyPEM []byte) error
+    SaveCertificate saves PEM to the given file. Directories will be created as
+    needed with 0755 permissions.
+
+func TLSFingerprintVerifier(wantFP string) (func(tls.ConnectionState) error, error)
+    TLSFingerprintVerifier returns a function which can be used for
+    tls.Config.VerifyConnection. It ensures the peer presents a certificate with
+    the given fingerprint, which must be a base64-encoded sha256 hash as used by
+    curl, with or without the leading sha256//.
+
+
+TYPES
+
+type InvalidFingerprintSizeError int
+    InvalidFingerprintSizeError indicates that a decoded fingerprint was an
+    invalid size.
+
+func (err InvalidFingerprintSizeError) Error() string
+    Error implements the error interface.
+
+type Listener struct {
+	// Wrapped net.Listener, which returns TLS'd conns.
+	net.Listener
+
+	// Base64-encoded SHA256 hash of the generated self-signed
+	// certificate's public key, suitable for passing to curl's
+	// --pinnedpubkey.
+	Fingerprint string
+}
+    Listener listens for TLS connections and handshakes with a self-signed
+    certificate.
+
+func Listen(
+	net string,
+	address string,
+	subject string,
+	lifespan time.Duration,
+	certFile string,
+) (Listener, error)
+    Listen listens on the given network and address using the given cert.
+    If it does not exist it is created with the given subject and lifespan.
+    It will have no SANs. The certFile is used to read a previously-generated
+    certificate; it may be the empty string to always generate a new
+    certificate.
+
+type PeerCertificatePubkeyError struct {
+	Idx    int /* 1-indexed index into presented cert slice. */
+	NCerts int /* Number of certificates presented. */
+	Err    error
+}
+    PeerCertificatePubkeyError is returned as part of TLS connection
+    verification if an error is encountered verifying a PubKey in one of the
+    peer's certificates.
+
+func (err PeerCertificatePubkeyError) Error() string
+    Error implements the error interface.
+
+func (err PeerCertificatePubkeyError) Unwrap() error
+    Unwrap returns err.Err.
+

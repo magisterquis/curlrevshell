@@ -1,0 +1,57 @@
+package ctxerrgroup // import "github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
+
+Package ctxerrgroup - Like errgroup, but with more contexts
+
+FUNCTIONS
+
+func ContextTag(ctx context.Context) string
+    ContextTag returns the tag in ctx set by Group.GoTag, if any. If no tag was
+    set the empty string is returned.
+
+func ContextTags(ctx context.Context) []string
+    ContextTags returns the tags in ctx set by nested calls to Group.GoTag,
+    if any. If no tags were set nil is returned.
+
+
+TYPES
+
+type Group struct {
+	// Has unexported fields.
+}
+    Group wraps golang.org/x/sync/errgroup.Group but makes it slightly easier
+    to add goroutines. Group's undocumented methods directly wrap its internal
+    errgroup.Group. All of Group's methods are safe to be simultaneously called
+    from multiple goroutines.
+
+func WithContext(ctx context.Context) (*Group, context.Context)
+    WithContext returns a new Group, similar to errgroup.WithContext.
+
+func (g *Group) Go(f func() error)
+
+func (g *Group) GoContext(ctx context.Context, f func(context.Context) error)
+    GoContext is like errgroup.Group.Go, but passes ctx to the called function.
+    The passed-in context is usually the context returned from WithContext.
+
+func (g *Group) GoTag(ctx context.Context, tag string, f func(context.Context) error)
+    GoTag is like GoContext, but errors returned by f will be wrapped in a
+    TaggedError.
+
+func (g *Group) SetLimit(n int)
+
+func (g *Group) TryGo(f func() error) bool
+
+func (g *Group) Wait() error
+
+type TaggedError struct {
+	Tag string
+	Err error
+}
+    TaggedError is the error type returned by Group.GoTag.
+
+func (err TaggedError) Error() string
+    Error implements the error interface. The returned string consists of the
+    tag, ": ", and the original error.
+
+func (err TaggedError) Unwrap() error
+    Unwrap return err.Err.
+

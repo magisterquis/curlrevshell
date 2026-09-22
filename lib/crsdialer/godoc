@@ -1,0 +1,38 @@
+package crsdialer // import "github.com/magisterquis/curlrevshell/lib/crsdialer"
+
+Package crsdialer - Easy dialer to connect to curlrevshell
+
+CONSTANTS
+
+const SHA256Prefix = sstls.SHA256Prefix
+    SHA256Prefix is allowed but not required to be at the start of the
+    fingerprint passed to Dial.
+
+
+VARIABLES
+
+var ErrNoMatchingCertificate = sstls.ErrNoMatchingCertificate
+    ErrNoMatchingCertificate indicates a TLS connection's peer did not present a
+    certificate matching a configured fingerprint.
+
+
+FUNCTIONS
+
+func Dial(ctx context.Context, serverURL, fingerprint string) (
+	*net.UnixConn,
+	error,
+)
+    Dial connects to curlrevshell at the given server HTTPS URL. The server's
+    TLS certificate is expected to have the given fingerprint as printed by
+    curlrevshell, though it allowed to omit sstls.SHA256Prefix. The returned
+    os.File, which is really a socketpair, is proxied to and from the HTTPS
+    connection, which will be closed when the os.File is closed or the context
+    is done.
+
+func TLSFingerprintVerifier(wantFP string) (
+	func(tls.ConnectionState) error,
+	error,
+)
+    Deprecated: As of curlrevshell v0.0.1-beta.9, this function simply calls
+    sstls.TLSFingerprintVerifier.
+

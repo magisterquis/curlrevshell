@@ -1,0 +1,18 @@
+package chanmutex // import "github.com/magisterquis/curlrevshell/internal/chanmutex"
+
+Package chanmutex - Chan-based, synctest-friendly mutex
+
+TYPES
+
+type Mutex chan struct{}
+    Mutex is a mutex based on a channel to play nicely with testing/synctest.
+    Mutex implements sync.Locker
+
+func New() Mutex
+
+func (mu Mutex) Lock()
+    Lock acquires an exclusive lock on the mutex.
+
+func (mu Mutex) Unlock()
+    Unlock releases a lock acquired by Lock.
+

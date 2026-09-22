@@ -1,0 +1,72 @@
+package hsrv // import "github.com/magisterquis/curlrevshell/internal/hsrv"
+
+Package hsrv - HTTP server
+
+CONSTANTS
+
+const (
+	LMFileRequested           = "File requested"
+	LMListenerStarted         = "Listener started"
+	LMOneShellClosingListener = "Got one shell, closing listener"
+	LMURLPaths                = "Non-Default URL Paths"
+
+	LKError          = "error"
+	LKFingerprint    = "fingerprint"
+	LKListenAddr     = "listen_address"
+	LKRequestInfo    = "http_request"
+	LKRequestedFile  = "requested_file"
+	LKStaticFilesDir = "static_files_dir"
+)
+    Log messages and keys.
+
+const (
+	// OneShellFlag is the flag we use to indicate we only want one shell.
+	OneShellFlag = "one-shell"
+)
+
+VARIABLES
+
+var ErrOneShellClosed = errors.New("closed after shell received")
+    ErrOneShellClosed indicates that the listener was closed as expected after
+    receiving a single shell.
+
+
+FUNCTIONS
+
+func StartFullDuplex(w http.ResponseWriter, r *http.Request) error
+    StartFullDuplex enables full duplex mode on w, if possible. This is
+    necessary for some clients which are waiting on a go-ahead.
+
+
+TYPES
+
+type Server struct {
+	// Has unexported fields.
+}
+    Server serves implants over HTTPS.
+
+func New(
+	sl *slog.Logger,
+	addr string,
+	tmplf string,
+	iob *iobroker.Broker,
+	certFile string,
+	cbAddrs []string,
+	printIPv6 bool,
+	printDebug bool,
+	params crstemplate.Params,
+) (*Server, error)
+    New returns a new Server, listening on addr. Call its Do method to start it
+    serving. tmplf is non-empty, it is taken as a file from which to read the
+    -template template. params.StaticFilesDir and params.URLPaths may be set by
+    the caller; all other fields will be set by New or its handlers.
+
+func (s *Server) Addr() net.Addr
+    Addr returns s's listener's address.
+
+func (s *Server) Do(ctx context.Context) error
+    Do actually serves HTTPS clients.
+
+func (s *Server) RegisterOneLiners()
+    RegisterOneLiners registers one-liner printing functions with s's iobroker.
+

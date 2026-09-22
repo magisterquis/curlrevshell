@@ -1,0 +1,10 @@
+package currentversion // import "github.com/magisterquis/curlrevshell/internal/currentversion"
+
+Package currentversion - Get the current version and branch
+
+FUNCTIONS
+
+func VersionAndBranch() string
+    VersionAndBranch returns the current main module build version plus the
+    branch, if not master.
+

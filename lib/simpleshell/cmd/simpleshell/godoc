@@ -1,0 +1,15 @@
+Program simpleshell is a simple client for curlrevshell.
+
+VARIABLES
+
+var (
+	Args              = ""
+	ArgsEnvVar        = "SIMPLESHELL_ARGS"
+	C2                = "https://127.0.0.1:4444/io"
+	C2EnvVar          = "SIMPLESHELL_C2"
+	Fingerprint       string
+	FingerprintEnvVar = "SIMPLESHELL_FP"
+	IgnoreFlags       string
+)
+    Compile-time defaults
+

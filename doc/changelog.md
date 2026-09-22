@@ -9,6 +9,9 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@betterdocs
 ```
+- Sprinkle offline-friendly [`go doc`]
+  (https://pkg.go.dev/cmd/go#hdr-Show_documentation_for_package_or_symbol)
+  docs about.
 
 `adapters`
 ----------

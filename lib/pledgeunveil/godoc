@@ -1,0 +1,35 @@
+package pledgeunveil // import "github.com/magisterquis/curlrevshell/lib/pledgeunveil"
+
+Package pledgeunveil - pledge(2) and unveil(2) on OpenBSD, no-ops elsewhere
+
+FUNCTIONS
+
+func MultiUnveil(toUnveil [][2]string) error
+    MultiUnveil wraps Unveil to unveil the {path, permissions} pairs in
+    toUnveil. Paths may be the empty string; if so the path and corresponding
+    perms are silently skipped. UnveilBlock is called if all of the calls to
+    Unveil succeed.
+
+func MustPledge(promises string)
+    MustPledge Calls Pledge(promises, ""). It panics on error.
+
+func Pledge(promises, execpromises string) error
+    Pledge is a thin wrapper around unix.Pledge on OpenBSD and a no-op
+    elsewhere.
+
+func PledgeExecpromises(execpromises string) error
+    PledgeExecpromises is a thin wrapper around unix.PledgeExecpromises on
+    OpenBSD and a no-op elsewhere.
+
+func PledgePromises(promises string) error
+    PledgePromises is a thin wrapper around unix.PledgePromises on OpenBSD and a
+    no-op elsewhere.
+
+func Unveil(path string, flags string) error
+    Unveil is a thin wrapper around unix.Unveil on OpenBSD and a no-op
+    elsewhere.
+
+func UnveilBlock() error
+    UnveilBlock is a thin wrapper around unix.UnveilBlock on OpenBSD and a no-op
+    elsewhere.
+
