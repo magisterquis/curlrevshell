@@ -9,6 +9,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertests
 ```
+- In tests, make sure we actually have the curl referred to by "curlrevshell".
 
 `dev`
 -----

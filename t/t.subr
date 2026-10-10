@@ -36,4 +36,16 @@ function gorun_pid {
                 "$@"
 }
 
+# must_have_curl emits a failed test and exits the script with an unhappy
+# status if curl is not available.
+# must_have_curl emits one TAP line.
+must_have_curl() {
+        PTC=$(which curl ||:)
+        tap_isnt "$PTC" "" "Curl found" "$0" $LINENO
+        if [[ -z "$PTC" ]]; then
+                tap_done_testing
+                exit 2
+        fi
+}
+
 # vim: ft=sh

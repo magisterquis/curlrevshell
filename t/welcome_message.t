@@ -13,10 +13,8 @@ set -euo pipefail
 FN=$0       # This file, for plike
 GOTLN=1     # Read line number, for plike
 
-# Current branch name
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-tap_plan 11 # One for each welcome message line
+tap_plan 12    # One for each welcome message line, one for curl itself.
+must_have_curl # Do we have curl?
 
 # plike reads a line from the coprocess and checks it against $1 with tap_like.
 #
@@ -35,11 +33,11 @@ CURLRESTART='^curl -sk '\
 '--pinnedpubkey sha256//[a-z0-9A-Z+/]{43}= '\
 'https://127.0.0.1:\d+$' 
 WANT="^Welcome to curlrevshell version \(devel\)"
+BRANCH=$(current_git_branch)
 if [[ "master" != "$BRANCH" ]]; then
         WANT="$WANT \($BRANCH branch\)"
 fi
 WANT="$WANT\$"
-#plike "^Welcome to curlrevshell version \(devel\) \($BRANCH branch\)$" $LINENO
 plike "$WANT" $LINENO
 plike '^Listening on 127.0.0.1:\d+$'                                 $LINENO
 plike '^To get files from ./t:$'                                     $LINENO
