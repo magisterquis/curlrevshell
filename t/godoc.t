@@ -4,7 +4,7 @@
 # Make sure offline-friendly Go docs are up-to-date
 # By J. Stuart McMurray
 # Created 20260922
-# Last Modified 20260922
+# Last Modified 20261007
 
 use autodie;
 use strict;
@@ -32,13 +32,14 @@ cmp_ok $nd, '>', 0, "Found Go source directores";
 # All of the godoc files correct?
 for my $dir (sort keys %dirs) {
         SKIP: {
-                my $fn = "$dir/godoc";
+                my $fn = "$dir/godoc.txt";
                 # Do we have the file?
                 unless (ok -f $fn, "$fn exists") {
                         skip "$fn missing", 1;
                 }
                 # Make sure the file matches the generated docs;
-                tie my @got, "Tie::File", $fn, autochomp => 0  or die "open $fn: $!";
+                tie my @got, "Tie::File", $fn, autochomp => 0
+                        or die "open $fn: $!";
                 my @want = `go doc -all $dir`;
                 is_deeply \@got, \@want, "$fn correct";
         };

@@ -51,3 +51,4 @@ func NoDefaultPort(addr string) string
 func Port(addr string) (string, error)
     Port takes an IP:port or host:port and returns just the port. If there was
     no port, Port returns DefaultPort.
+

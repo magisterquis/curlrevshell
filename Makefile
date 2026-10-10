@@ -2,7 +2,7 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20260804
+# Last Modified 20261010
 
 BINNAME      != basename $$(pwd)
 GOBUILDFLAGS  = -trimpath -ldflags "-w -s"
@@ -51,8 +51,8 @@ install: ## Install curlrevshell with go install
 	go install ${GOBUILDFLAGS}
 .PHONY: install
 
-clean:     subclean ## Remove built things
-distclean: subclean ## Remove more built things
+clean:     subclean                ## Remove built things
+distclean: docs_distclean subclean ## Remove more built things
 
 subclean: .USE
 .for SUBDIR in ${SUBMAKES:H}
