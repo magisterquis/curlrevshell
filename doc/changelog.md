@@ -22,6 +22,7 @@ go install github.com/magisterquis/curlrevshell@adapters
 - Sprinkle offline-friendly [`go doc`]
   (https://pkg.go.dev/cmd/go#hdr-Show_documentation_for_package_or_symbol)
   docs about.
+- Add [`go fix`](https://pkg.go.dev/cmd/fix) to [`make test`](../Makefile).
 - Updated dependencies.
 
 `dev`
