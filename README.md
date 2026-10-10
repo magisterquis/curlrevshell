@@ -40,7 +40,7 @@ go: downloading golang.org/x/net v0.61.0
 go: downloading golang.org/x/sync v0.24.0
 go: downloading golang.org/x/sys v0.49.0
 go: downloading golang.org/x/text v0.43.0
-go: downloading golang.org/x/tools v0.51.0
+go: downloading golang.org/x/tools v0.52.0
 $ curlrevshell
 01:04:42.758 Welcome to curlrevshell version v0.0.1-beta.8 (adapters branch)
 01:04:42.760 Listening on 0.0.0.0:4444
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20261010164616-5b5e15d028bf+dirty (adapters branch)
+Version v0.0.1-beta.8.0.20261010165159-a6f4e333e506+dirty (adapters branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i

@@ -4,19 +4,26 @@
 # Make sure we can set URL paths
 # By J. Stuart McMurray
 # Created 20241205
-# Last Modified 20250621
+# Last Modified 20261010
 
-use warnings;
+use autodie;
 use strict;
+use warnings;
 
+use IPC::Cmd qw/can_run/;
 use IPC::Open2;
-use Test::More tests => 6;
+use Test::More tests => 7;
 
 $|=1;
 
 my $want_in     = "testitest";
 my $want_out    = "testotest";
 my $want_script = "testctest";
+
+# Can't do anything without curl.
+my $curl = can_run("curl") // "";
+isnt $curl, "", "Curl found";
+exit 2 if "" eq $curl;
 
 # Start curlrevshell
 my $pid = open2 my $chld_out, my $chld_in, <<_eof

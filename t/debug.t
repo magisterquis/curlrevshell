@@ -4,11 +4,10 @@
 # Make sure we don't have debugging things left in
 # By J. Stuart McMurray
 # Created 20250216
-# Last Modified 20251011
+# Last Modified 20261010
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 4
