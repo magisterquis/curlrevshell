@@ -1,0 +1,18 @@
+package lockingfile // import "github.com/magisterquis/curlrevshell/internal/lockingfile"
+
+Package lockingfile - os.File which locks during writes
+
+TYPES
+
+type File struct {
+	os.File
+}
+    File wraps an os.File with a Write that flock(2)s the file during writes.
+
+func OpenFile(name string, flag int, perm os.FileMode) (*File, error)
+    OpenFile wraps os.OpenFile to return a File.
+
+func (f *File) Write(b []byte) (int, error)
+    Write wraps os.File.Write but attempts to hold a lock with syscall.Flock.
+    Write does not return an error if the file is unable to be locked.
+

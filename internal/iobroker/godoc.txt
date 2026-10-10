@@ -1,0 +1,157 @@
+package iobroker // import "github.com/magisterquis/curlrevshell/internal/iobroker"
+
+Package iobroker - Hook up io.Read/Writers to opshell channels
+
+CONSTANTS
+
+const (
+	LMAlreadyConnected = "Connection already established"
+	LMConnectionClosed = "Connection closed"
+	LMIDIncorrect      = "ID incorrect"
+	LMIDMissing        = "ID missing"
+	LMNewConnection    = "New connection"
+	LMShellFinished    = "Shell finished"
+	LMShellIO          = "Shell I/O"
+	LMShellStarting    = "Shell starting"
+	LMUnknownInputType = "Unknown input type"
+
+	LKData      = "data"
+	LKDirection = "direction"
+	LKError     = "error"
+	LKID        = "id"
+	LKType      = "type"
+
+	LVBidir  streamDir = "bidirectional"
+	LVInput  streamDir = "input"
+	LVOutput streamDir = "output"
+
+	SMBufferingInput   = "Buffering input until a shell connects..."
+	SMConnectionClosed = "Connection closed"
+	SMShellIsGone      = "Shell is gone :("
+	SMShellIsReady     = "Shell is ready to go!"
+)
+    Shell messages and Log messages, keys, and values.
+
+const (
+	// LogColor is used for happy logs.
+	LogColor = opshell.ColorGreen
+	// ErrColor is used for unhappy logs.
+	ErrColor = opshell.ColorRed
+	// WarnColor is used for warnings.
+	WarnColor = opshell.ColorMagenta
+)
+
+VARIABLES
+
+var ErrIDEmpty = errors.New("stream ID empty")
+    ErrIDEmpty is returned by Broker.HandleInput and Broker.HandleOutput when
+    passed an empty stream ID.
+
+var ErrIDIncorrect = errors.New("stream ID incorrect")
+    ErrIDIncorrect is returned by Broker.HandleInput and Broker.HandleOutput
+    when a stream connects with an ID different than a connected stream of the
+    opposite direction.
+
+var ErrInputClosed = fmt.Errorf("input closed")
+    ErrInputClosed indicates that Broker.Run exited after the input channel it
+    was passed was closed.
+
+var ErrNotRunning = errors.New("not running")
+    ErrNotRunning is returned by Broker.HandleInput and Broker.HandleOutput when
+    a stream connects to a not running broker.
+
+var ErrOneShell = errors.New("single shell finished")
+    ErrOneShell indicates one shell connected and disconnected, if oneShell was
+    passed to Broker.Run.
+
+var ErrStreamAlreadyConnected = errors.New("stream already connected")
+    ErrStreamAlreadyConnected is returned by Broker.HandleInput and
+    Broker.HandleOutput when a stream of the same direction is already
+    connected.
+
+
+TYPES
+
+type Broker struct {
+	// Has unexported fields.
+}
+    Broker allows io.Read/Writers to be hooked up to opshell channels.
+    It ensures at most one input and one output stream are connected at the
+    same time, and disconnects a connected input stream if the connected output
+    stream disconnects. With the exception of Run, Broker's methods are safe for
+    simultaneous use from multiple goroutines.
+
+func New(och chan<- opshell.CLine) *Broker
+    New returns a new Broker, ready for use. Call its Run method to start it
+    going.
+
+func (b *Broker) Colorf(
+	tag string,
+	color opshell.Color,
+	format string, v ...any,
+)
+    Colorf logs a tagged message in a given color. The tag will be omitted if it
+    is the empty string.
+
+func (b *Broker) HandleBidirectional(
+	ctx context.Context,
+	sl *slog.Logger,
+	id string,
+	tag string,
+	rw io.ReadWriteCloser,
+) error
+    HandleBidirectional proxies between the connected shell and ich/och.
+    rw.Close may be called before HandleOutput returns. If rw has CloseRead
+    or CloseWrite methods, they may be called. id may be the empty string,
+    in which case a random ID will be generated.
+
+func (b *Broker) HandleInput(
+	ctx context.Context,
+	sl *slog.Logger,
+	id string,
+	tag string,
+	in io.Writer,
+) error
+    HandleInput proxies from b's input channel (ich) to the connected shell
+    input stream in, ensuring that there's only one input stream connected,
+    that the ID matches the output stream's ID, if applicable, and so on.
+    in will not be closed before returning. HandleInput will add the id to sl.
+
+    Cancel the context when in is no longer valid, e.g. when the connection
+    disconnects. Returned errors will have already been logged. When the input
+    from the user is ended or the conext is cancelled, nil is returned.
+
+func (b *Broker) HandleOutput(
+	ctx context.Context,
+	sl *slog.Logger,
+	id string,
+	tag string,
+	out io.ReadCloser,
+) error
+    HandleOutput proxies from the connected shell output stream out to och,
+    ensuring that there's only one output stream connected, that the ID matches
+    the input stream's ID, if applicable, and so on. out.Close may be called
+    before HandleOutput returns. If out.Read returns an error other than io.EOF
+    or an error occuring after the context is done or b is finished it will be
+    returned.
+
+func (b *Broker) RegisterHelpMessage(name string, hm HelpMessage)
+    RegisterHelpMessage registers a function to print a help message before
+    waiting for a shell to connect. Messages will be preceded with a timestamp
+    and printed in the order registered. The name is only used in reporting
+    errors.
+
+func (b *Broker) Run(
+	ctx context.Context,
+	ich <-chan string,
+	oneShell bool,
+) error
+    Run starts the broker going. If oneShell is true, after the first
+    time an input stream and output stream are simultaneously connected,
+    no new connections will be accepted and Run will return when the streams
+    disconnect.
+
+type HelpMessage func() (string, error)
+    HelpMessage returns a help message to be shown to the user before waiting
+    for a shell to connect.
+

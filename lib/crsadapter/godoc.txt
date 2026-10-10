@@ -1,0 +1,140 @@
+package crsadapter // import "github.com/magisterquis/curlrevshell/lib/crsadapter"
+
+Package crsadapter - Protocol adapter library for curlrevshell
+
+Package crsadapter - Bidirectional stream of JSON objects.
+
+VARIABLES
+
+var ErrDecodeAfterRead = errors.New(
+	"attempt to decode JSON value after reading raw bytes",
+)
+    ErrDecodeAfterRead is returned by Stream.DecodeNext if called after a call
+    to Stream.Read.
+
+var ErrNoBufferedNewline = errors.New("stream did not have a newline after the last JSON object")
+    ErrNoBufferedNewline is returned by Stream.Read when it detects the last
+    JSON object sent to the stream did not have a trailing newline.
+
+
+FUNCTIONS
+
+func RandomID() string
+    RandomID returns a reasonably random ID, suitable for use as a
+    ConnTypeShellStreamArgs.ID.
+
+
+TYPES
+
+type ConnRequest struct {
+	ConnType ConnType
+	Args     any
+}
+    ConnRequest is always the first thing sent by an adapter on a connnection.
+
+type ConnResponse struct {
+	// Error explains why a ConnRequest was rejected.  If the ConnRequest
+	// was not rejected, Error will be null.
+	Error string `json:",omitzero"`
+}
+    ConnResponse is sent to the adapter in response to a ConnRequest. In happy
+    situations, it's just an empty object.
+
+type ConnResponseError struct {
+	ConnResponse
+}
+    ConnResponseError is an error type wrapping a ConnResponse.
+
+func (err ConnResponseError) Error() string
+    Error returns err's underlying string, which may be the empty string.
+
+func (err ConnResponseError) Is(target error) bool
+    Is indicates whether err matches target. If target is nil and err's
+    underlying string is nil, Is returns true. In general, it is preferable to
+    use [ConnResponse.ToError] than wrap ConnResponse in a ConnResponseError
+    directly.
+
+type ConnType string
+    ConnType is used in ConnRequest to indicate the type of connection
+    requested.
+
+const (
+	ConnTypeUnspecified ConnType = ""
+	ConnTypeShellStream ConnType = "shell-stream"
+)
+type ConnTypeShellStreamArgs struct {
+	// Direction indicates the direction of the stream.
+	Direction ShellStreamDirection
+
+	// ID helps ensure that input and output streams belong together and
+	// helps correlate log messages related to a single shell.
+	// For a bidirectional (InOut) stream, ID is only used for logging.
+	// ID should be reasonably collision-resistant.
+	ID string
+
+	// Tag is presented to the curlrevshell user in square brackets before
+	// connection-related status messages and should give the user a good
+	// idea of what's connecting, e.g. a hostname or IP address.
+	Tag string
+
+	// LogInfo will be added to log messages related to this connection.
+	// It may be any legal JSON value or entirely omitted.
+	LogInfo any `json:",omitzero"`
+}
+    ConnTypeShellStreamArgs contains information about a shell input, output,
+    or input/output connection.
+
+type ShellStreamDirection string
+    ShellStreamDirection indicates the direction of a stream in a
+    ConnTypeShellStream ConnRequest.
+
+const (
+	ShellStreamDirectionInput  ShellStreamDirection = "input"  /* /i */
+	ShellStreamDirectionInOut  ShellStreamDirection = "in/out" /* /io */
+	ShellStreamDirectionOutput ShellStreamDirection = "output" /* /o */
+)
+type Stream struct {
+	Streamer
+
+	// Has unexported fields.
+}
+    Stream represents a connection to Curlrevshell's adapter interface.
+    It provides a bidirectional stream of JSON objects but may also be used
+    for Sending and receiving non-JSON data with the caveat that its built-in
+    JSON object decoder is no longer usable after the first non-JSON read.
+    Stream's methods are generally not safe for concurrent use, with the
+    exception that calls to Write/Send may be called concurrently with calls to
+    Read/DecodeNext. JSON objects are expected to be newline-terminated.
+
+func Dial(ctx context.Context, path string, ct ConnType, args any) (*Stream, error)
+    Dial connects to the curlrevshell adapter socket path and requests a
+    connection of type ct with the given arguments. Once dial has returned,
+    the context will not affect the stream.
+
+func Handshake(s Streamer, ct ConnType, args any) (*Stream, error)
+    Handshake sends a ConnRequest and checks the ConnResponse.
+
+func NewStream(b Streamer) *Stream
+    NewStream returns a new Stream wrapping s.
+
+func (j Stream) DecodeNext(v any) error
+    DecodeNext attempts to decode the next JSON message into v. Do not call
+    DecodeNext after the first call to Read.
+
+func (j *Stream) Read(b []byte) (int, error)
+    Read reads plain bytes from j, bypassing JSON decoding. Do not call
+    concurrently with DecodeNext or another call to Read. As Stream is indended
+    for newline-separated messages, if a newline was sent after the last JSON
+    message, it will not be returned.
+
+func (j Stream) Send(v any) error
+    Send encods and sends v to j. Do not call concurrently with Write.
+
+type Streamer interface {
+	io.ReadWriteCloser
+	CloseRead() error
+	CloseWrite() error
+}
+    Streamer is the interface Stream wraps. In particular, net.UnixConn
+    satisfies Streamer.
+

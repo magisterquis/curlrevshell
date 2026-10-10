@@ -1,0 +1,94 @@
+package adsrv // import "github.com/magisterquis/curlrevshell/internal/adsrv"
+
+Package adsrv - Adapter (and such) over Unix sockets server
+
+CONSTANTS
+
+const ConnRequestMaxWait = time.Minute
+    ConnRequestMaxWait is the maximum time Server will wait for a [ConnRequest]
+    to show up on a new connection.
+
+
+VARIABLES
+
+var (
+	LMConnRequestArgsError   = "Connection request arguments error"
+	LMConnRequestError       = "Connection request error"
+	LMConnRequestReceived    = "Connection request received"
+	LMConnResponseError      = "Connection response error"
+	LMConnResponseSent       = "Connection response sent"
+	LMAdapterListenerStarted = "Adapter listener started"
+	LMNewAdapterConn         = "New adapter connection"
+
+	LKAdapterInfo    = "adapter_info"
+	LKConnRequest    = "connection_request"
+	LKConnResponse   = "connection_response"
+	LKConnectionName = "connection_name"
+	LKError          = "error"
+	LKSocketPath     = "socket_path"
+)
+    Log messages, keys, and values.
+
+var ErrConnRequestTimeout = fmt.Errorf("timeout reading conection request")
+    ErrConnRequestTimeout indicates a connection request took too long.
+
+var ErrUnspecifiedConnType = fmt.Errorf("unspecified connection type")
+    ErrUnspecifiedConnType indicates an adapter requested a connection without a
+    ConnType.
+
+
+TYPES
+
+type ConnResponseError struct {
+	crsadapter.ConnResponse
+}
+    ConnResponseError is an error type wrapping a ConnResponse.
+
+func (err ConnResponseError) Error() string
+    Error returns err's underlying string, which may be the empty string.
+
+func (err ConnResponseError) Is(target error) bool
+    Is indicates whether err matches target. If target is nil and err's
+    underlying string is nil, Is returns true. In general, it is preferable to
+    use [ConnResponse.ToError] than wrap ConnResponse in a ConnResponseError
+    directly.
+
+type Server struct {
+	// Has unexported fields.
+}
+    Server serves requests from adapters and other such things.
+
+func New(
+	sl *slog.Logger,
+	lPath string,
+	iob *iobroker.Broker,
+) (*Server, error)
+    New listens on the unix socket lPath, unlinking it if it exists, and returns
+    a new Server ready for a call to Run.
+
+func (s *Server) Addr() net.Addr
+    Addr returns s's listener's address.
+
+func (s *Server) Run(
+	ctx context.Context,
+) error
+    Run handles adapter (and such) clients.
+
+type UnknownConnTypeError struct {
+	ConnType crsadapter.ConnType
+}
+    UnknownConnTypeError indicates an adapter requested a connection with an
+    unknown ConnType.
+
+func (err UnknownConnTypeError) Error() string
+    Error implements the error interface.
+
+type UnknownShellStreamDirectionError struct {
+	Direction crsadapter.ShellStreamDirection
+}
+    UnknownShellStreamDirectionError indicates an adapter requested a shell
+    stream with an unknown direction.
+
+func (err UnknownShellStreamDirectionError) Error() string
+    Error implements the error interface.
+
