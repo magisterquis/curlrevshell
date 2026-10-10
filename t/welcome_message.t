@@ -4,11 +4,10 @@
 # Make sure the welcome message is correct
 # By J. Stuart McMurray
 # Created 20250615
-# Last Modified 20251107
+# Last Modified 20261010
 
 set -euo pipefail
 
-. ./t/shmore.subr
 . ./t/t.subr
 
 FN=$0       # This file, for plike

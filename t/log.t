@@ -4,10 +4,9 @@
 # Make sure logging works
 # By J. Stuart McMurray
 # Created 20251008
-# Last Modified 20260304
+# Last Modified 20261010
 
 . ./t/t.subr
-. ./t/shmore.subr
 
 tap_plan 1
 

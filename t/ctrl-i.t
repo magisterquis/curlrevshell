@@ -4,11 +4,10 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20260819
+# Last Modified 20261010
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 # One test per Ctrl+I file.
