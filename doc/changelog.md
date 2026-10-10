@@ -36,6 +36,7 @@ go install github.com/magisterquis/curlrevshell@dev
   for passing arbitrary key/value pairs about.
 - [`crstemplate`]: Key-p templates from being generated if they use
   non-existent map keys.
+- In tests, make sure we actually have the curl referred to by "curlrevshell".
 - Updated dependencies.
 
 

@@ -4,11 +4,10 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20251107
+# Last Modified 20261010
 
 set -e
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 12

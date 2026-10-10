@@ -4,19 +4,21 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20260819
+# Last Modified 20261010
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 # One test per Ctrl+I file.
 FS=$(find ./t/testdata/ctrl-i -maxdepth 1 -name '*.subr')
 NFS=$(($(echo "$FS" | egrep -v '^$' | wc -l)))
-tap_plan $((5+$NFS))
+tap_plan $((6+$NFS))
 
-# Make sure we actually have test files
+# Make sure we have curl.
+must_have_curl
+
+# Make sure we actually have test files.
 tap_isnt "$NFS" 0 "Have test files" "$0" $LINENO
 
 # start_curlrevshell starts curlrevshell in a coprocess with the -ctrl-i file

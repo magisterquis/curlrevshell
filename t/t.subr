@@ -4,9 +4,12 @@
 # Handy test subroutines and other things
 # By J. Stuart McMurray
 # Created 20250615
-# Last Modified 20260819
+# Last Modified 20261010
 
 set -euo pipefail
+
+# Users of these functions are all tests anyways.
+. t/shmore.subr
 
 # current_git_branch prints the name of the current git branch to stdout.
 function current_git_branch {
@@ -31,6 +34,18 @@ function gorun_pid {
                 -no-timestamps \
                 -tls-certificate-cache "" \
                 "$@"
+}
+
+# must_have_curl emits a failed test and exits the script with an unhappy
+# status if curl is not available.
+# must_have_curl emits one TAP line.
+must_have_curl() {
+        PTC=$(which curl ||:)
+        tap_isnt "$PTC" "" "Curl found" "$0" $LINENO
+        if [[ -z "$PTC" ]]; then
+                tap_done_testing
+                exit 2
+        fi
 }
 
 # vim: ft=sh

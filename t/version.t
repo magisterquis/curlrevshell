@@ -4,11 +4,10 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20260628
+# Last Modified 20261010
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 10
