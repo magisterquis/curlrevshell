@@ -5,7 +5,7 @@ package sstls
  * Verify a TLS peer's fingerprint
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260823
+ * Last Modified 20261010
  */
 
 import (

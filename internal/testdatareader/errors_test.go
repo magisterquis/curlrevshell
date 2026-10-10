@@ -5,7 +5,7 @@ package testdatareader
  * Tests for errors.go
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260815
+ * Last Modified 20260820
  */
 
 import (
