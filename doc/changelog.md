@@ -25,6 +25,7 @@ go install github.com/magisterquis/curlrevshell@adapters
 - Add [`go fix`](https://pkg.go.dev/cmd/fix) to [`make test`](../Makefile).
 - Updated dependencies.
 
+
 `dev`
 -----
 - `go` un-`tool`'d staticcheck, because hypothetical supply chain
