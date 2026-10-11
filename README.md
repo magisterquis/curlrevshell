@@ -35,7 +35,7 @@ It should look like the following, but with nicer colors:
 ```
 $ go install github.com/magisterquis/curlrevshell@dev
 go: downloading github.com/magisterquis/goxterm v0.0.1-beta.4
-go: downloading golang.org/x/exp v0.0.0-20261009195045-ca0d7ba23607
+go: downloading golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49
 go: downloading golang.org/x/net v0.61.0
 go: downloading golang.org/x/sync v0.24.0
 go: downloading golang.org/x/sys v0.49.0
@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20261010155358-6a90d624b4f4+dirty (dev branch)
+Version v0.0.1-beta.8.0.20261010210115-709cda5a8797+dirty (dev branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
