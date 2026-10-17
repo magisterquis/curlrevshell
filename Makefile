@@ -9,6 +9,7 @@ GOBUILDFLAGS  = -trimpath -ldflags "-w -s"
 SHMOREURL     = https://raw.githubusercontent.com/magisterquis/shmore/refs/heads/master/shmore.subr
 SUBMAKES     != find * -mindepth 1 -name Makefile -type f
 TESTFLAGS    += -timeout 3s
+.MAKE        ?= ${MAKE}
 
 .include "src/mk/docs.mk"
 .include "src/mk/tools.mk"

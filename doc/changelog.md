@@ -14,6 +14,7 @@ go install github.com/magisterquis/curlrevshell@bettertests
   refer to open sockets (e.g. ksh93 pipelines on Linux).
 - [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
   non-OpenBSD.
+- Various and sundry changes to accomodate building and testing on Linux.
 - Updated dependencies.
 
 
