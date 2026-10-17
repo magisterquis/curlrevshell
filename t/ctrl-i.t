@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20261010
+# Last Modified 20261011
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ set -euo pipefail
 
 # One test per Ctrl+I file.
 FS=$(find ./t/testdata/ctrl-i -maxdepth 1 -name '*.subr')
-NFS=$(($(echo "$FS" | egrep -v '^$' | wc -l)))
+NFS=$(($(echo "$FS" | grep -E -v '^$' | wc -l)))
 tap_plan $((6+$NFS))
 
 # Make sure we have curl.
@@ -28,8 +28,8 @@ tap_isnt "$NFS" 0 "Have test files" "$0" $LINENO
 # $1 - File to insert.
 start_curlrevshell() {
         # Curlrevshell as a coprocess.
-        local _ctrl_i_file=$1
-        ( go run -ldflags \
+        typeset _ctrl_i_file=$1
+        { go run -ldflags \
                 '-X github.com/magisterquis/curlrevshell/lib/opshell.TestingTTY=yes' \
                 . \
                 -ctrl-i "$_ctrl_i_file" \
@@ -37,7 +37,7 @@ start_curlrevshell() {
                 -no-timestamps \
                 -prompt '' \
                 -tls-certificate-cache "" |
-        perl -pE '$|=1;s/\r\n$/\n/' ) |&
+        perl -pE '$|=1;s/\r\n$/\n/'; } |&
 }
 
 # read_until reads from the coprocess until a line matching $1 is found.
@@ -60,8 +60,8 @@ close_curlrevshell() { exec 3>&p; exec 3>&-; wait; }
 # Arguments:
 # $1 - File to insert.
 get_inserted_data() {
-        local _ctrl_i_file=$1
-        local _got
+        typeset _ctrl_i_file=$1
+        typeset _got
 
         # Start curlrevshell going.
         start_curlrevshell "$_ctrl_i_file"
@@ -71,7 +71,16 @@ get_inserted_data() {
         read_until 'Would have sent the following*'
         COUNT=${REPLY#Would have sent the following }
         COUNT=${COUNT% bytes:}
-        _got=$(dd bs=1 count=$((COUNT)) status=none <&p)
+        # Good Heavens this is a hack.  Linux buffers <&p all funny.
+        typeset _oifs=$IFS
+        IFS='
+'
+        _got=""
+        while [[ $COUNT -gt ${#_got} ]]; do
+                read -pr
+                _got="$_got$REPLY
+"
+        done
 
         # Close curlrevshell before we return.
         close_curlrevshell
@@ -182,7 +191,7 @@ function check_ctrl_i {
         tap_ok "$?" "Sent SIGUSR1 to curlrevshell (pid $CRSPID)" "$0" $LINENO
 
         # Work out how much we think we sent.
-        for i in `jot 2`; do read -r -u5; done
+        for i in 1 2; do read -r -u5; done # Linux doesn't have jot.
         CRSSIZE=$(($(print -r "$REPLY" | cut -f 2 -d ' ')))
         tap_is "$CRSSIZE" "$WANTSIZE" "Reported size correct" "$0" $LINENO
 

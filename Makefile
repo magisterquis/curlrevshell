@@ -2,13 +2,14 @@
 # Build curlrevshell
 # By J. Stuart McMurray
 # Created 20240323
-# Last Modified 20261010
+# Last Modified 20261017
 
 BINNAME      != basename $$(pwd)
 GOBUILDFLAGS  = -trimpath -ldflags "-w -s"
 SHMOREURL     = https://raw.githubusercontent.com/magisterquis/shmore/refs/heads/master/shmore.subr
 SUBMAKES     != find * -mindepth 1 -name Makefile -type f
 TESTFLAGS    += -timeout 3s
+.MAKE        ?= ${MAKE}
 
 .include "src/mk/docs.mk"
 .include "src/mk/tools.mk"
