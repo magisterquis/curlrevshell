@@ -12,6 +12,8 @@ go install github.com/magisterquis/curlrevshell@bettertests
 - In tests, make sure we actually have the curl referred to by "curlrevshell".
 - Handle `-log`files which refer to paths which refer to file descriptors which
   refer to open sockets (e.g. ksh93 pipelines on Linux).
+- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
+  non-OpenBSD.
 - Updated dependencies.
 
 
