@@ -5,7 +5,7 @@ package crsadapter
  * Tests for crsadapter.go
  * By J. Stuart McMurray
  * Created 20260809
- * Last Modified 20260906
+ * Last Modified 20261017
  */
 
 import (
@@ -155,10 +155,15 @@ func TestDial(t *testing.T) {
 
 // Do we whine properly when we can't connect to a socket?
 func TestDial_DialError(t *testing.T) {
-	c, err := Dial(t.Context(), t.TempDir(), ConnType(tlog.S("test")), nil)
-	if got, want := err, syscall.ENOTSOCK; !errors.Is(got, want) {
+	c, err := Dial(
+		t.Context(),
+		filepath.Join(t.TempDir(), "s"),
+		ConnType(tlog.S("test")),
+		nil,
+	)
+	if got, want := err, syscall.ENOENT; !errors.Is(got, want) {
 		t.Errorf(
-			"Unexpected error connecting to directory\n"+
+			"Unexpected error connecting to non-existent path\n"+
 				" got: %v\n"+
 				"want: %v",
 			got,
