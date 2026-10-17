@@ -23,6 +23,8 @@ go install github.com/magisterquis/curlrevshell@adapters
   (https://pkg.go.dev/cmd/go#hdr-Show_documentation_for_package_or_symbol)
   docs about.
 - Add [`go fix`](https://pkg.go.dev/cmd/fix) to [`make test`](../Makefile).
+- [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
+  not-OpenBSD.
 - Updated dependencies.
 
 
