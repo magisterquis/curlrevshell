@@ -37,7 +37,7 @@ test: gosubdirs docs ## Run tests
 		/.{80,}/\
 			{ print "Long usage line: " $0; exit 1 }\
 	'
-	prove -It --directives
+	prove --directives
 .PHONY: test
 
 update: ## Fetch the latest Shmore and up-to-date Go things
