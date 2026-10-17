@@ -1,0 +1,170 @@
+package crstemplate // import "github.com/magisterquis/curlrevshell/lib/crstemplate"
+
+Package crstemplate contains bits and bobs related to curlrevshell's template
+usage.
+
+CONSTANTS
+
+const (
+	DefaultURLPathIn     = "i"  /* Shell input */
+	DefaultURLPathInOut  = "io" /* Shell bidirectional stream */
+	DefaultURLPathOut    = "o"  /* Shell output */
+	DefaultURLPathScript = "c"  /* Script generation. */
+)
+    Default URL paths for comms with shells.
+
+const (
+	SubtemplateCallback = "callback" /* "To get a shell" pastables */
+	SubtemplateFiles    = "files"    /* Static fileserver pastables */
+	SubtemplateScript   = "script"   /* Exceuted by /c */
+
+)
+    Subtemplate names in DefaultTemplate. These may be overridden with the
+    {{define ...}} blocks in the template passed to -template.
+
+const C2Param = "c2"
+    C2Param is a URL parameter or header which may be set in requetss to /c to
+    give the URL to which to call back.
+
+
+VARIABLES
+
+var (
+	// ErrNoSubtemplates indicates that a template file was specified which
+	// had no subtemplates.
+	ErrNoSubtemplates = errors.New("no subtemplates")
+
+	// ErrOutsideSubtemplate indicates the file passed to Execute had data
+	// outside subtemplates; likely an old-style template.
+	ErrOutsideSubtemplate = errors.New(
+		"non-subtemplate template data found",
+	)
+)
+var DefaultTemplate string
+    DefaultTemplate is the default callback script template. It can be
+    overridden at runtime with -template.
+
+var DefaultURLPaths = URLPaths{
+	In:     DefaultURLPathIn,
+	InOut:  DefaultURLPathInOut,
+	Out:    DefaultURLPathOut,
+	Script: DefaultURLPathScript,
+}
+    DefaultURLPaths are the URL paths we use if we don't have any others.
+    This should not be modified.
+
+var ErrRequestAlreadyAdded = errors.New("Params already has a request")
+    ErrRequestAlreadyAdded is returned by AddRequest if the Params to which a
+    request was to be added already had one.
+
+
+FUNCTIONS
+
+func CleanURLPaths(p *URLPaths)
+    CleanURLPaths removes leading and trailing slashes from the fields in p.
+    If an element of p is empty, it is taken from the corresponding field in
+    DefaultURLPaths.
+
+func Execute(name SubtemplateName, file string, params Params) (string, error)
+    Execute executes the given subtemplate with the given parameters.
+
+    If file is not the empty string, it is taken as a template file to attempt
+    to read to override the built-in template. Named subtemplates override
+    subtemplates with the similar name. The file must contain at least one
+    subtemplate.
+
+    If file is not the empty string and the file did not exist, DefaultTemplate
+    will be used but errors.Is(err, fs.ErrNotExist) will be true to enable a
+    warning that a template file is missing but the returned string will still
+    be the result of executing DefaultTemplate's subtemplate.
+
+
+TYPES
+
+type BasicAuth struct {
+	Ok       bool /* True if the request contained credentials. */
+	Username string
+	Password string
+}
+    BasicAuth contains the Basic Auth credentials sent in a request.
+
+type Params struct {
+
+	// ListenAddress is the IP:port on which the server is listening.
+	ListenAddress string
+
+	// PubkeyFP is the base64-encoded SHA256 hash of the Server's TLS
+	// public key.
+	PubkeyFP string
+
+	// CallbackAddresses are the host:ports on which the server is expected
+	// to be reached: interface addresses as well as addresses set with
+	// -callback-address and -icanhazip.
+	CallbackAddresses []string
+
+	// URLPaths are usually i, o, etc but may have been changed at
+	// compile-time.  They will not include slashes.
+	URLPaths URLPaths
+
+	// StaticFilesDir is the directory from which static files are to be
+	// served, or empty if no static files are served.
+	StaticFilesDir string
+
+	// For the callback and files subtemplates, C2Addr is the address for
+	// which to generate a one-liner.
+	//
+	// For the script (/c) subtemplate, C2Addr contains, in order of
+	// priority, the c2 parameter in HTTP form data or URL's query
+	// parameters, the HTTP C2: header, the HTTP Host: header, the TLS SNI,
+	// or nothing.  If C2Addr is not empty, it will either have the port
+	// set in the request or, if no port was set in the request the port on
+	// which the request was received.
+	C2Addr string
+
+	// ID is a random ID string consisting of a base36-encoded uint64.
+	// Only set when executing the script subtemplate (/c).
+	ID string
+
+	// Request is the HTTP request for which the script template is being
+	// executed.
+	// Only set when executing the script subtemplate (/c).
+	Request *http.Request
+
+	// BasicAuth are the Username and Password set in the request's
+	// Authorization header, if set.
+	// Only set when executing the script subtemplate (/c).
+	BasicAuth BasicAuth
+
+	// LocalAddress is the address on which the request was received.
+	// Only set when executing the script subtemplate (/c).
+	LocalAddress string
+
+	// M may be used to set arbitrary key/value pairs during template
+	// execution using Params' With method.
+	// It is initially empty.
+	M map[string]any
+}
+    Params are passed to subtemplates. All hosts and addresses not in Request
+    have port numbers.
+
+func AddRequest(p Params, r *http.Request) (Params, error)
+    AddRequest returns a copy of p with information from r set, for the script
+    template.
+
+func (p Params) With(key string, value any) (Params, error)
+    With returns a copy of p with a new map with p.M[key] set to value. The new
+    map is a shallow clone of p.M, or a new map if p.M is nil.
+
+type SubtemplateName string
+    SubtemplateName prevents inadvertently passing random strings where a
+    subtemplate name is expected
+
+type URLPaths struct {
+	In     string /* Default: i */
+	InOut  string /* Default: io */
+	Out    string /* Default: o */
+	Script string /* Default: c */
+}
+    URLPaths contain the parts of the URL paths indicating what an HTTPS request
+    is for.
+

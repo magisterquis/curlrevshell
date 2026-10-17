@@ -4,7 +4,7 @@
 # Make sure compile-time defaults work
 # By J. Stuart McMurray
 # Created 202501010
-# Last Modified 20251010
+# Last Modified 20251011
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ LDFLAGS="
 # get_default reads the next line from the coprocess, which should be a flag's
 # help text, and extracts the default value.
 get_default() {
-        local _got
+        typeset _got
         read -pr _got
         _got=${_got##*\(default \"}
         _got=${_got%\"\)}

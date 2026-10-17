@@ -6,7 +6,7 @@ package pledgeunveil
  * pledge(2) and unveil(2) on OpenBSD, no-ops elsewhere
  * By J. Stuart McMurray
  * Created 20251010
- * Last Modified 20251010
+ * Last Modified 20261017
  */
 
 import "golang.org/x/sys/unix"
@@ -40,6 +40,3 @@ func Unveil(path string, flags string) error {
 func UnveilBlock() error {
 	return unix.UnveilBlock()
 }
-
-//go:generate ./gen_other.pl $GOFILE
-//go:generate gofmt -w .

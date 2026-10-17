@@ -10,7 +10,7 @@ package pledgeunveil
  * pledge(2) and unveil(2) on OpenBSD, no-ops elsewhere
  * By J. Stuart McMurray
  * Created 20251010
- * Last Modified 20251010
+ * Last Modified 20261017
  */
 
 // Pledge is a thin wrapper around [unix.Pledge]

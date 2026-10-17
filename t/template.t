@@ -4,11 +4,10 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20251107
+# Last Modified 20261017
 
 set -e
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 12
@@ -23,8 +22,7 @@ trap 'rm -r "$TMPLF" "$TMPLD"; tap_done_testing' EXIT
 GOT="$(find . -type f \
         \! -name '*.swp' \
         \! -path './t/*' \
-        -exec grep html/template {} + |
-        egrep -v '^Binary file \./[^[:space:]]+ matches$' ||:
+        -exec grep -I html/template {} + ||:
 )"
 
 tap_is "$GOT" "" "Not using html/template" "$0" $LINENO
@@ -108,7 +106,7 @@ tap_like \
 # $3 - Lineno
 function template_ok {
         gorun -template "$1" |&
-        for i in `jot 3`; do read -pr; done
+        for i in 1 2 3; do read -pr; done
         tap_like "$REPLY" "^To get a shell:" "$2" "$0" "$3"
         exec 9>&p; exec 9>&-; while read -pr; do :; done; wait
 }

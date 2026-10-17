@@ -4,17 +4,16 @@
 # Make sure we don't have debugging things left in
 # By J. Stuart McMurray
 # Created 20250216
-# Last Modified 20251011
+# Last Modified 20261011
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 4
 
 # Make sure we're not using MQD
-GOT=$(gorun </dev/null 2>&1 | egrep 'MQD DEBUG PACKAGE LOADED$' ||:)
+GOT=$(gorun </dev/null 2>&1 | grep -E 'MQD DEBUG PACKAGE LOADED$' ||:)
 tap_is "$GOT" "" "Not using github.com/magisterquis/mqd" "$0" $LINENO
 
 

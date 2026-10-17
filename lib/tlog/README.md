@@ -1,0 +1,3 @@
+tlog
+====
+Testing-friendly logger

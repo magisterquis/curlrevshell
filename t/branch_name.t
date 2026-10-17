@@ -4,11 +4,10 @@
 # Make sure we're using the right branch name
 # By J. Stuart McMurray
 # Created 20250615
-# Last Modified 20250615
+# Last Modified 20261010
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 1

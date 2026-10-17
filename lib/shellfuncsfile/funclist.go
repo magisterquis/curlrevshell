@@ -5,7 +5,7 @@ package shellfuncsfile
  * Shell function to print the list of functions we offer.
  * By J. Stuart McMurray
  * Created 20240728
- * Last Modified 20241205
+ * Last Modified 20260819
  */
 
 import (
@@ -61,7 +61,7 @@ func GenFuncList(s string) ([]byte, error) {
 	fmt.Fprintf(tw, "%s\t- %s\n", ListFuncName, ListFuncDesc)
 
 	/* Add each line to the table. */
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		/* Don't care about non-doc lines. */
 		if !strings.HasPrefix(line, DocPrefix) {
 			continue

@@ -5,7 +5,7 @@ package simpleshell
  * Tests for shell.go
  * By J. Stuart McMurray
  * Created 20241013
- * Last Modified 20250924
+ * Last Modified 20260819
  */
 
 import (
@@ -25,6 +25,7 @@ func testShell(t *testing.T, ctx context.Context, s Shell, have, want string) {
 	s.SetInput(io.NopCloser(strings.NewReader(have)))
 	o := s.Output()
 	buf := new(bytes.Buffer)
+	defer o.Close()
 
 	eg, ectx := ctxerrgroup.WithContext(ctx)
 	eg.GoTag(ectx, "shell", s.Go)
@@ -61,10 +62,8 @@ func TestCmdShell(t *testing.T) {
 	}
 
 	/* Setup a new shell to run test_cat. */
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	s, err := NewCmdShell(exec.CommandContext(
-		ctx,
+		t.Context(),
 		/* This is way faster than building our own cat but fails on
 		Windows.  We'll cross that bridge when we come to it. */
 		"/bin/sh", "-c", `while read -r X; do echo "$X"; done`,
@@ -72,8 +71,9 @@ func TestCmdShell(t *testing.T) {
 	if nil != err {
 		t.Fatalf("Error setting up shell: %s", err)
 	}
+	defer s.Output().Close()
 
-	testShell(t, ctx, s, "kittens\n", "kittens\n")
+	testShell(t, t.Context(), s, "kittens\n", "kittens\n")
 }
 
 func TestEchoShell(t *testing.T) {

@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20250215
+ * Last Modified 20260829
  */
 
 import (
@@ -66,7 +66,7 @@ func TestExecute(t *testing.T) {
 		defaultScript = func(_ *testing.T, r *http.Request) string {
 			return fmt.Sprintf(
 				`#!/bin/sh
-curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://%s/testI/testID -N  </dev/null 2>&0 |
+curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://%s/testI/testID -N  </dev/null 2>/dev/null |
 /bin/sh 2>&1 |
 curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= https://%s/testO/testID -T- >/dev/null 2>&1
 `,
@@ -207,6 +207,24 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 				`{{end}}`,
 			wantf: defaultFiles,
 		},
+		SubtemplateScript + "/map/key_exists": {
+			name: SubtemplateScript,
+			have: `{{define "mtmpl"}}{{.k1}}{{end}}` +
+				`{{define "script"}}{{template "mtmpl"` +
+				`(map "k1" "v1")}}{{end}}`,
+			want: "v1",
+		},
+		SubtemplateScript + "/map/key_does_not_exist": {
+			name: SubtemplateScript,
+			have: `{{define "mtmpl"}}{{.nope}}{{end}}` +
+				`{{define "script"}}{{template "mtmpl"` +
+				`(map "k1" "v1")}}{{end}}`,
+			werr: errors.New(
+				`executing template: template: _base:1:20: ` +
+					`executing "mtmpl" at <.nope>: ` +
+					`map has no entry for key "nope"`,
+			),
+		},
 	}
 	for n, c := range cs {
 		t.Run(n, func(t *testing.T) {
@@ -236,7 +254,8 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 				params,
 			)
 			if nil != c.werr { /* Expected an error. */
-				if !errors.Is(err, c.werr) {
+				if !errors.Is(err, c.werr) &&
+					err.Error() != c.werr.Error() {
 					t.Fatalf(
 						"Incorrect error:\n"+
 							" got: %s\n"+
