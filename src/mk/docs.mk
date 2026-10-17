@@ -2,7 +2,7 @@
 # Make makefile include to build documents
 # By J. Stuart McMurray
 # Created 20251209
-# Last Modified 20261010
+# Last Modified 20261017
 
 # Documents to generate.
 GENDOCS = README.md doc/config.md
@@ -20,7 +20,7 @@ src/docs/${D:T}.built! .NOTMAIN
 
 # Offline-friendly go doc output.
 GOSRCS != find * -mindepth 1 -name '*.go' \! -name '*_test.go'
-GODIRS != for D in ${GOSRCS:H:QL}; do echo $$D; done | sort -u
+GODIRS  = ${GOSRCS:H}
 GODOCS  = ${GODIRS:S,$,/godoc.txt,}
 godocs: ${GODOCS} .NOTMAIN
 
