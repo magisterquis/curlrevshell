@@ -2,11 +2,12 @@
 # Put together a README with current help text
 # By J. Stuart McMurray
 # Created 20251209
-# Last Modified 20260105
+# Last Modified 20261017
 
 .SUFFIXES: .m4 .built
 
 CURRENT_BRANCH_FILE  = ../../internal/currentversion/current_branch
+PLEDGEUNVEIL_OTHER   = ../../lib/pledgeunveil/pledgeunveil_other.go
 SRCS                != ls *.m4
 
 # Our local current_branch is out of date if it's not the same as the real
@@ -33,19 +34,22 @@ M4_ARGS += -Dm4_$F="$$(<$F)"
 	mv $@.tmp $@
 
 usage: ../../go.mod ../../go.sum ../../curlrevshell.go ${CURRENT_BRANCH_FILE}
+usage: ${PLEDGEUNVEIL_OTHER}
 	TD=$$(mktemp -d); TF=$$TD/curlrevshell;\
 		go build -o "$$TF" ../../ &&\
 		"$$TF" -h >$@.tmp 2>&1 &&\
 		rm "$$TF" && rmdir "$$TD"
 	mv $@.tmp $@
 
-${CURRENT_BRANCH_FILE}: ../../.git/HEAD
-	make -C ${@D} ${@F}
+# Things made from other things.
+${CURRENT_BRANCH_FILE}: ../../.git/HEAD call_make
+
+${PLEDGEUNVEIL_OTHER}: call_make
 
 current_branch: ${CURRENT_BRANCH_FILE}
 	cp $> $@
 
-downloading_deps: ../../go.mod ../../go.sum
+downloading_deps: ../../go.mod ../../go.sum ${CURRENT_BRANCH_FILE}
 	go list -deps -f '\
 		{{- define "M"}}go: downloading {{.Path}} {{.Version}}{{end -}}\
 		{{- with .Module -}}\
@@ -59,6 +63,11 @@ downloading_deps: ../../go.mod ../../go.sum
 		{{- end -}}\
 	' ../../ | sort -u >$@.tmp
 	mv $@.tmp $@
+
+# Call a makefile in another directory
+call_make: .USE
+	${MAKE} -C ${@D} ${@F}
+
 
 clean:
 	rm -f *.built downloading_deps usage current_branch

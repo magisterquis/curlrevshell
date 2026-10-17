@@ -4,7 +4,7 @@
 # Make sure Ctrl+C works
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20250928
+# Last Modified 20261011
 
 set -euo pipefail
 
@@ -28,12 +28,12 @@ run() {
 
 # Do we get a warning after one Ctrl+C?
 WANT='Caught Ctrl+C.  One more in the next second to kill the shell.'
-GOT=$(printf '\003test\r\n' | run | fgrep -o "$WANT" ||:)
+GOT=$(printf '\003test\r\n' | run | grep -F -o "$WANT" ||:)
 tap_is "$GOT" "$WANT" "First Ctrl+C message" "$0" $LINENO
 
 # Do we get a message after two Ctrl+C's?
 WANT='Caught second Ctrl+C'
-GOT=$(printf '\003\003' | run | fgrep -o "$WANT" ||:)
+GOT=$(printf '\003\003' | run | grep -F -o "$WANT" ||:)
 tap_is "$GOT" "$WANT" "Second Ctrl+C message" "$0" $LINENO
 
 # Do two Ctrl+C's actually terminate the program?

@@ -5,7 +5,7 @@ package ctxerrgroup
  * Tests for ctxerrgroup.go
  * By J. Stuart McMurray
  * Created 20241226
- * Last Modified 20260605
+ * Last Modified 20261011
  */
 
 import (
@@ -417,7 +417,7 @@ func testGroupSetLimit(t *testing.T) {
 	/* Spawn lots and lots of Goroutines and make sure we never have too
 	many. */
 	for range nGo {
-		go eg.Go(func() error {
+		eg.Go(func() error {
 			/* Note we're running and how many we've peaked at
 			running. */
 			mu.Lock()
