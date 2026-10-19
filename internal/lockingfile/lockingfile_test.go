@@ -5,11 +5,12 @@ package lockingfile
  * Tests for lockingfile.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20251212
+ * Last Modified 20261016
  */
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -17,18 +18,100 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"syscall"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 )
 
 func TestFile_Smoketest(t *testing.T) {
 	/* Make a new File. */
 	fn := filepath.Join(t.TempDir(), "kittens")
-	if _, err := OpenFile(fn, os.O_WRONLY|os.O_CREATE, 0600); nil != err {
+	f, err := OpenFile(fn, os.O_WRONLY|os.O_CREATE, 0600)
+	if nil != err {
 		t.Fatalf("Error creating %s: %s", fn, err)
+	}
+	f.Close()
+}
+
+// Can we make a new File, even if it points to a socket?
+func TestFile_Socket(t *testing.T) {
+	/* Pair of socket file descriptors. */
+	fds, err := syscall.Socketpair(
+		syscall.AF_UNIX,
+		syscall.SOCK_STREAM,
+		0,
+	)
+	if nil != err {
+		t.Fatalf("Error calling socketpair: %v", err)
+	}
+
+	/* Other end of the socket pair. */
+	s := os.NewFile(uintptr(fds[0]), "testsocket")
+	defer s.Close()
+
+	/* Open the socket. */
+	var (
+		fd = fds[1]
+		fn = fmt.Sprintf("/dev/fd/%d", fd)
+
+		ofn = fn
+	)
+	/* On OpenBSD, we'll add a testing prefix so the open fails. */
+	if "openbsd" == runtime.GOOS {
+		ofn = testUnopenableDevFDPrefix + fn
+	}
+	lf, err := OpenFile(ofn, os.O_WRONLY|os.O_APPEND, 0600)
+	if nil != err {
+		syscall.Close(fd)
+		t.Fatalf("Unexpected error from OpenFile: %v", err)
+	}
+	defer lf.Close()
+	if got, want := lf.Name(), fn; got != want {
+		t.Errorf("Incorrect filename\n got: %s\nwant: %s", got, want)
+	}
+	if got, want := lf.Fd(), uintptr(fd); got != want {
+		t.Errorf(
+			"Incorrect file descriptor number\n"+
+				" got: %d\n"+
+				"want: %d",
+			got,
+			want,
+		)
+	}
+
+	/* Can we write to it? */
+	var (
+		buf     []byte
+		eg, ctx = ctxerrgroup.WithContext(t.Context())
+		msg     = tlog.S("message")
+	)
+	eg.GoTag(ctx, "read", func(ctx context.Context) error {
+		var err error
+		buf, err = io.ReadAll(s)
+		return err
+	})
+	eg.GoTag(ctx, "write", func(ctx context.Context) error {
+		defer lf.Close()
+		_, err := io.WriteString(lf, msg)
+		return err
+	})
+	if err := eg.Wait(); nil != err {
+		t.Errorf("Error: %v", err)
+	}
+	if got, want := string(buf), msg; got != want {
+		t.Errorf(
+			"Incorrect bytes read from write\n"+
+				" got: %q\n"+
+				"want: %q",
+			got,
+			want,
+		)
 	}
 }
 
@@ -43,6 +126,7 @@ func TestFileWrite(t *testing.T) {
 	if nil != err {
 		t.Fatalf("Error creating file: %s", err)
 	}
+	defer f.Close()
 
 	/* Can we write ok. */
 	haves := []string{"moose", "zoomies!"}
@@ -70,10 +154,27 @@ func TestFileWrite(t *testing.T) {
 	}
 }
 
+// Do we get an error if we can't open the file?
+func TestOpenFile_OpenError(t *testing.T) {
+	f, err := OpenFile(t.TempDir(), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0660)
+	if got, want := err, os.ErrExist; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorect error opening extant file with O_EXCL\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+	if nil == err {
+		f.Close()
+	}
+}
+
 // Can we write without interleaving?  Unfortunately, there's not a great way
 // to make sure all writes interleave.  But we can try a bunch of times
 // anyways.
-func TestFlock_interleavedwrites(t *testing.T) {
+func TestFileFlock_interleavedwrites(t *testing.T) {
 	const (
 		/* This one's kinda hard to test without knowing if interleaved
 		writes would happen in the first place.  Set this to false to
@@ -94,6 +195,7 @@ func TestFlock_interleavedwrites(t *testing.T) {
 	if nil != err {
 		t.Fatalf("Error creating file: %s", err)
 	}
+	defer f.Close()
 	fi, err := f.Stat()
 	if nil != err {
 		t.Fatalf("Getting file info: %s", err)
@@ -262,7 +364,7 @@ func TestFlock_interleavedwrites(t *testing.T) {
 }
 
 // Can we write to a pipe, which doesn't support locking?
-func TestFileWrite_pipe(t *testing.T) {
+func TestFileWrite_Pipe(t *testing.T) {
 	pr, pw, err := os.Pipe()
 	if nil != err {
 		t.Fatalf("Error allocating pipe: %s", err)
@@ -297,7 +399,7 @@ func TestFileWrite_pipe(t *testing.T) {
 	wg.Go(func() {
 		buf, rerr = io.ReadAll(pr)
 	})
-	if _, err := (&File{File: *pw}).Write([]byte(have)); nil != err {
+	if _, err := (&File{pw}).Write([]byte(have)); nil != err {
 		t.Fatalf("Write error: %s", err)
 	} else if err := pw.Close(); nil != err {
 		t.Fatalf("Error closing pipe: %s", err)
@@ -314,5 +416,183 @@ func TestFileWrite_pipe(t *testing.T) {
 			got,
 			want,
 		)
+	}
+}
+
+// Do we get an error if we can't lock before writing?
+func TestFileWrite_LockError(t *testing.T) {
+	_, err := (&File{}).Write(nil)
+	if got, want := err, os.ErrInvalid; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error locking nil file\n got: %v\nwant: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we get an error if we can't write after locking?
+func TestFileWrite_WriteError(t *testing.T) {
+	f, err := OpenFile(t.TempDir(), os.O_RDONLY, 0)
+	if nil != err {
+		t.Fatalf("Error opening temporary directory: %v", err)
+	}
+	_, err = f.Write([]byte("kittens"))
+	if got, want := err, syscall.EBADF; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error writing to directory\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we get an error if we can't unlock a file after writing?
+func TestFileWrite_UnlockError(t *testing.T) {
+	var es = tlog.S("error")
+	f, err := os.OpenFile(
+		filepath.Join(t.TempDir(), "f"),
+		os.O_CREATE|os.O_RDWR,
+		0,
+	)
+	if nil != err {
+		t.Fatalf("Error opening temporary file: %v", err)
+	}
+	defer f.Close()
+	_, err = (&File{
+		os.NewFile(f.Fd(), testUnlockErrorPrefix+es),
+	}).Write([]byte(""))
+	if got, want := err, es; errors.Unwrap(err).Error() != es {
+		t.Errorf(
+			"Incorrect unlock error after write\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+	runtime.KeepAlive(f)
+}
+
+// Does flock reject a nil file?
+func TestFlock_NilFile(t *testing.T) {
+	if got, want := flock(nil, 0), os.ErrInvalid; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error locking a nil file\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Does flock return the right error on an impossibly large file descriptor
+// number?
+func TestFlock_ClosedFile(t *testing.T) {
+	if got, want := flock(os.NewFile(0xFFFF, t.Name()), syscall.LOCK_EX),
+		syscall.EBADF; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error locking a closed file\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we return an error if we can't call code on the file's file descriptor?
+func TestFlock_ControlError(t *testing.T) {
+	var es = tlog.S("error")
+	f, err := os.Create(filepath.Join(t.TempDir(), "f"))
+	if nil != err {
+		t.Fatalf("Error creating file: %v", err)
+	}
+	defer f.Close()
+	if got, want := flock(
+		os.NewFile(f.Fd(), testRawConnErrorPrefix+es),
+		syscall.LOCK_EX,
+	), es; errors.Unwrap(got).Error() != want {
+		t.Errorf(
+			"Incorrect error injecting an error into Control\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Can we roll a File from a string giving a file descriptor.
+func TestOpenNamedFD(t *testing.T) {
+	/* check calls openNamedFD and makes sure the returned File contains an
+	os.File with the given name and file descriptor number.
+	If fd is -1, try makes sure nil is retuned. */
+	check := func(t *testing.T, name string, fd int) {
+		gotF := openNamedFD(name)
+
+		/* Errors are easy. */
+		if -1 == fd {
+			if nil != gotF {
+				t.Fatalf(
+					"Got name:%s fd:%d, not nil",
+					gotF.Name(),
+					gotF.Fd(),
+				)
+			}
+			return
+		}
+
+		/* Should have got something. */
+		if nil == gotF {
+			t.Fatalf("Got nil File")
+		}
+
+		/* Name and FD correct? */
+		if got, want := gotF.Name(), name; got != want {
+			t.Errorf(
+				"Incorrect name\n got: %s\nwant: %s",
+				got,
+				want,
+			)
+		}
+		if got, want := gotF.Fd(), uintptr(fd); got != want {
+			t.Errorf(
+				"Incorrect file descriptor number\n"+
+					" got: %d\n"+
+					"want: %d",
+				got,
+				want,
+			)
+		}
+	}
+	try := func(name string, fd int) {
+		t.Run(name, func(t *testing.T) { check(t, name, fd) })
+	}
+
+	/* Do all of the special names work? */
+	for name, fd := range specialNames {
+		try(name, int(fd))
+	}
+
+	/* Do normal names work? */
+	for name, fd := range map[string]int{
+		"/dev/fd/0":           0,
+		"/dev/fd/1":           1,
+		"/dev/fd/100":         100,
+		"/dev/fd/100/kittens": -1,
+		"/dev/fd/10kittens":   -1,
+		"/dev/fd/kittens/":    -1,
+		"/dev/fd/kittens":     -1,
+		"/dev/fd/1/":          -1,
+		"/dev/fd/":            -1,
+		"/dev/fd":             -1,
+		"/kittens":            -1,
+		testInvalidDevFDName:  -1,
+	} {
+		try(name, fd)
 	}
 }

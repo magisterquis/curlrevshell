@@ -5,7 +5,7 @@ package pledgeunveil
  * Wrappers around the real pledge/unveil wrappers.
  * By J. Stuart McMurray
  * Created 20251010
- * Last Modified 20251011
+ * Last Modified 20261017
  */
 
 import (
@@ -70,3 +70,6 @@ func parseMultiUnveilArgs(toUnveil [][2]string) map[string]string {
 
 	return ret
 }
+
+//go:generate ./gen_other.pl pledgeunveil_openbsd.go
+//go:generate gofmt -w .

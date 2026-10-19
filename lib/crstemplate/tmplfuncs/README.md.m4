@@ -1,3 +1,4 @@
+m4_ifdef(m4_paste,,`m4_define(`m4_paste',`m4_include($*)')')m4_dnl Linux...
 m4_changequote(dummy,dummy)m4_dnl
 Template Functions
 ==================

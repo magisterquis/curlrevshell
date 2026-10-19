@@ -4,11 +4,10 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20260628
+# Last Modified 20261017
 
 set -euo pipefail
 
-. t/shmore.subr
 . t/t.subr
 
 tap_plan 10
@@ -32,54 +31,59 @@ if [[ "master" != $(current_git_branch) ]]; then
         WANT="$WANT ($(current_git_branch) branch)"
 fi
 GOT=$(gorun -no-timestamps </dev/null 2>&1 |
-        egrep '^Welcome to curlrevshell version' ||:)
+        grep -E '^Welcome to curlrevshell version' ||:)
 tap_is "$GOT" "$WANT" "Version looks ok" "$0" $LINENO
 
 # Make sure that all of the go install URLs are for this branch.
 subtest() {
+        set +o braceexpand
         # These should all be using "latest" if we're on the master branch.
-        local _want=$TAG
+        typeset _want=$TAG
         if [[ "master" = $(current_git_branch) ]]; then
                 _want=latest
         fi
 
         PATTERN='github.com/magisterquis/curlrevshell@[^[:space:]]+'
         # Look for what looks like go install URLs
-        LINES="$(find . -type f \
+        OIFS=$IFS
+        IFS='
+'
+        set -A LINES $(find . -type f \
                 \! -name '*.m4' \
                 \! -name '*.swp' \
                 \! -path './t/*' \
-                -exec egrep \
+                -exec grep \
+                        -E \
                         -n \
                         "$PATTERN" \
                         {} + |
-                sort -u)"
+                sort -u)
+        IFS=$OIFS
 
         # Number of files is the number of subtest tests we'll run, plus a
         # check we got files at all
-        tap_plan "$(( $(echo -n "$LINES" | egrep -v '^$' | wc -l) + 1 ))"
+        NLINES=${#LINES[@]}
+        tap_plan $((NLINES+1))
 
         # Make sure we got at least one file
-        tap_isnt "$LINES" "" "Got files with the install path" "$0" $LINENO
+        tap_isnt $NLINES 0 "Got files with the install path" "$0" $LINENO
 
         # Make sure each file is correct
-        IFS='
-'
         set +o braceexpand
-        for LINE in $LINES; do
+        for LINE in "${LINES[@]}"; do
                 FILE="$(print -r "$LINE" | cut -f 1,2 -d :)"
-                GOT="$( print -r "$LINE" | egrep -o "$PATTERN" |
+                GOT="$( print -r "$LINE" | grep -E -o "$PATTERN" |
                         cut -f 2 -d @)"
                 # The changelog is special.  On the master branch, the go get
                 # should actually be dev.
-                local _linewant=$_want
+                typeset _linewant=$_want
                 if [[ "$FILE" = ./doc/changelog.md:* &&
                         "master" == $(current_git_branch) ]]; then
                         _linewant=dev
                 fi
                 tap_is "$GOT" "$_linewant" "$FILE is correct" "$0" $LINENO
         done
-        set +o braceexpand
+        set -o braceexpand
 }
 tap_subtest "Correct go install paths in docs" subtest "$0" $LINENO
 
@@ -90,7 +94,7 @@ GOT=$(diff \
         -L "README.md" \
         /dev/fd/3 /dev/fd/4 \
         3<<_eof 4<<_eof ||:
-$(go run . -h 2>&1 | egrep -v '^Version')
+$(go run . -h 2>&1 | grep -E -v '^Version')
 _eof
 $(awk '
 /^Usage$/ { # For waiting until we have the usage section
@@ -137,8 +141,8 @@ function regularize_version {
 # $2 - Want
 # $3 - $LINENO
 test_regularize() {
-        local _have=$1 _want=$2 _lineno=$3
-        local _got=$(regularize_version "$_have")
+        typeset _have=$1 _want=$2 _lineno=$3
+        typeset _got=$(regularize_version "$_have")
         tap_is \
                 "$_got" "$_want" \
                 "Version regularized correctly - $_have" \
@@ -202,8 +206,8 @@ WANT=$(go list -deps -f '
 tap_is "$GOT" "$WANT" "Correct downloaded modules in README" "$0" $LINENO
 
 # Make sure the top of the changelog has the right version
-GOT="$(egrep -B1 '^-+$' doc/changelog.md |
-        egrep '^`' |
+GOT="$(grep -E -B1 '^-+$' doc/changelog.md |
+        grep -E '^`' |
         cut -f 2 -d '`' |
         head -n 1 ||:)"
 tap_is "$GOT" "$TAG" "Changelog has correct tag" "$0" $LINENO
@@ -229,7 +233,7 @@ else
 fi
 
 # Make sure there's no replace directives in go.mod.
-GOT=$(egrep ^replace go.mod ||:)
+GOT=$(grep -E ^replace go.mod ||:)
 tap_is "$GOT" "" "No replace directives in go.mod" "$0" $LINENO
 
 # vim: ft=sh

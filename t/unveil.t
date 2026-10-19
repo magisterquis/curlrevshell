@@ -4,7 +4,7 @@
 # Make sure we unveil as expected
 # By J. Stuart McMurray
 # Created 20251010
-# Last Modified 20251026
+# Last Modified 20261017
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ tap_plan 10
 # $1 - -log
 # $2 - -tls-certificate-cache
 get_run_errors() {
-        local _log=$1 _cache=$2
+        typeset _log=$1 _cache=$2
         # Run it.
         set +e
         GOT=$(go run . \
