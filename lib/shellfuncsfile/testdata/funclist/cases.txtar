@@ -1,23 +1,26 @@
 -- empty.have --
 -- empty.want --
 tab_list() {
-        echo 'tab_list  - This function list'
+        printf '%s' 'tab_list  - This function list
+'
 }
 -- simple.have --
 # TABDOC: foo A nice function foo
 # TABDOC: a_somewhat_long_name A function with a silly name
 -- simple.want --
 tab_list() {
-        echo 'a_somewhat_long_name  - A function with a silly name'
-        echo 'foo                   - A nice function foo'
-        echo 'tab_list              - This function list'
+        printf '%s' 'a_somewhat_long_name  - A function with a silly name
+foo                   - A nice function foo
+tab_list              - This function list
+'
 }
 -- quotes.have --
 # TABDOC: fname A 'quoted' description
 -- quotes.want --
 tab_list() {
-        echo 'fname     - A '\''quoted'\'' description'
-        echo 'tab_list  - This function list'
+        printf '%s' 'fname     - A '\''quoted'\'' description
+tab_list  - This function list
+'
 }
 -- nolist.have --
 foo# TABDOC:NOTABLISTbar

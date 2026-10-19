@@ -14,8 +14,9 @@ b() {
 # vim: ft=sh
 
 tab_list() {
-        echo 'a         - A sample A'
-        echo 'b         - A sample B'
-        echo 'pl        - Get all encodey'
-        echo 'tab_list  - This function list'
+        printf '%s' 'a         - A sample A
+b         - A sample B
+pl        - Get all encodey
+tab_list  - This function list
+'
 }

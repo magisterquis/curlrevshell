@@ -15,6 +15,8 @@ go install github.com/magisterquis/curlrevshell@bettertests
 - [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
   non-OpenBSD.
 - Various and sundry changes to accomodate building and testing on Linux.
+- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
+  shell built-in and less likely to `-E`.
 - Updated dependencies.
 
 

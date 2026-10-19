@@ -5,7 +5,7 @@ package shellfuncsfile
  * Shell function to print the list of functions we offer.
  * By J. Stuart McMurray
  * Created 20240728
- * Last Modified 20260819
+ * Last Modified 20261019
  */
 
 import (
@@ -34,10 +34,16 @@ const (
 
 // funcListTemplate makes a nice table of TABDOC'd functions.
 var (
+	//	funcListTemplate = template.Must(template.New("funcList").Parse(
+	//		ListFuncName + `() {
+	//{{ range . }}        echo '{{ . }}'
+	//{{ end }}}` + "\n",
+	//	))
 	funcListTemplate = template.Must(template.New("funcList").Parse(
 		ListFuncName + `() {
-{{ range . }}        echo '{{ . }}'
-{{ end }}}` + "\n",
+        printf '%s' '{{range . }}{{ . }}
+{{ end }}'
+}` + "\n",
 	))
 )
 
