@@ -8,7 +8,7 @@ package tmplfuncs
  * Functions available to templates
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20251008
+ * Last Modified 20251019
  */
 
 import (
@@ -99,7 +99,7 @@ func hasNoPort(err error) bool {
 func Map(kvs ...any) (map[string]any, error) {
 	/* Make sure we don't have a half-pair. */
 	if 0 != len(kvs)&0x1 {
-		return nil, fmt.Errorf("need a value for each key")
+		return nil, errMissingValue
 	}
 	/* Assemble the map. */
 	ret := make(map[string]any)
@@ -107,11 +107,7 @@ func Map(kvs ...any) (map[string]any, error) {
 		/* Key should be a string. */
 		s, ok := kvs[i].(string)
 		if !ok {
-			return nil, fmt.Errorf(
-				"key %v is a %T, not a string",
-				kvs[i],
-				kvs[i],
-			)
+			return nil, incorrectKeyTypeError{key: kvs[i]}
 		}
 		/* Save this pair. */
 		ret[s] = kvs[i+1]
