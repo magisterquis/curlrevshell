@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"regexp"
 	"text/template"
 )
@@ -26,6 +27,7 @@ const DefaultPort = "443"
 // TemplateFuncs are functions added to templates' function map.
 var TemplateFuncs = template.FuncMap{
 	"ensureport":    EnsurePort,
+	"env":           Env,
 	"host":          Host,
 	"map":           Map,
 	"matchre":       MatchRE,
@@ -127,4 +129,10 @@ func MatchRE(re, s string) (bool, error) {
 		)
 	}
 	return cre.MatchString(s), nil
+}
+
+// Env returns the value of the environment variable v.
+// It is a thin wrapper around [os.Getenv], a wrapper around getenv(3).
+func Env(v string) string {
+	return os.Getenv(v)
 }

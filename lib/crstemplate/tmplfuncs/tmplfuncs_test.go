@@ -211,6 +211,10 @@ func TestMatchRE(t *testing.T) {
 
 // Can we call the functions in a template.
 func Test_FunctionCall(t *testing.T) {
+	/* Known environment, for env. */
+	var envK, envV = tlog.S("envK"), tlog.S("envV")
+	t.Setenv(envK, envV)
+
 	for n, c := range map[string]struct {
 		template string
 		dot      string
@@ -286,6 +290,11 @@ func Test_FunctionCall(t *testing.T) {
 		template: `{{ . | port }}`,
 		dot:      "kittens.com:123",
 		want:     "123",
+	}, "env/set": {
+		template: `{{ env "` + envK + `" }}`,
+		want:     envV,
+	}, "env/unset": {
+		template: `{{ env "` + tlog.S("unset") + `" }}`,
 	}} {
 		t.Run(n, func(t *testing.T) {
 			tmpl, err := template.New("").

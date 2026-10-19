@@ -9,6 +9,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
+- [`tmplfuncs`]: Add `env` to query the environment.
 
 
 `dev`

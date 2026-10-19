@@ -114,6 +114,7 @@ A small number of extra functions are made available to templates:
 Function      | Arguments                          | Example                                                                               | Description
 --------------|------------------------------------|---------------------------------------------------------------------------------------|------------
 ensureport    | `port` (default: `443`), `address` | `ensureport 123 "needsaport.com"` -> `needsaport.com:123`                             | Ensure `address` has a port
+env           | `varname`                          | `env EDITOR` -> `/usr/local/bin/vim`                                                  | Returns the value of an environment variable
 host          | `address`                          | `address dontwantaport.com:123` -> `dontwantaport.com`                                | Returns the host (or IP address) from `address`
 map           | (`key`, `value`)...                | `map "sk" "sv" "nk" 2 "bk" true` -> `map[string]any{"sk": "sv", "nk": 2, "bk": true}` | Assembles a map from key/value pairs
 matchre       | `regex` `string`                   | `matchre "\d+$" "letters"` -> `true`                                                  | Returns true if `string` matches `regex`
