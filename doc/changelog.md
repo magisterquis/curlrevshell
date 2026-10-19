@@ -11,6 +11,8 @@ go install github.com/magisterquis/curlrevshell@pledgeunveil
 ```
 - [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
   not-OpenBSD.
+- [`-icanhazip`](./flags.md#-icanhazip) works on OpenBSD with a bit of
+  environment variable-setting.
 
 
 `adapters`

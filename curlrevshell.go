@@ -75,7 +75,7 @@ const (
 func main() { os.Exit(rmain()) }
 func rmain() int {
 	pledgeunveil.MustPledge(
-		"cpath flock inet rpath stdio tty unix unveil wpath",
+		"cpath dns flock inet rpath stdio tty unix unveil wpath",
 	)
 	/* Command-line flags. */
 	var cbAddrs []string
@@ -247,10 +247,8 @@ Options:
 		return 0
 	}
 
-	/* Restrict what files we can see, but make the certificate cache
-	directory first, so we can unveil down to just the file. */
-	/* Restrict what files we can see, but make the directories for files
-	we may create first so we can unveil down to just the file. */
+	/* Restrict what files we can see, but first make sure the directories
+	we'll need are available so we can unveil down to files. */
 	for _, v := range [][2]string{
 		{"certificate cache", *certFile},
 		{"logfile", *logFile},
@@ -270,22 +268,33 @@ Options:
 			return 5
 		}
 	}
-	if err := pledgeunveil.MultiUnveil([][2]string{
+	toUnveil := [][2]string{
+		{*adapterPath, "cw"},
 		{*certFile, "crw"},
 		{*fdir, "r"},
 		{*insertFile, "r"},
 		{*logFile, "cw"},
 		{*tmplf, "r"},
-		{*adapterPath, "cw"},
-	}); errors.Is(err, syscall.ENOENT) {
-		log.Printf("Unveil error: %s", err)
-		return 4
-	} else if nil != err {
-		panic("unveil: " + err.Error())
 	}
 	pledges := "cpath flock inet rpath stdio tty wpath"
 	if "" != *adapterPath {
 		pledges += " unix"
+	}
+	if *useIcanhazip {
+		toUnveil = append(
+			toUnveil,
+			[2]string{"/etc/ssl/cert.pem", "r"},
+		)
+		pledges += " dns"
+	}
+	if err := pledgeunveil.MultiUnveil(toUnveil); errors.Is(
+		err,
+		syscall.ENOENT,
+	) {
+		log.Printf("Unveil error: %s", err)
+		return 4
+	} else if nil != err {
+		panic("unveil: " + err.Error())
 	}
 	pledgeunveil.MustPledge(pledges)
 
