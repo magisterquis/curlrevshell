@@ -6,7 +6,7 @@ package lockingfile
  * os.File which locks during writes
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20261016
+ * Last Modified 20261020
  */
 
 import (
@@ -65,7 +65,8 @@ func OpenFile(name string, flag int, perm os.FileMode) (*File, error) {
 }
 
 // Write wraps [os.File.Write] but holds a lock with [syscall.Flock].  If the
-// file does not support flock-style locks (i.e. returns [syscall.EOPNOTSUPP])
+// file does not support flock-style locks
+// (i.e. returns [syscall.EOPNOTSUPP] or [syscall.ENOTSUP] on Darwin)
 // the write will be attempted without the lock held.
 func (f *File) Write(b []byte) (int, error) {
 	/* Lock the file. */
@@ -124,10 +125,7 @@ func flock(f *os.File, how int) error {
 		}
 	}
 	if serr = rc.Control(func(fd uintptr) {
-		if lerr = syscall.Flock(int(fd), how); errors.Is(
-			lerr,
-			syscall.EOPNOTSUPP,
-		) {
+		if lerr = syscall.Flock(int(fd), how); isNotSupported(lerr) {
 			lerr = nil
 		} else if nil != lerr {
 			lerr = fmt.Errorf("changing lock: %w", lerr)
