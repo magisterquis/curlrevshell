@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20261017
+# Last Modified 20261019
 
 set -euo pipefail
 
@@ -129,7 +129,7 @@ function regularize_version {
         SEDCMD=$SEDCMD'[[:digit:]]{14}-[[:xdigit:]]{12}(\+[^[:space:]]+)? '
         SEDCMD=$SEDCMD'(\([^[:space:]]+ branch\))?'
         SEDCMD=$SEDCMD'/\1placeholder \3/'
-        echo -E "$*" | sed -E "$SEDCMD"
+        printf '%s' "$*" | sed -E "$SEDCMD"
 }
 # test_regularize checks if regularize_version properly regularizes a version
 # string.

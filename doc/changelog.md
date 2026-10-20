@@ -9,7 +9,17 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertemplates
 ```
-- [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Add `env` to query the environment.
+- [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Add `env` to query the
+  environment.
+- In tests, make sure we actually have the curl referred to by "curlrevshell".
+- Handle `-log`files which refer to paths which refer to file descriptors which
+  refer to open sockets (e.g. ksh93 pipelines on Linux).
+- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
+  non-OpenBSD.
+- Various and sundry changes to accomodate building and testing on Linux.
+- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
+  shell built-in and less likely to `-E`.
+- Updated dependencies.
 
 
 `dev`
