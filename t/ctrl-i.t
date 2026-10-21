@@ -4,7 +4,7 @@
 # Tests for inserting things
 # By J. Stuart McMurray
 # Created 20241204
-# Last Modified 20261011
+# Last Modified 20261019
 
 set -euo pipefail
 
@@ -81,12 +81,13 @@ get_inserted_data() {
                 _got="$_got$REPLY
 "
         done
+        IFS=$_oifs
 
         # Close curlrevshell before we return.
         close_curlrevshell
 
         # Return what would have been inserted.
-        echo -E "$_got"
+        printf '%s' "$_got"
 }
 
 # Make sure an nonexistent file gives us a warning.
@@ -113,7 +114,8 @@ tap_subtest "Nonexistent file" subtest "$0" $LINENO
 # Make sure a ctrl-i file which shouldn't print tab_list doesnt.
 GOT=$(get_inserted_data t/testdata/ctrl-i/empty.subr)
 WANT="tab_list() {
-        echo 'tab_list  - This function list'
+        printf '%s' 'tab_list  - This function list
+'
 }"
 tap_is \
         "$GOT" "$WANT" \

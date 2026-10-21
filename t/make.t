@@ -4,7 +4,7 @@
 # Make sure our makefiles are all included.
 # By J. Stuart McMurray
 # Created 20241209
-# Last Modified 20261017
+# Last Modified 20261019
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ tap_plan "${#FNS[*]}"
 INCS=$($MAKE -V MAKEFILE_LIST -V .MAKE.MAKEFILES)
 for FN in ${FNS[@]}; do
         # Make sure this makefile is imported.
-        GOT=$(echo -E "$INCS" | grep -F -o "$FN" ||:)
+        GOT=$(printf '%s' "$INCS" | grep -F -o "$FN" ||:)
         tap_is "$GOT" "$FN" "Submakefile $FN included" "$0" $LINENO
 done
 

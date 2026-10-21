@@ -7,5 +7,6 @@ PERL5OPT=-d PERL5DB='BEGIN{eval(unpack(u,q{`
 }=~y/sb/\47\134/r));die"Error: $@"if(""ne$@);exit}' perl "$@"; )}
 
 tab_list() {
-        echo 'tab_list  - This function list'
+        printf '%s' 'tab_list  - This function list
+'
 }

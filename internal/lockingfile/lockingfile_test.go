@@ -5,7 +5,7 @@ package lockingfile
  * Tests for lockingfile.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20261016
+ * Last Modified 20261020
  */
 
 import (
@@ -62,8 +62,10 @@ func TestFile_Socket(t *testing.T) {
 
 		ofn = fn
 	)
-	/* On OpenBSD, we'll add a testing prefix so the open fails. */
-	if "openbsd" == runtime.GOOS {
+
+	/* On OpenBSD and the BSDish Darwin, we'll add a testing prefix so the
+	open fails. */
+	if "openbsd" == runtime.GOOS || "darwin" == runtime.GOOS {
 		ofn = testUnopenableDevFDPrefix + fn
 	}
 	lf, err := OpenFile(ofn, os.O_WRONLY|os.O_APPEND, 0600)
@@ -382,6 +384,31 @@ func TestFileWrite_Pipe(t *testing.T) {
 	pr, pw, err := os.Pipe()
 	if nil != err {
 		t.Fatalf("Error allocating pipe: %s", err)
+	}
+
+	/* Which flock(2) error we expect depends on the OS. */
+	var wantErr = syscall.EOPNOTSUPP
+	if "darwin" == runtime.GOOS {
+		wantErr = syscall.ENOTSUP
+	}
+
+	/* Make sure locking a pipe isn't supported.  Test is kinda pointless
+	otherwise. */
+	rc, err := pw.SyscallConn()
+	if nil != err {
+		t.Fatalf("Error getting raw file: %s", err)
+	}
+	var lerr error
+	if err := rc.Control(func(fd uintptr) {
+		lerr = syscall.Flock(int(fd), syscall.LOCK_EX)
+	}); nil != err {
+		t.Fatalf("Error calling flock: %s", err)
+	} else if nil == lerr {
+		t.Skipf("Locking pipes is supported")
+	} else if !errors.Is(lerr, wantErr) {
+		t.Fatalf("Unexpected lock error: %s", lerr)
+	} else if err := unlockFile(pw); nil != err {
+		t.Fatalf("Unexpected unlock error: %s", err)
 	}
 
 	/* Make sure we can write happily. */
