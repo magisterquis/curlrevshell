@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251008
+ * Last Modified 20261021
  */
 
 import (
@@ -171,9 +171,6 @@ func (s *Server) Do(ctx context.Context) error {
 		close(evCh)
 	}()
 
-	/* Tell the user we're listening. */
-	s.Logf(opshell.ColorNone, "Listening on %s", s.l.Addr())
-
 	/* Tell user where to get static files. */
 	if "" != s.params.StaticFilesDir {
 		s.printStaticFileHelp()
@@ -193,6 +190,9 @@ func (s *Server) Do(ctx context.Context) error {
 	})
 	return eg.Wait()
 }
+
+// Addr returns the HTTP listener's address.
+func (s *Server) Addr() net.Addr { return s.l.Addr() }
 
 // listenAddresseses gets all of the addresses we have for the box, sorted.
 func (s *Server) listenAddresses(cbAddrs []string) ([]string, error) {

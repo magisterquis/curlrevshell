@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260103
+ * Last Modified 20261021
  */
 
 import (
@@ -544,8 +544,6 @@ func TestServer_IncorrectSubtemplates(t *testing.T) {
 
 	/* Make sure we get a warning about templates. */
 	wantCLines := []opshell.CLine{{
-		Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
-	}, {
 		Color: opshell.ColorRed,
 		Line: fmt.Sprintf(
 			"Error generating callback one-liners: "+

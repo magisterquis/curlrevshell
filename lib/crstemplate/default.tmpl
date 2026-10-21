@@ -3,7 +3,7 @@
      * Callback script (and more) template
      * By J. Stuart McMurray
      * Created 20240325
-     * Last Modified 20260103
+     * Last Modified 20261021
      */ -}}
 
 {{/* curl is a subsubtemplate which makes our curl calls consistent. */}}
@@ -29,6 +29,14 @@ curl -sk --pinnedpubkey sha256//{{.PubkeyFP}} https://{{.C2Addr | nodefaultport}
 {{/* files is a one-liner to serve up static files. */}}
 {{- define "files" -}}
 {{template "curl" .}}
+{{- end -}}
+
+{{/* welcome is printed to the user when curlrevshell starts */}}
+{{- define "welcome" -}}
+Welcome to curlrevshell version {{.Version}}
+{{- if .ListenAddress }}
+Listening on {{.ListenAddress}}
+{{- end -}}
 {{- end -}}
 
 {{/* vim: set filetype=gotexttmpl noexpandtab smartindent: */ -}}

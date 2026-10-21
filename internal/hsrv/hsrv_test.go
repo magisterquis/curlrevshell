@@ -5,7 +5,7 @@ package hsrv
  * Tests for hserv.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260819
+ * Last Modified 20261021
  */
 
 import (
@@ -148,11 +148,6 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 		prep func(s string) string
 		want opshell.CLine
 	}
-	listeningWCLs := []wantCLine{{
-		want: opshell.CLine{
-			Line: fmt.Sprintf("Listening on %s", s.l.Addr()),
-		},
-	}}
 	fileWCLs := []wantCLine{{
 		want: opshell.CLine{
 			Color: ScriptColor,
@@ -231,9 +226,8 @@ func newTestServerMaybeWithDir(t *testing.T, makeFDir bool) (
 	wantCLines := make(
 		[]wantCLine,
 		0,
-		len(listeningWCLs)+len(fileWCLs)+len(shellWCLs),
+		len(fileWCLs)+len(shellWCLs),
 	)
-	wantCLines = append(wantCLines, listeningWCLs...)
 	if makeFDir {
 		wantCLines = append(wantCLines, fileWCLs...)
 	}
@@ -537,7 +531,7 @@ func TestServer_NoDebug(t *testing.T) {
 
 		/* Remove normal startup things from the output channel.  These
 		have been checked elsewhere. */
-		for range 5 {
+		for range 4 {
 			<-och
 		}
 

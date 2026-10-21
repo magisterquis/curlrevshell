@@ -7,7 +7,7 @@ package crstemplate
  * Curlrevshell template things
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20260829
+ * Last Modified 20261021
  */
 
 import (
@@ -40,6 +40,7 @@ const (
 	SubtemplateCallback = "callback" /* "To get a shell" pastables */
 	SubtemplateFiles    = "files"    /* Static fileserver pastables */
 	SubtemplateScript   = "script"   /* Exceuted by /c */
+	SubtemplateWelcome  = "welcome"  /* Welcome message */
 
 	// baseName isn't a subtemplate.  It's what's used as the name
 	// of the template outside {{define ...}} blocks.
@@ -75,13 +76,13 @@ var parsedDefaultTemplate = template.Must(newTemplate(DefaultTemplate))
 // subtemplate.
 //
 // If file is not the empty string and the file did not exist, DefaultTemplate
-// will be used but errors.Is(err, fs.ErrNotExist) will be true to enable a
+// will be used but errors.Is(err, os.ErrNotExist) will be true to enable a
 // warning that a template file is missing but the returned string will still
 // be the result of executing DefaultTemplate's subtemplate.
-func Execute(name SubtemplateName, file string, params Params) (string, error) {
+func Execute[P Params | WelcomeParams](name SubtemplateName, file string, params P) (string, error) {
 	/* Try to parse the user's template if we have one. */
 	tmpl, err := mergeTemplateFrom(file)
-	if nil != err {
+	if nil != err && !errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf("adding custom templates: %w", err)
 	}
 
@@ -104,7 +105,7 @@ func Execute(name SubtemplateName, file string, params Params) (string, error) {
 		return "", fmt.Errorf("executing template: %w", err)
 	}
 
-	return b.String(), nil
+	return b.String(), err /* May wrap os.ErrNotExist. */
 
 }
 
@@ -113,6 +114,10 @@ func Execute(name SubtemplateName, file string, params Params) (string, error) {
 //
 // As a special case, mergeTemplateFrom returns parsedDefaultTemplate if fn is
 // the empty string or names an empty file.
+//
+// As another special case, if reading fn resulted in an error which resolves
+// os.ErrNotExist,parsedDefaultTemplate is returend along with the error, as
+// described by [Execute].
 func mergeTemplateFrom(fn string) (*template.Template, error) {
 	/* If we're not actually reading a template, life's easy. */
 	if "" == fn {
@@ -121,12 +126,14 @@ func mergeTemplateFrom(fn string) (*template.Template, error) {
 
 	/* Slurp the custom template. */
 	b, err := os.ReadFile(fn)
-	if nil != err {
+	if errors.Is(err, os.ErrNotExist) {
+		b = make([]byte, 0)
+	} else if nil != err {
 		return nil, fmt.Errorf("reading template: %w", err)
 	}
 	/* If the file was empty, life's easy as well. */
 	if 0 == len(b) {
-		return parsedDefaultTemplate, nil
+		return parsedDefaultTemplate, err
 	}
 
 	/* Merge the template from the file in. */

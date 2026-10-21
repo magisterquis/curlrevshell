@@ -2,13 +2,20 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
-`bettertemplates`
+`welcometemplate`
 -----------------
 The following changes are available on this branch and will (probably) be in
 the next tagged version.  Get them with
 ```sh
-go install github.com/magisterquis/curlrevshell@bettertemplates
+go install github.com/magisterquis/curlrevshell@welcometemplate
 ```
+- [`crstemplate`](../lib/crstemplate): Added a new `welcome` subtemplate for
+  welcoming in new ways.
+- [`crstemplate`](../lib/crstemplate): `Execute` now does actually return
+  template output even when the template file doesn't exist.
+
+`bettertemplates`
+-----------------
 - [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Add `env` to query the
   environment.
 - In tests, make sure we actually have the curl referred to by "curlrevshell".
