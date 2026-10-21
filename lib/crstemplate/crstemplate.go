@@ -53,18 +53,6 @@ const (
 //go:embed default.tmpl
 var DefaultTemplate string
 
-var (
-	// ErrNoSubtemplates indicates that a template file was specified which
-	// had no subtemplates.
-	ErrNoSubtemplates = errors.New("no subtemplates")
-
-	// ErrOutsideSubtemplate indicates the file passed to Execute had data
-	// outside subtemplates; likely an old-style template.
-	ErrOutsideSubtemplate = errors.New(
-		"non-subtemplate template data found",
-	)
-)
-
 // parsedDefaultTemplate is DefaultTemplate, parsed.
 var parsedDefaultTemplate = template.Must(newTemplate(DefaultTemplate))
 
@@ -89,10 +77,7 @@ func Execute[P Params | WelcomeParams](name SubtemplateName, file string, params
 	/* Make sure the base template doesn't have anything, for a warning. */
 	b := new(bytes.Buffer)
 	if err := tmpl.ExecuteTemplate(b, baseName, params); nil != err {
-		return "", fmt.Errorf(
-			"checking for extraneous template data: %w",
-			err,
-		)
+		return "", ExtraneousTemplateDataCheckError{Err: err}
 	} else if "" != strings.TrimSpace(b.String()) {
 		return "", ErrOutsideSubtemplate
 	}

@@ -5,7 +5,7 @@ package crstemplate
  * Tests for request.go
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20260819
+ * Last Modified 20261021
  */
 
 import (
@@ -456,5 +456,55 @@ func TestC2Addr(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// Does c2Addr detect errors properly?
+func TestC2Addr_Errors(t *testing.T) {
+	/* Requests to try. */
+	for n, c := range map[string]struct {
+		have *http.Request
+		want string
+	}{"invalid_URL_query": {
+		have: httptest.NewRequest(
+			http.MethodGet,
+			"http://test?;",
+			nil,
+		),
+		want: "parsing request: invalid semicolon separator in query",
+	}, "invalid Host": {
+		have: httptest.NewRequest(
+			http.MethodGet,
+			"http://xn--x",
+			nil,
+		),
+		want: `punycoding xn--x: idna: invalid label "x"`,
+	}} {
+		t.Run(n, func(t *testing.T) {
+			_, err := c2Addr(c.have, nil)
+			if nil == err {
+				err = errors.New("nil error")
+			}
+			if got := err.Error(); got != c.want {
+				t.Errorf(
+					"Incorrect error\n got: %v\nwant: %v",
+					got,
+					c.want,
+				)
+			}
+		})
+	}
+}
+
+// Do we whine  we try to add a request from whech we can't get a C2 address?
+func TestAddRequest_NoC2Addr(t *testing.T) {
+	req := (&http.Request{}).WithContext(context.WithValue(
+		t.Context(),
+		http.LocalAddrContextKey,
+		&net.TCPAddr{},
+	))
+	_, err := AddRequest(Params{}, req)
+	if got, want := err, ErrOutOfIdeas; !errors.Is(got, want) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
 	}
 }

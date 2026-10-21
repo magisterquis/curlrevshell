@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/magisterquis/curlrevshell/internal/tlog"
@@ -514,4 +515,73 @@ func TestIsNilPointer(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Do we whine when we error working out if there's non-subtemplate data?
+func TestExecute_ErrorCheckingForExtraneousData(t *testing.T) {
+	/* Write a template known to cause problems. */
+	fn := filepath.Join(t.TempDir(), "t.tmpl")
+	if err := os.WriteFile(fn, []byte(
+		`{{.Nope}}{{ define "script" }}{{.Nope}}{{ end }}`,
+	), 0600); nil != err {
+		t.Fatalf("Error writing template to file: %v", err)
+	}
+	b, err := Execute(SubtemplateCallback, fn, Params{})
+	if 0 != len(b) {
+		t.Errorf("Unexpect template output: %q", b)
+	}
+	dce, ok := errors.AsType[ExtraneousTemplateDataCheckError](
+		err,
+	)
+	if !ok {
+		t.Errorf("Incorrect error type\n got: %T\nwant: %T", err, dce)
+	}
+	if got, want := dce.Error(),
+		`checking for extraneous template data: `+
+			`template: _base:1:2: `+
+			`executing "_base" at <.Nope>: `+
+			`can't evaluate field Nope in `+
+			`type crstemplate.Params`; got != want {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// Do we whine when we can't merge templates?
+func TestMergeTemplateFrom_Errors(t *testing.T) {
+	/* Do we whine when handedd a directory instead of a template? */
+	t.Run("directory", func(t *testing.T) {
+		tmpl, err := mergeTemplateFrom(t.TempDir())
+		if nil != tmpl {
+			t.Errorf("Got non-nil template")
+		}
+		if got, want := err, syscall.EISDIR; !errors.Is(got, want) {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	})
+	/* Do we whine when handedd a directory instead of a template? */
+	t.Run("invalid_template", func(t *testing.T) {
+		fn := filepath.Join(t.TempDir(), "t.tmpl")
+		if err := os.WriteFile(fn, []byte("{{"), 0600); nil != err {
+			t.Fatalf(
+				"Error writing broken template to file: %v",
+				err,
+			)
+		}
+		tmpl, err := mergeTemplateFrom(fn)
+		if nil != tmpl {
+			t.Errorf("Got non-nil template")
+		}
+		if got, want := err.Error(), "parsing template: "+
+			"template: _base:1: unclosed action"; got != want {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	})
 }
