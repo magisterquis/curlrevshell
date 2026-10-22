@@ -495,7 +495,7 @@ func TestServerListenAddresses_AddPorts(t *testing.T) {
 // Do we handle failures to listen nicely?
 func TestNew_ListenError(t *testing.T) {
 	var (
-		addr    = tlog.S("({impossibleAddr!})")
+		addr    = tlog.S("({impossibleAddr..!})")
 		lb, sl  = tlog.NewBuffer()
 		wantErr = "no such host"
 	)
