@@ -9,6 +9,10 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertests
 ```
+- The [Makefile](../Makefile) now checks the environment variable `PROVEFLAGS`
+  for extra flags for [`prove(1)`](https://perldoc.perl.org/prove), e.g.
+  `PROVEFLAGS=-j2` on blazingly-fast OpenBSD arm64 VMs.
+
 
 `dev`
 -----
