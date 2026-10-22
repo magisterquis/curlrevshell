@@ -2,6 +2,7 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
+
 `dev`
 -----
 The following changes are available on this branch and will (probably) be in
@@ -24,7 +25,7 @@ go install github.com/magisterquis/curlrevshell@dev
   in GoTag'd goroutines.
 - Make gunked up logfiles from multiple concurrent curlrevshell processes a bit
   less likely.
-- [`sstls`](../lib/sstls) - Overwriting an archive now overwrites the whole
+- [`sstls`](../lib/sstls): Overwriting an archive now overwrites the whole
   archive and leaves no survivors.
 - [`t/extract_templates.t`](../t/extract_templates.t) now reports how many TAP
   lines it'll emit.
@@ -32,32 +33,26 @@ go install github.com/magisterquis/curlrevshell@dev
 - Relatived paths better in [this changelog](./changelog.md).
 - `TLSFingerprintVerifier` moved from [`crsdialer`](../lib/crsdialer) to
   [`sstls`](../lib/sstls).
-- [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
+- [`-template`](./flags.md#-template): Add a map to the Params struct to allow
   for passing arbitrary key/value pairs about.
-- [`crstemplate`](../lib/crstemplate): Key-p templates from being generated if
+- [`-template`](./flags.md#-template): Key-p templates from being generated if
   they use non-existent map keys.
 - In tests, make sure we actually have the curl referred to by "curlrevshell".
-- Handle `-log`files which refer to paths which refer to file descriptors which
-  refer to open sockets (e.g. ksh93 pipelines on Linux).
+- [`-log`](./flags.md#-log): Handle files which refer to paths which refer to
+  file descriptors which refer to open sockets (e.g. ksh93 pipelines on Linux).
 - [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
   non-OpenBSD.
 - Various and sundry changes to accomodate building and testing on Linux.
-- In tests, make sure we actually have the curl referred to by "curlrevshell".
-- Handle `-log`files which refer to paths which refer to file descriptors which
-  refer to open sockets (e.g. ksh93 pipelines on Linux).
-- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
-  non-OpenBSD.
-- Various and sundry changes to accomodate building and testing on Linux.
-- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
-  shell built-in and less likely to `-E`.
-- Logfile locking should work better with non-file files.
+- [`-template`](./flags.md#-template): Switch from `echo` and `echo -E` to
+  `printf`, which seems more likely to be a shell built-in and less likely to
+  `-E`.  Also in tests.
+- [`-log`](./flags.md#-log): Logfile locking should work better with non-file
+  files.
 - [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
   logging library.
-- Logfile locking should work better with non-file files.
-- Preliminary support for comms adapters, for things like C2 over CW.
+- [`-experimental-adapter-socket`](./flags.md#-experimental-adapter-socket):
+  Preliminary support for comms adapters, for things like C2 over CW.
 - [`crsadapter`](../lib/crsadapter) - New library for adaptering.
-- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
-  logging library.
 - [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
 - [`sstls`](../lib/sstls): Add `ParseCachedCertificate` a parser of (in-memory)
   cached certificates.
@@ -69,18 +64,11 @@ go install github.com/magisterquis/curlrevshell@dev
 - Add [`go fix`](https://pkg.go.dev/cmd/fix) to [`make test`](../Makefile).
 - [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
   not-OpenBSD.
-- In tests, make sure we actually have the curl referred to by "curlrevshell".
-- Handle `-log`files which refer to paths which refer to file descriptors which
-  refer to open sockets (e.g. ksh93 pipelines on Linux).
-- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
-  non-OpenBSD.
-- Various and sundry changes to accomodate building and testing on Linux.
-- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
-  shell built-in and less likely to `-E`.
-- [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
-  not-OpenBSD.
 - [`-icanhazip`](./flags.md#-icanhazip) works on OpenBSD with a bit of
   environment variable-setting.
+- The [Makefile](../Makefile) now checks the environment variable `PROVEFLAGS`
+  for extra flags for [`prove(1)`](https://perldoc.perl.org/prove), e.g.
+  `PROVEFLAGS=-j2` on blazingly-fast OpenBSD arm64 VMs.
 - Updated dependencies.
 
 
