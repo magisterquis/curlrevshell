@@ -19,6 +19,10 @@ go install github.com/magisterquis/curlrevshell@bettertemplates
 - Various and sundry changes to accomodate building and testing on Linux.
 - Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
   shell built-in and less likely to `-E`.
+- [`crstemplate`](../lib/crstemplate): Added a new `welcome` subtemplate for
+  welcoming in new ways.
+- [`crstemplate`](../lib/crstemplate): `Execute` now does actually return
+  template output even when the template file doesn't exist.
 - Updated dependencies.
 
 

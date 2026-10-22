@@ -10,7 +10,9 @@ sets the script sent with `/c` as well as the helpful one-liners.
 In practice, this takes the form of handing curlrevshell one or more
 templates-inside-templates (i.e. [subtemplates](#subtemplates)) which it
 executes with (i.e. `dot` is set to) a structure of type
-[Params](../lib/crstemplate/params.go).
+[`Params`](../lib/crstemplate/params.go), except the `welcome`
+subtemplate which receives a structure of type
+[`WelcomeParams`](../lib/crstemplate/params.go).
 
 Much easier with a few [examples](#longer-examples).
 
@@ -97,6 +99,7 @@ Subtemplate | Generates a...
 `callback`  | ...`To get a shell:` one-liner
 `files`     | ...one-liner to download static files
 `script`    | ...shell hooked up to two `curl`s (for `/c`)
+`welcome`   | ...different welcome message
 
 Any or all may be put into a `-template` file to override the defaults from the
 [built-in](../lib/crstemplate/default.tmpl) template.  An empty template file
@@ -106,7 +109,9 @@ Dot
 ---
 Subtemplates will be executed with
 [`dot`](https://pkg.go.dev/text/template#pkg-overview)
-set to an instance of [Params](../lib/crstemplate/params.go).
+set to an instance of [`Params`](../lib/crstemplate/params.go) (or, for
+the `welcome` [subtemplate](#subtemplates),
+[`Params`](../lib/crstemplate/params.go)).
 
 Functions
 ---------

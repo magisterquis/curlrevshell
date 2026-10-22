@@ -6,7 +6,7 @@ package main
  * Even worse reverse shell, powered by cURL
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20251212
+ * Last Modified 20261021
  */
 
 import (
@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/magisterquis/curlrevshell/internal/currentversion"
@@ -333,14 +334,6 @@ Options:
 	)}
 	defer cleanup()
 
-	/* Print a welcome message with our version. */
-	shell.Logf(
-		opshell.ColorNone,
-		false,
-		"Welcome to curlrevshell version %s",
-		currentversion.VersionAndBranch(),
-	)
-
 	/* Warn the user if the insertion file isn't there or looks empty. */
 	if "" != *insertFile {
 		fi, err := os.Stat(*insertFile)
@@ -418,6 +411,28 @@ Options:
 			err,
 		)
 		return 2
+	}
+
+	/* Print a welcome message with our version and other helpful info. */
+	wm, err := crstemplate.Execute(
+		crstemplate.SubtemplateWelcome,
+		*tmplf,
+		crstemplate.WelcomeParams{
+			Version:       currentversion.VersionAndBranch(),
+			ListenAddress: svr.Addr().String(),
+		},
+	)
+	if nil != err && !errors.Is(err, os.ErrNotExist) {
+		shell.Logf(
+			opshell.ColorRed,
+			false,
+			"Error generating welcome message: %v",
+			err,
+		)
+		return 7
+	}
+	for line := range strings.Lines(wm) {
+		shell.Logf(opshell.ColorNone, false, "%s", line)
 	}
 
 	/* Start ALL the things. */

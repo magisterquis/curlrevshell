@@ -5,7 +5,7 @@ package crstemplate
  * Parameters passed to -template templates
  * By J. Stuart McMurray
  * Created 20241205
- * Last Modified 20260819
+ * Last Modified 20261021
  */
 
 import (
@@ -91,8 +91,6 @@ type BasicAuth struct {
 	Password string
 }
 
-// NewParams returns a new Params, ready for use.
-
 // With returns a copy of p with a new map with p.M[key] set to value.
 // The new map is a shallow clone of p.M, or a new map if p.M is nil.
 func (p Params) With(key string, value any) (Params, error) {
@@ -104,4 +102,16 @@ func (p Params) With(key string, value any) (Params, error) {
 	}
 	ret.M[key] = value
 	return ret, nil
+}
+
+// WelcomeParams are passed to the "welcome" subtemplate
+// ([SubtemplateWelcome]).
+type WelcomeParams struct {
+	// Version is the current main module build version plus the git
+	// branch, if not master.
+	Version string
+
+	// ListenAddress is the HTTPS listen address, corresponding to the
+	// -listen-address flag.
+	ListenAddress string
 }
