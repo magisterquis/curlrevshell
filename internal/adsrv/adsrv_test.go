@@ -5,7 +5,7 @@ package adsrv
  * Tests for adsrv.go
  * By J. Stuart McMurray
  * Created 20260803
- * Last Modified 20260814
+ * Last Modified 20261022
  */
 
 import (
@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 	"testing/synctest"
@@ -25,6 +26,7 @@ import (
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
 	"github.com/magisterquis/curlrevshell/lib/opshell"
 	"github.com/magisterquis/curlrevshell/lib/tlog"
+	"golang.org/x/net/nettest"
 )
 
 const (
@@ -53,6 +55,7 @@ func newTestServer(t *testing.T, conf *testServerConfig) (
 	bidirpipe.Pipe, /* c */
 	*Server, /* s */
 ) {
+	t.Helper()
 	/* Do actually need a config. */
 	if nil == conf {
 		conf = new(testServerConfig)
@@ -82,12 +85,23 @@ func newTestServer(t *testing.T, conf *testServerConfig) (
 		)
 	}
 
+	/* On Darwin, unix socket paths can't be longer than 103 characters. */
+	if "darwin" == runtime.GOOS && 103 < len(lPath) {
+		var err error
+		if lPath, err = nettest.LocalPath(); nil != err {
+			t.Fatalf("Error generating short socket path: %v", err)
+		}
+	}
+	t.Cleanup(func() { os.Remove(lPath) }) /* For just in case. */
+
 	/* Create and start a server. */
 	eg, ctx := ctxerrgroup.WithContext(ctx)
 	s, err := New(sl, lPath, iob)
 	if nil != err {
 		t.Fatalf("Error creating Server: %v", err)
 	}
+
+	/* Did it work? */
 	tb.Expect(t.Context(), t,
 		tlog.M.
 			With(LKSocketPath, s.Addr().String()).
