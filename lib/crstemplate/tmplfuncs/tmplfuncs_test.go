@@ -5,15 +5,19 @@ package tmplfuncs
  * Tests for tmplfuncs.go
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20251011
+ * Last Modified 20261022
  */
 
 import (
 	"bytes"
+	"errors"
 	"net"
+	"os"
 	"reflect"
 	"testing"
 	"text/template"
+
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 func TestPort(t *testing.T) {
@@ -207,6 +211,10 @@ func TestMatchRE(t *testing.T) {
 
 // Can we call the functions in a template.
 func Test_FunctionCall(t *testing.T) {
+	/* Known environment, for env. */
+	var envK, envV = tlog.S("envK"), tlog.S("envV")
+	t.Setenv(envK, envV)
+
 	for n, c := range map[string]struct {
 		template string
 		dot      string
@@ -282,6 +290,11 @@ func Test_FunctionCall(t *testing.T) {
 		template: `{{ . | port }}`,
 		dot:      "kittens.com:123",
 		want:     "123",
+	}, "env/set": {
+		template: `{{ env "` + envK + `" }}`,
+		want:     envV,
+	}, "env/unset": {
+		template: `{{ env "` + tlog.S("unset") + `" }}`,
 	}} {
 		t.Run(n, func(t *testing.T) {
 			tmpl, err := template.New("").
@@ -309,4 +322,78 @@ func Test_FunctionCall(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Do we whine if we can't get the host for an address?
+func Test_SplitHostPortError(t *testing.T) {
+	/* try makes sure that f returns a too many colons error. */
+	try := func(t *testing.T, f func(string) (string, error)) {
+		/* Address with too many colons. */
+		addr := tlog.S("addr::")
+		/* Try with Host or Port. */
+		res, err := f(addr)
+		if "" != res {
+			t.Errorf("Non-empty return value %q", res)
+		}
+		/* Apparently net.AddrError doesn't play nicely with
+		errors.Is. */
+		want := &net.AddrError{
+			Addr: addr,
+			Err:  "too many colons in address",
+		}
+		if got, ok := errors.AsType[*net.AddrError](
+			err,
+		); !ok || *got != *want {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	}
+	/* Try with the two net.SplitHostPort wrappers. */
+	t.Run("Host", func(t *testing.T) { try(t, Host) })
+	t.Run("Port", func(t *testing.T) { try(t, Port) })
+}
+
+// Do we whine when Map's arguments aren't usable?
+func TestMap_Errors(t *testing.T) {
+	/* Do we get the right error for odd numbers of keys? */
+	checkMissing := func(t *testing.T, kvs ...any) {
+		m, err := Map(kvs...)
+		if nil != m {
+			t.Errorf("Unexpected non-nil map: %#v", m)
+		}
+		if got, want := err, errMissingValue; !errors.Is(got, want) {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	}
+	t.Run("odd_arg_count/1", func(t *testing.T) {
+		checkMissing(t, "kittens")
+	})
+	t.Run("odd_arg_count/3", func(t *testing.T) {
+		checkMissing(t, "kittens", "moose", "zoomies!")
+	})
+
+	/* Do we error on non-string keys? */
+	t.Run("non_string_key", func(t *testing.T) {
+		key := os.Stdin
+		m, err := Map(key, true)
+		if nil != m {
+			t.Errorf("Unexpected non-nil map: %#v", m)
+		}
+		if got, want := err.Error(), (incorrectKeyTypeError{
+			key: key,
+		}.Error()); got != want {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	})
 }

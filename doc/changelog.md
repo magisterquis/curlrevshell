@@ -69,6 +69,16 @@ go install github.com/magisterquis/curlrevshell@dev
 - The [Makefile](../Makefile) now checks the environment variable `PROVEFLAGS`
   for extra flags for [`prove(1)`](https://perldoc.perl.org/prove), e.g.
   `PROVEFLAGS=-j2` on blazingly-fast OpenBSD arm64 VMs.
+- [`tmplfuncs`](../lib/crstemplate/tmplfuncs): Add `env` to query the
+  environment.
+- Handle `-log`files which refer to paths which refer to file descriptors which
+  refer to open sockets (e.g. ksh93 pipelines on Linux).
+- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
+  shell built-in and less likely to `-E`.
+- [`crstemplate`](../lib/crstemplate): Added a new `welcome` subtemplate for
+  welcoming in new ways.
+- [`crstemplate`](../lib/crstemplate): `Execute` now does actually return
+  template output even when the template file doesn't exist.
 - Updated dependencies.
 
 

@@ -4,13 +4,13 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20261017
+# Last Modified 20261021
 
 set -e
 
 . t/t.subr
 
-tap_plan 12
+tap_plan 13
 
 # We'll need a temporary template and a directory for the templates from
 # doc/template.md
@@ -54,7 +54,7 @@ GOT=$(get_error)
 close_coroutine
 tap_like \
         "$GOT" \
-        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: reading template: open ./doesnotexist: no such file or directory' \
+        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: open ./doesnotexist: no such file or directory' \
         "Warning for missing template file" \
         "$0" $LINENO
 
@@ -62,19 +62,18 @@ tap_like \
 cat >$TMPLF <<_eof
 No subtemplates at all :(
 _eof
-gorun -template "$TMPLF" |&
+gorun -template "$TMPLF" 2>&1 |&
 GOT=$(get_error)
 tap_like \
         "$GOT" \
-        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: adding custom templates: no subtemplates' \
+        'Error generating welcome message: adding custom templates: no subtemplates' \
         "Warning for old-style template file" \
         "$0" $LINENO
 read -p; GOT=$REPLY
-close_coroutine
 tap_like \
         "$GOT" \
-        '^You probably need {{define "callback"}} \.\.\. {{end}} around your template\.' \
-        "Helpful message after old-style template file" \
+        'exit status 7' \
+        "Unhappy exit with old-style template file" \
         "$0" $LINENO
 
 # Make sure we get a warning if we're using a non-subtemplate template.
@@ -82,19 +81,18 @@ cat >$TMPLF <<_eof
 {{define "script"}}dummy{{end}}
 Extra data
 _eof
-gorun -template "$TMPLF" |&
+gorun -template "$TMPLF" 2>&1 |&
 GOT=$(get_error)
 tap_like \
         "$GOT" \
-        '^Error generating callback one-liners: executing callback subtemplate for 127.0.0.1:\d+: non-subtemplate template data found' \
+        '^Error generating welcome message: non-subtemplate template data found' \
         "Warning for template with outside-subtemplate data" \
         "$0" $LINENO
 read -p; GOT=$REPLY
-close_coroutine
 tap_like \
         "$GOT" \
-        '^You probably need {{define "callback"}} \.\.\. {{end}} around your template\.' \
-        "Helpful message after template with outside-subtemplate data" \
+        'exit status 7' \
+        "Unhappy exit with old-style template file" \
         "$0" $LINENO
 
 # template_ok makes sure a template doesn't cause curlrevshell to print an
@@ -125,5 +123,9 @@ tap_isnt "$(ls "$TMPLD")" "" "List extracted template files" "$0" $LINENO
 for tmpl in $TMPLD/*; do
         template_ok $tmpl "doc/template.md $(basename "$tmpl") works" $LINENO
 done
+
+# Make sure all children have exited.
+wait
+tap_pass "All child processes exited"
 
 # vim: ft=sh

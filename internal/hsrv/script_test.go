@@ -5,7 +5,7 @@ package hsrv
  * Tests for script.go
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260814
+ * Last Modified 20261021
  */
 
 import (
@@ -449,8 +449,7 @@ func TestServerScriptHandler_FromFile(t *testing.T) {
 			t.Fatalf("Error removing %s: %s", fn, err)
 		}
 		want = ""
-		wantCLineError = "adding custom templates: reading template: " +
-			"open " + fn + ": no such file or directory"
+		wantCLineError = "open " + fn + ": no such file or directory"
 		f(t, http.StatusInternalServerError)
 	})
 
