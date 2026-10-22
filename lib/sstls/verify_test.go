@@ -5,7 +5,7 @@ package sstls
  * Verify a TLS peer's fingerprint
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260815
+ * Last Modified 20260819
  */
 
 import (
@@ -21,7 +21,7 @@ import (
 
 	"github.com/magisterquis/curlrevshell/internal/bufferedconn"
 	"github.com/magisterquis/curlrevshell/internal/testdatareader"
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // testdataFS contains the testdata directory.

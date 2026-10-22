@@ -5,14 +5,14 @@ package testdatareader
  * Tests for errors.go
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260815
+ * Last Modified 20260820
  */
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Do we error properly?

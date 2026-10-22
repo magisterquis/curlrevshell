@@ -5,7 +5,7 @@ package lockingfile
  * Tests for lockingfile.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20261020
+ * Last Modified 20261022
  */
 
 import (
@@ -25,8 +25,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
 	"github.com/magisterquis/curlrevshell/lib/ctxerrgroup"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 func TestFile_Smoketest(t *testing.T) {
@@ -117,6 +117,20 @@ func TestFile_Socket(t *testing.T) {
 	}
 }
 
+// Do we get an error if we can't open a file?
+func TestOpenFile_Error(t *testing.T) {
+	var (
+		fn   = filepath.Join(t.TempDir(), "doesnotexist")
+		want = syscall.ENOENT
+	)
+	if _, got := OpenFile(fn, os.O_RDWR|os.O_EXCL, 0); !errors.Is(
+		got,
+		want,
+	) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
+	}
+}
+
 // Does File.Write work?
 func TestFileWrite(t *testing.T) {
 	/* Make a new File. */
@@ -162,6 +176,30 @@ func TestOpenFile_OpenError(t *testing.T) {
 	if got, want := err, os.ErrExist; !errors.Is(got, want) {
 		t.Errorf(
 			"Incorect error opening extant file with O_EXCL\n"+
+				" got: %v\n"+
+				"want: %v",
+			got,
+			want,
+		)
+	}
+	if nil == err {
+		f.Close()
+	}
+}
+
+// Are write errors reported?
+func TestFileWrite_Error(t *testing.T) {
+	/* We'll try to write to a directory, which should fail. */
+	f, err := OpenFile(t.TempDir(), os.O_RDONLY, 0)
+	if nil != err {
+		t.Fatalf("Error opening temporary directory: %v", err)
+	}
+	/* Should fail with EBADF, specifically. */
+	var want error = syscall.EBADF
+	/* Does it? */
+	if _, got := f.Write([]byte(tlog.S("msg"))); !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect error writing to directory\n"+
 				" got: %v\n"+
 				"want: %v",
 			got,

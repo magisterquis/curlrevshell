@@ -19,7 +19,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/magisterquis/curlrevshell/internal/tlog"
+	"github.com/magisterquis/curlrevshell/lib/tlog"
 )
 
 // Make sure it works if we don't use WithConetxt.

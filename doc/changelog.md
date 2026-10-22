@@ -50,6 +50,9 @@ go install github.com/magisterquis/curlrevshell@dev
 - Various and sundry changes to accomodate building and testing on Linux.
 - Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
   shell built-in and less likely to `-E`.
+- Logfile locking should work better with non-file files.
+- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
+  logging library.
 - Updated dependencies.
 
 
