@@ -1,63 +1,70 @@
-#!/bin/ksh
+#!/usr/bin/env perl
 #
 # tmplfuncs_docs.t
 # Make sure tmplfuncs' docs are correct
 # By J. Stuart McMurray
 # Created 20250613
-# Last Modified 20251008
+# Last Modified 20261008
 
-set -euo pipefail
+use autodie;
+use strict;
+use warnings;
 
-. t/shmore.subr
+use Fcntl qw/O_RDONLY/;
+use List::Util qw/first/;
+use Test::More tests => 11;
+use Tie::File;
 
-tap_plan 7
+use feature 'signatures';
 
-DOCTM=./doc/template.md
-TFDIR=./lib/crstemplate/tmplfuncs
-TFDOC="$TFDIR/godoc.txt"
-READM="$TFDIR/README.md"
-TEMPD="$(mktemp -d)"
-GODOC="$TEMPD/godoc.new"
-GDRMM="$TEMPD/godoc.readme"
-trap 'rm -rf "$TEMPD"; tap_done_testing' EXIT
+my $libdir = "./lib/crstemplate/tmplfuncs";
 
-# Generate new godoc, make sure it doesn't end in a blank line.
-go doc -all "$TFDIR" | sed '$d' >"$GODOC"
-tap_ok $? "Godoc generated happily" "$0" $LINENO
-LASTL=$(tail -n 1 <"$GODOC")
-tap_isnt "$LASTL" "" "Godoc does not end in blank line" "$0" $LINENO
+# idx returns the index of what in where, or undef if not found.
+sub idx ($what, @where) { first { $what eq $where[$_] } 0..$#where; }
 
-# Is the godoc.txt file current?
-GOT=$(diff -u "$TFDOC" "$GODOC" ||:)
-tap_is "$GOT" "" "$TFDOC correct" "$0" $LINENO
+# Get latest godoc
+chomp(my @current_godoc = `go doc -all $libdir`);
+is   $?,               0, "go doc ran happily";
+isnt @current_godoc+0, 0, "Got docs from go doc";
 
-# Is the godoc in the readme correct?
-awk '/^```text$/,/^```$/{if ($0 !~ /^```/) {print}}' "$READM" >"$GDRMM"
-AWKEC=$?
-GOT=$(diff -u "$GDRMM" "$GODOC" ||:)
-tap_ok    $AWKEC           "Awk searched $READM for godoc happily" "$0" $LINENO
-tap_isnt "$(<"$GDRMM")" "" "Extracted godoc from $READM"           "$0" $LINENO
-tap_is   "$GOT"         "" "Godoc in $READM correct"               "$0" $LINENO
+# Is godoc.txt current?
+my $fn = "$libdir/godoc.txt";
+tie my @godoc_txt, 'Tie::File', $fn, mode => O_RDONLY or die "opening $fn: $!";
+is_deeply \@godoc_txt, \@current_godoc, "Docs in godoc.txt current";
 
-# Does the table list all of the functions?
-cat "$DOCTM" |&
-while read -pr; do # Get to the table section
-        if [[ "$REPLY" = Functions ]]; then
-                break
-        fi
-done
-read -pr; read -pr; read -pr; read -pr # Skip from section header to table
-GOT=
-while read -pr; do # Get the functions
-        if [[ -z "$REPLY" ]]; then
-                break
-        fi
-        GOT="$GOT $(echo "$REPLY" | cut -f 1 -d ' ')"
-done
-while read -pr; do :; done
-wait
-WANT=$(go doc ./lib/crstemplate/tmplfuncs |
-        perl -ne '/^func ([^\(]+)/&&print " ", lc $1' | sort -u)
-tap_is "$GOT" "$WANT" "All template functions listed in $DOCTM" "$0" $LINENO
+# But we don't want a trailing newline in the README.
+pop @current_godoc while ("" eq $current_godoc[-1]);
 
-# vim: ft=sh
+# Extract the godoc from the README.
+$fn = "$libdir/README.md";
+tie my @readme, 'Tie::File', $fn, mode => O_RDONLY or die "opening $fn: $!";
+my $start = idx '```text', @readme;
+my $end   = idx '```',     @readme;
+isnt $start, undef, "Found start of docs in README.md";
+isnt $end,   undef, "Found end of docs in README.md";
+
+# Is the godoc in the README correct?
+my @readme_docs = @readme[$start+1..$end-1];
+is_deeply \@readme_docs, \@current_godoc, "Docs in README.md correct";
+
+# Does the godoc in the README end in not a newline.
+isnt $readme_docs[-1], "\n", "Docs in README.md don't end in newline";
+
+# Find the table of functions in template.md.
+$fn="doc/template.md";
+tie my @tmpl_md, 'Tie::File', $fn, mode => O_RDONLY or die "opening $fn: $!";
+$start = idx "Functions", @tmpl_md;
+isnt $start, undef, "Found functions section in template.md";
+$start += 5;
+like $tmpl_md[$start], qr/^\S+\s+\|\s+/,
+        "Found start of functions table in tmplate.md";
+$end = idx '', @tmpl_md[$start..$#tmpl_md];
+isnt $end, undef, "Fond end of functions table in template.md";
+$end += $start - 1;
+
+# Get the list of functions in the docs and from go doc.
+my @got  = map {s/\s.*//r} @tmpl_md[$start..$end];
+my @want = map {/^func ([^(]+)/ ? lc $1 : undef } grep /^func /, @current_godoc;
+is_deeply \@got, \@want, "All template functions listed in template.md";
+
+done_testing;

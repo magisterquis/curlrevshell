@@ -28,6 +28,7 @@ test: gosubdirs docs ## Run tests
 	go test ${GOBUILDFLAGS} ${TESTFLAGS} ./...
 	go vet  ${GOBUILDFLAGS} ./...
 	! which staticcheck >/dev/null || staticcheck ./...
+	[[ -z "$$(go fix -diff ./... | tee /dev/stderr)" ]]
 	go run ${GOBUILDFLAGS} . -h 2>&1 |\
 	awk '\
 		/^Options:$$|MQD DEBUG PACKAGE LOADED$$/\
@@ -52,8 +53,8 @@ install: ## Install curlrevshell with go install
 	go install ${GOBUILDFLAGS}
 .PHONY: install
 
-clean:     subclean ## Remove built things
-distclean: subclean ## Remove more built things
+clean:     subclean                ## Remove built things
+distclean: docs_distclean subclean ## Remove more built things
 
 subclean: .USE
 .for SUBDIR in ${SUBMAKES:H}

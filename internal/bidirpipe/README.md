@@ -1,0 +1,3 @@
+bidirpipe
+=========
+Bidirectional pipe

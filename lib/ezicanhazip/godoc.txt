@@ -1,0 +1,15 @@
+package ezicanhazip // import "github.com/magisterquis/curlrevshell/lib/ezicanhazip"
+
+Package ezicanhazip - Get IP addresses from icanhazip.com
+
+CONSTANTS
+
+const BaseDomain = "icanhazip.com"
+    BaseDomain is icanhazip's domain.
+
+
+FUNCTIONS
+
+func IPv4() (netip.Addr, error)
+    IPv4 returns the IP address returned by icanhazip.com.
+

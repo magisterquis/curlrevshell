@@ -6,7 +6,7 @@ package bufferedconn
  * In-memory buffered net.Conn pair
  * By Stuart McMurray
  * Created 20260325
- * Last Modified 20260502
+ * Last Modified 20260817
  */
 
 import (
@@ -17,6 +17,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/magisterquis/curlrevshell/internal/chanmutex"
 )
 
 // BufLen is the number of buffers (not bytes) a Conn will queue.
@@ -32,15 +34,18 @@ type Conn struct {
 
 	txCh  chan<- []byte
 	rxCh  <-chan []byte
-	rxMu  sync.Mutex
+	rxMu  chanmutex.Mutex
 	rxBuf []byte
 
-	done      chan struct{}
-	closeDone func() /* Closes done, once. */
-	peerDone  <-chan struct{}
+	closeReadDone  func() /* Closes readDone, once. */
+	closeWriteDone func() /* Closes writeDone, once. */
+	peerReadDone   <-chan struct{}
+	peerWriteDone  <-chan struct{}
+	readDone       chan struct{}
+	writeDone      chan struct{}
 
-	readDeadline  pipeDeadline
-	writeDeadline pipeDeadline
+	readDeadline  PipeDeadline
+	writeDeadline PipeDeadline
 }
 
 // NewPair return a pair of conns connected to each other.
@@ -49,38 +54,54 @@ func NewPair() (*Conn, *Conn) {
 		al, ar = newAddrPair()
 		l2r    = make(chan []byte, BufLen)
 		r2l    = make(chan []byte, BufLen)
-		lDone  = make(chan struct{})
-		rDone  = make(chan struct{})
+		lRDone = make(chan struct{})
+		lWDone = make(chan struct{})
+		rRDone = make(chan struct{})
+		rWDone = make(chan struct{})
 	)
 	return &Conn{
-			localAddr:     al,
-			remoteAddr:    ar,
-			txCh:          l2r,
-			rxCh:          r2l,
-			done:          lDone,
-			closeDone:     sync.OnceFunc(func() { close(lDone) }),
-			peerDone:      rDone,
-			readDeadline:  makePipeDeadline(),
-			writeDeadline: makePipeDeadline(),
+			localAddr:  al,
+			remoteAddr: ar,
+
+			txCh: l2r,
+			rxCh: r2l,
+			rxMu: chanmutex.New(),
+
+			closeReadDone:  closeOnce(lRDone),
+			closeWriteDone: closeOnce(lWDone),
+			peerReadDone:   rRDone,
+			peerWriteDone:  rWDone,
+			readDone:       lRDone,
+			writeDone:      lWDone,
+
+			readDeadline:  NewPipeDeadline(),
+			writeDeadline: NewPipeDeadline(),
 		}, &Conn{
-			localAddr:     ar,
-			remoteAddr:    al,
-			txCh:          r2l,
-			rxCh:          l2r,
-			done:          rDone,
-			closeDone:     sync.OnceFunc(func() { close(rDone) }),
-			peerDone:      lDone,
-			readDeadline:  makePipeDeadline(),
-			writeDeadline: makePipeDeadline(),
+			localAddr:  ar,
+			remoteAddr: al,
+
+			txCh: r2l,
+			rxCh: l2r,
+			rxMu: chanmutex.New(),
+
+			closeReadDone:  closeOnce(rRDone),
+			closeWriteDone: closeOnce(rWDone),
+			peerReadDone:   lRDone,
+			peerWriteDone:  lWDone,
+			readDone:       rRDone,
+			writeDone:      rWDone,
+
+			readDeadline:  NewPipeDeadline(),
+			writeDeadline: NewPipeDeadline(),
 		}
 }
 
 func (c *Conn) Read(b []byte) (n int, err error) {
 	/* Don't even try to read if we're not meant to. */
 	select {
-	case <-c.done:
+	case <-c.readDone:
 		return 0, io.ErrClosedPipe
-	case <-c.readDeadline.wait():
+	case <-c.readDeadline.Wait():
 		return 0, os.ErrDeadlineExceeded
 	default:
 	}
@@ -92,15 +113,15 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	if 0 == len(c.rxBuf) {
 		select {
 		case c.rxBuf = <-c.rxCh:
-		case <-c.done:
+		case <-c.readDone:
 			return 0, io.ErrClosedPipe
-		case <-c.peerDone:
+		case <-c.peerWriteDone:
 			select { /* Drain channel. */
 			case c.rxBuf = <-c.rxCh:
 			default:
 				return 0, io.EOF
 			}
-		case <-c.readDeadline.wait():
+		case <-c.readDeadline.Wait():
 			return 0, os.ErrDeadlineExceeded
 		}
 	}
@@ -114,11 +135,11 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 func (c *Conn) Write(b []byte) (n int, err error) {
 	/* Don't even try to queue the buffer if we're not meant to. */
 	select {
-	case <-c.done:
+	case <-c.writeDone:
 		return 0, io.ErrClosedPipe
-	case <-c.peerDone:
+	case <-c.peerReadDone:
 		return 0, io.EOF
-	case <-c.writeDeadline.wait():
+	case <-c.writeDeadline.Wait():
 		return 0, os.ErrDeadlineExceeded
 	default:
 	}
@@ -132,16 +153,18 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	select {
 	case c.txCh <- bytes.Clone(b):
 		return len(b), nil
-	case <-c.peerDone:
-		return 0, io.EOF
-	case <-c.done:
+	case <-c.writeDone:
 		return 0, io.ErrClosedPipe
-	case <-c.writeDeadline.wait():
+	case <-c.peerReadDone:
+		return 0, io.EOF
+	case <-c.writeDeadline.Wait():
 		return 0, os.ErrDeadlineExceeded
 	}
 }
 
-func (c *Conn) Close() error         { c.closeDone(); return nil }
+// Close closes the connection.
+func (c *Conn) Close() error { c.CloseRead(); c.CloseWrite(); return nil }
+
 func (c *Conn) LocalAddr() net.Addr  { return c.localAddr }
 func (c *Conn) RemoteAddr() net.Addr { return c.remoteAddr }
 
@@ -154,24 +177,35 @@ func (c *Conn) SetDeadline(t time.Time) error {
 
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	select {
-	case <-c.done:
+	case <-c.readDone:
 		return io.ErrClosedPipe
-	case <-c.peerDone:
+	case <-c.peerWriteDone:
 		return io.EOF
 	default:
 	}
-	c.readDeadline.set(t)
+	c.readDeadline.Set(t)
 	return nil
 }
 
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	select {
-	case <-c.done:
+	case <-c.writeDone:
 		return io.ErrClosedPipe
-	case <-c.peerDone:
+	case <-c.peerReadDone:
 		return io.EOF
 	default:
 	}
-	c.writeDeadline.set(t)
+	c.writeDeadline.Set(t)
 	return nil
+}
+
+// CloseRead shuts down the reading side of the Conn.
+func (c *Conn) CloseRead() error { c.closeReadDone(); return nil }
+
+// CloseWrite shuts down the writing side of the Conn.
+func (c *Conn) CloseWrite() error { c.closeWriteDone(); return nil }
+
+// closeOnce returns a [sync.OnceFunc] which closes ch, once.
+func closeOnce(ch chan struct{}) func() {
+	return sync.OnceFunc(func() { close(ch) })
 }

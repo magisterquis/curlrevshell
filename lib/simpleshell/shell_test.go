@@ -25,6 +25,7 @@ func testShell(t *testing.T, ctx context.Context, s Shell, have, want string) {
 	s.SetInput(io.NopCloser(strings.NewReader(have)))
 	o := s.Output()
 	buf := new(bytes.Buffer)
+	defer o.Close()
 
 	eg, ectx := ctxerrgroup.WithContext(ctx)
 	eg.GoTag(ectx, "shell", s.Go)
@@ -70,6 +71,7 @@ func TestCmdShell(t *testing.T) {
 	if nil != err {
 		t.Fatalf("Error setting up shell: %s", err)
 	}
+	defer s.Output().Close()
 
 	testShell(t, t.Context(), s, "kittens\n", "kittens\n")
 }

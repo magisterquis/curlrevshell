@@ -1,0 +1,113 @@
+package simpleshell // import "github.com/magisterquis/curlrevshell/lib/simpleshell"
+
+Package simpleshell is a no-frills shell which connects to Curlrevshell.
+
+CONSTANTS
+
+const (
+	// IOPath is the path on Curlrevshell to which we'll connect.
+	IOPath = "/io"
+	// DefaultShell is the path to the shell used if [GoSimple] is
+	// called with no args.
+	DefaultShell = "/bin/sh"
+)
+
+VARIABLES
+
+var ErrNoMatchingCertificate = errors.New(
+	"no certificate with correct fingerprint found",
+)
+    ErrNoMatchingCertificate indicates a TLS connection's peer did not present a
+    certificate matching a configured fingerprint.
+
+
+FUNCTIONS
+
+func Go(ctx context.Context, conf ConnConfig, shell Shell) error
+    Go connects a Shell to Curlrevshell.
+
+func GoSimple(ctx context.Context, c2, fingerprint string, args []string) error
+    GoSimple is the simplest way to run a shell. It wraps CmdShell, ConnConfig,
+    and Go. If args is empty or nil, []string{DefaultShell} will be used.
+
+func SplitArgs(s string) []string
+    SplitArgs splits s into a slice of strings using the first rune in s as the
+    separator. Runs of empty elements are not compressed.
+
+
+TYPES
+
+type CmdShell struct {
+	// Has unexported fields.
+}
+    CmdShell turns an *exec.Cmd into a Shell.
+
+func NewCmdShell(cmd *exec.Cmd) (*CmdShell, error)
+    NewCmdShell returns a new CmdShell which wraps cmd.
+
+func (c *CmdShell) Go(ctx context.Context) error
+    Go runs c's exec.Cmd. ctx is not used; use exec.CommandContext or cause an
+    EOF on the io.ReadCloser set via c.SetInPipe to stop Go.
+
+func (c *CmdShell) Output() io.ReadCloser
+    Output returns an io.ReadCloser on which c sends output.
+
+func (c *CmdShell) SetInput(in io.ReadCloser)
+    SetInput sets the io.ReadCloser from which c reads input.
+
+func (c *CmdShell) String() string
+    String calls c's exec.Cmd.String.
+
+type ConnConfig struct {
+	// C2 is where we find curlrevshell.  Its path should normaly be
+	// IOPath.
+	C2 string
+
+	// Fingerprint is the Base64-encoded SHA256 hash of the server's TLS
+	// certificate, as normally passed to curl --pinnedpubkey.  The
+	// leading sha256// is optional.
+	Fingerprint string
+}
+    ConnConfig describes a connection between a Shell and Curlrevshell.
+
+type EchoShell struct {
+	// Has unexported fields.
+}
+    EchoShell is a Shell which just echos its input to its output, useful for
+    testing.
+
+func NewEchoShell() (in *io.PipeWriter, out *io.PipeReader, shell *EchoShell)
+    NewEchoShell returns a new EchoShell and pre-made i/o.
+
+func (e *EchoShell) Go(ctx context.Context) error
+    Go copies between the returned i/o pipes.
+
+func (e *EchoShell) Output() io.ReadCloser
+    Output returns o's output. This is the same *io.PipeReader returned by
+    NewEchoShell.
+
+func (e *EchoShell) SetInput(in io.ReadCloser)
+    SetInput sets e's input; this is normally unnecessary.
+
+type Shell interface {
+	// SetInput sets the io.ReadCloser on which data from Curlrevshell will
+	// be sent.  Shells may close in before returning from Go.
+	SetInput(in io.ReadCloser)
+
+	// Output returns an io.ReadCloser from which data to send to Curlrevshell
+	// will be read.  Shells must close the returned io.ReadCloser when no
+	// more will be read, e.g. when an underlying subprocess terminates.
+	// Output will always be called by Go.
+	Output() io.ReadCloser
+
+	// Go runs the underlying shell.  The io.ReadCloser returned by Output
+	// should be closed before Go returns.  The io.ReadCloser set by
+	// SetInput may be closed by Go before returning.
+	// Go should not return an error if both all I/O completed successfully
+	// and the underlying shell completed successfully, e.g. a subprocess
+	// returned 0 on Unix.
+	Go(ctx context.Context) error
+}
+    Shell is connected to Curlrevshell by Go. It need not actually be a "real"
+    shell (e.g. /bin/sh).
+

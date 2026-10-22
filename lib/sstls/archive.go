@@ -5,7 +5,7 @@ package sstls
  * Read and Save certs with an archive file
  * By J. Stuart McMurray
  * Created 20240327
- * Last Modified 20260816
+ * Last Modified 20260823
  */
 
 import (
@@ -20,6 +20,13 @@ import (
 	"golang.org/x/tools/txtar"
 )
 
+// Names of files in a txtar archive for the PEM-encoded cert and key.
+const (
+	txtarCertFile        = "cert"
+	txtarFingerprintFile = "fingerprint"
+	txtarKeyFile         = "key"
+)
+
 // LoadCachedCertificate loads the certificate from the named file, which
 // should have been created with SaveCertificate.
 func LoadCachedCertificate(certFile string) (tls.Certificate, error) {
@@ -31,12 +38,17 @@ func LoadCachedCertificate(certFile string) (tls.Certificate, error) {
 			err,
 		)
 	}
-	return loadCachedCertificate(certFile, b)
+	return ParseCachedCertificate(b)
 }
 
-// loadCachedCertificate does what LoadCachedCertificate says it does but
-// from a pre-loaded file.  certFile is only used in error messages.
-func loadCachedCertificate(certFile string, b []byte) (tls.Certificate, error) {
+// ParseCachedCertificate is like [LoadCachedCertificate], but loads the
+// certificate from b, which should have been created with [SaveCertificate].
+func ParseCachedCertificate(b []byte) (tls.Certificate, error) {
+	/* Mooched from the go stdlib .*/
+	fail := func(err error) (tls.Certificate, error) {
+		return tls.Certificate{}, err
+	}
+
 	/* Read the saved cert. */
 	ta := txtar.Parse(b)
 
@@ -53,26 +65,20 @@ func loadCachedCertificate(certFile string, b []byte) (tls.Certificate, error) {
 
 	/* Try to use it. */
 	if 0 == len(certB) {
-		return tls.Certificate{}, ErrCacheFileEmpty
+		return fail(ErrCacheFileEmpty)
 	} else if 0 == len(keyB) {
-		return tls.Certificate{}, fmt.Errorf(
-			"PEM-encoded key missing",
-		)
+		return fail(ErrPrivateKeyPEMEmpty)
 	}
 	cert, err := tls.X509KeyPair(certB, keyB)
 	if nil != err {
-		return tls.Certificate{}, fmt.Errorf(
-			"loading certificate from %s: %w",
-			certFile,
-			err,
-		)
+		return fail(fmt.Errorf("parsing certificate: %w", err))
 	}
 
 	/* Make sure Leaf is set.  At one point, tls.X509KeyPair didn't
 	always do this, but it should now unless someone set
 	GODEBUG=x509keypairleaf=0. */
 	if nil == cert.Leaf {
-		return tls.Certificate{}, ErrLeafCertificateNotSet
+		return fail(ErrLeafCertificateNotSet)
 	}
 
 	return cert, nil
@@ -81,6 +87,29 @@ func loadCachedCertificate(certFile string, b []byte) (tls.Certificate, error) {
 // SaveCertificate saves PEM to the given file.  Directories will be created
 // as needed with 0755 permissions.
 func SaveCertificate(certFile string, certPEM, keyPEM []byte) error {
+	/* Work out the fingerprint.  Also validates the cert for us. */
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if nil != err {
+		return fmt.Errorf("parsing certificate: %w", err)
+	}
+	fp, err := PubkeyFingerprintTLS(cert)
+	if nil != err {
+		return fmt.Errorf("calculating fingerprint: %w", err)
+	}
+
+	/* Do what we said we'd do in the first place. */
+	return saveCertificateFingerprint(certFile, fp, certPEM, keyPEM)
+}
+
+// saveCertificateFingerprint is like SaveCertificate, but with a
+// pre-calculated fingerprint to avoid having to parse fresh PEM.
+func saveCertificateFingerprint(
+	certFile string,
+	fingerprint string,
+	certPEM []byte,
+	keyPEM []byte,
+) error {
+	/* openFile tries to open certFile. */
 	openFile := func() (*os.File, error) {
 		return os.OpenFile(
 			certFile,
@@ -112,6 +141,9 @@ func SaveCertificate(certFile string, certPEM, keyPEM []byte) error {
 			time.Now().Format(time.RFC3339),
 		),
 		Files: []txtar.File{{
+			Name: txtarFingerprintFile,
+			Data: []byte(fingerprint),
+		}, {
 			Name: txtarCertFile,
 			Data: certPEM,
 		}, {

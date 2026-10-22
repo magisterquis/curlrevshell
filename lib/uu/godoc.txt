@@ -1,0 +1,76 @@
+package uu // import "github.com/magisterquis/curlrevshell/lib/uu"
+
+Package uu - Simple uuencode/uudecode
+
+This package provides simple uuencoding and uudecoding. It is compatible with
+Perl's pack/unpack "u" template. See https://perldoc.perl.org/functions/pack for
+more details.
+
+VARIABLES
+
+var ErrInvalidDataLen = errors.New(
+	"encoded data not a multiple of four characters",
+)
+    ErrInvalidDataLen indicates the data part of the line was not a multiple of
+    four characters.
+
+
+FUNCTIONS
+
+func AppendDecode(dst, src []byte) ([]byte, error)
+    AppendDecode decodes src, appends it to dst, and returns the extended
+    buffer.
+
+func AppendEncode(dst, src []byte) []byte
+    AppendEncode encodes src, appends it to dst, and returns the extended
+    buffer.
+
+func MaxDecodedLen(b []byte) int
+    MaxDecodedLen eeturns a maximum number of bytes of the decoded form of b as
+    required by AppendDecode. Accuracy is traded for O(1) execution; in practice
+    AppendDecode will usuallu require less space.
+
+func MaxEncodedLen(b []byte) int
+    MaxEncodedLen eeturns a maximum number of bytes of the encoded form of b as
+    required by AppendEncode. Accuracy is traded for O(1) execution; in practice
+    AppendEncode will usuallu require less space.
+
+
+TYPES
+
+type DecodeError struct {
+	Line, Offset int   /* Where the error occured. */
+	Err          error /* What happened. */
+}
+    DecodeError indicates where in the encoded data decoding failed.
+
+func (err DecodeError) Error() string
+    Error implements the error interface.
+
+func (err DecodeError) Unwrap() error
+    Unwrap returns err.Err.
+
+type IncorrectDataLenError struct {
+	Expected int
+	Actual   int
+}
+    IncorrectDataLenError indicates the data part of the line was inconsistent
+    with the length character.
+
+func (err IncorrectDataLenError) Error() string
+    Error implements the error interface.
+
+type InvalidEncodedCharacterError rune
+    InvalidEncodedCharacterError indicates a line contained an invalid
+    character.
+
+func (err InvalidEncodedCharacterError) Error() string
+    Error implements the error interface.
+
+type InvalidLengthCharacterError rune
+    InvalidLengthCharacterError indicates a line's length (first) character
+    indicated a length less than 0.
+
+func (err InvalidLengthCharacterError) Error() string
+    Error implements the error interface.
+

@@ -1,0 +1,35 @@
+package chanlog // import "github.com/magisterquis/curlrevshell/lib/chanlog"
+
+Package chanlog - log to a channel, fortesting
+
+CONSTANTS
+
+const BufLen = 1024
+
+TYPES
+
+type ChanLog chan string
+    ChanLog wraps a chan string as a blockingish logfile. Writes are sent as
+    strings less timestamps and surrounding whitespace to the wrapped chan.
+    Don't send it anything which isn't a log line.
+
+func New() (ChanLog, *slog.Logger)
+    New returns a new chanLog with a BufLen-sized buffer and slog.Logger which
+    wraps it.
+
+func (cl ChanLog) Expect(t *testing.T, lines ...string)
+    Expect expects the log entries on cl. It calls t.Errorf for mismatches and
+    blocks until as many log entries as supplied lines are read.
+
+func (cl ChanLog) ExpectEmpty(t *testing.T, lines ...string)
+    ExpectEmpty is like cl.Expect, except it checks that the log is empty and
+    calls t.Errorf which each line if not. This is inherently racy and should be
+    called concurrently to calls to cl.Write.
+
+func (cl ChanLog) ExpectUnordered(t *testing.T, lines ...string)
+    ExpectUnordered is like Expect, but doesn't require the lines come in order.
+
+func (cl ChanLog) Write(b []byte) (int, error)
+    Write converts b to a string and sends it to cl. It always returns len(b),
+    nil.
+
