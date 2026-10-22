@@ -2,6 +2,7 @@ Changelog
 =========
 This lists the feature creep present in each tagged version.
 
+
 `bettertests`
 -------------
 The following changes are available on this branch and will (probably) be in
@@ -49,22 +50,13 @@ go install github.com/magisterquis/curlrevshell@bettertests
 - [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
   non-OpenBSD.
 - Various and sundry changes to accomodate building and testing on Linux.
-- In tests, make sure we actually have the curl referred to by "curlrevshell".
-- Handle `-log`files which refer to paths which refer to file descriptors which
-  refer to open sockets (e.g. ksh93 pipelines on Linux).
-- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
-  non-OpenBSD.
-- Various and sundry changes to accomodate building and testing on Linux.
 - Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
   shell built-in and less likely to `-E`.
 - Logfile locking should work better with non-file files.
 - [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
   logging library.
-- Logfile locking should work better with non-file files.
 - Preliminary support for comms adapters, for things like C2 over CW.
 - [`crsadapter`](../lib/crsadapter) - New library for adaptering.
-- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
-  logging library.
 - [`sstls`](../lib/sstls): Stick the fingerprint in archive files.
 - [`sstls`](../lib/sstls): Add `ParseCachedCertificate` a parser of (in-memory)
   cached certificates.
@@ -74,16 +66,6 @@ go install github.com/magisterquis/curlrevshell@bettertests
   (https://pkg.go.dev/cmd/go#hdr-Show_documentation_for_package_or_symbol)
   docs about.
 - Add [`go fix`](https://pkg.go.dev/cmd/fix) to [`make test`](../Makefile).
-- [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
-  not-OpenBSD.
-- In tests, make sure we actually have the curl referred to by "curlrevshell".
-- Handle `-log`files which refer to paths which refer to file descriptors which
-  refer to open sockets (e.g. ksh93 pipelines on Linux).
-- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
-  non-OpenBSD.
-- Various and sundry changes to accomodate building and testing on Linux.
-- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
-  shell built-in and less likely to `-E`.
 - [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
   not-OpenBSD.
 - [`-icanhazip`](./flags.md#-icanhazip) works on OpenBSD with a bit of
