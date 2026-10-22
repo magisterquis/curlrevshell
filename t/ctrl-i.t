@@ -176,14 +176,14 @@ function check_ctrl_i {
 
         # We'll want to stick curl in a co-process, so hook up curl to
         # different file descriptors.
-        exec 4>&p # Input
-        exec 5<&p # Output
+        exec 4>&p # Curlrevshell input
+        exec 5<&p # Curlrevshell output
 
         # Connect up curl to get the Ctrl+I output after a SIGUSR1.
         $CURL --silent -T- --no-progress-meter |&
         while read -r -u5; do
                 if [[ "$REPLY" == \
-                        *"[127.0.0.1] Input connected: ID \"$ID\""* ]]; then
+                        *"[127.0.0.1] Input connected: ID $ID"* ]]; then
                         break
                 fi
         done

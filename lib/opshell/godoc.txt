@@ -1,0 +1,171 @@
+package opshell // import "github.com/magisterquis/curlrevshell/lib/opshell"
+
+Package opshell - Operator's interactive shell
+
+CONSTANTS
+
+const (
+	// PlainWritePause is the amount of time a terminal must have no
+	// plain writes (i.e. [CLine]'s with Plain set to true) after a user
+	// sends Ctrl+O before plain writes are written again.
+	// This is meant to give a user a fighting chance after he accidentally
+	// cats a large file.
+	PlainWritePause = 2 * time.Second
+
+	// CtrlCWait is the amount of time after receiving a Ctrl+C which we
+	// wait for a second one for stopping the Shell.
+	CtrlCWait = time.Second
+
+	// FirstCtrlCWarning is sent to the shell in red the first time a user
+	// hits Ctrl+C to let him know a second is needed to kill the shell.
+	FirstCtrlCWarning = "Caught Ctrl+C.  " +
+		"One more in the next second to kill the shell."
+
+	// SecondCtrlCWarning is sent to stdout in red to let the user know
+	// the shell's going away.
+	SecondCtrlCWarning = "Caught second Ctrl+C."
+)
+
+VARIABLES
+
+var ErrInputDone = errors.New("input closed")
+    ErrInputDone is returned by Shell.Do to indicate its input closed.
+
+var ErrOutputClosed = errors.New("output channel closed")
+    ErrOutputClosed is returned by Shell.Do when it returns because someone
+    closed the output channel.
+
+var TestingTTY string
+    TestingTTY may be set to an empty string to always treat Shell's i/o as a
+    TTY but also disable colors. It is intended to be used in tests via
+
+        go build -ldflags '-X github.com/magisterquis/curlrevshell/lib/opshell.TestingTTY="yes"'
+
+
+FUNCTIONS
+
+func ColorEC(ec *goxterm.EscapeCodes, color Color) []byte
+    ColorEC returns the escape code for the given color from ec. A non-nil slice
+    will always be returned, even if ec is nil. As a special case, ColorNone
+    returns an empty slice, as do unknown colors. The returned slice is a copy
+    of the slice in ec or a newly-allocated slice; it may be modified at will.
+
+func ExpectNoShellMessages(t *testing.T, och <-chan CLine)
+    ExpectNoShellMessages calls t.Errorf for each message read from och.
+
+func ExpectShellMessages(t *testing.T, och <-chan CLine, wantCLines ...CLine)
+    ExpectShellMessages makes sure that all of the lines in wantCLines are read
+    from och in order.
+
+    This is no longer done in a subtest, but may again in the future when
+    subtests (i.e. testing.T.Run) are supported by [synctest.Test].
+
+
+TYPES
+
+type CLine struct {
+	Color       Color
+	Line        string
+	Prompt      string
+	NoTimestamp bool /* Don't print a timestamp. */
+	Plain       bool /* No newline, color, timestamp, or anything else. */
+}
+    CLine is a line and a color to print. If Prompt is not empty, it is set as
+    the prompt before printing the line.
+
+type ChanWriter chan<- string
+    ChanWriter turns a chan string into an io.Writer.
+
+func (cw ChanWriter) Write(b []byte) (int, error)
+    Write satisfies io.Writer. It blocks until it can write and always returns
+    nil, len(b).
+
+type Color int
+    Color represents a specific color.
+
+const (
+	ColorNone Color = iota // Equivalent to Terminal.Logf
+	ColorBlack
+	ColorRed
+	ColorGreen
+	ColorYellow
+	ColorBlue
+	ColorMagenta
+	ColorCyan
+	ColorWhite
+	ColorReset
+)
+    Options for colors in Terminal.ColorLogf
+
+func (i Color) String() string
+
+type Shell struct {
+	// Has unexported fields.
+}
+    Shell is the shell used by an operator. It's a wrapper around
+    github.com/magisterquis/goxterm.Terminal
+
+func New(
+	ich chan<- string,
+	och <-chan CLine,
+	prompt string,
+	noTimestamps bool,
+	insertGen func() ([]byte, error),
+	insertName string,
+) (*Shell, func(), error)
+    New returns returns Shell wrapping stdin and stdout. Stdin will be put in
+    raw mode if it is a terminal. Call Shell.Do to start processing lines and
+    handle resizing and call the returned function to restore the TTY's state
+    and clean up other resources. ich will be closed before Shell.Do returns.
+    If noTimestamps is true, no timestamps will be printed. insertGen will be
+    called to generate bytes to send to the shell on Ctrl+I and will be logged
+    as if it were inserting data from insertName.
+
+func NewWrapping(
+	ich chan<- string,
+	och <-chan CLine,
+	prompt string,
+	noTimestamps bool,
+	insertGen func() ([]byte, error),
+	insertName string,
+	stdin io.Reader,
+	stdout io.Writer,
+) (*Shell, func(), error)
+    NewWrapping is like New but requires explicit input and output instead of
+    assuming stdio.
+
+func (s *Shell) Do(ctx context.Context) error
+    Do proxies between the channels with which the shell was made and stdio
+    as well as watches for SIGWINCH to handle shell resizing. Do returns
+    ErrOutputClosed if the output channel passed to New is closed.
+
+func (s *Shell) Insert()
+    Insert inserts the data returned by the insertGen function passed to New.
+    This is what Ctrl+I uses. No error is returned; all errors are handled by
+    sending messages to the user.
+
+func (s *Shell) Logf(
+	color Color,
+	noTS bool,
+	format string,
+	v ...any,
+) (int, error)
+    Logf logs a line to the shell. It is similar to log.Printf but includes
+    a color and only logs the time, not the date. Logf may be called from
+    multiple goroutines simultaneously. noTS can be used to suppress logging the
+    timestamp, even if s would normally log timestamps.
+
+func (s *Shell) RedLogf(format string, v ...any) (int, error)
+    RedLogf is a wrapper around Logf which always uses the color red and doesn't
+    suppress timestamps. This is handy for logging errors.
+
+func (s *Shell) SetPrompt(prompt string)
+    SetPrompt sets the shell's prompt. This can also be done by sending
+    it a CLine with CLine.Prompt set. Don't forget a trailing space. Use
+    s.WrapIncolor to color the prompt.
+
+func (s *Shell) WrapInColor(st string, color Color) string
+    WrapInColor returns s, wrapped on the left with the given color and on
+    the right with ColorReset. As a special case, if color is ColorNone,
+    s is returned unchanged.
+

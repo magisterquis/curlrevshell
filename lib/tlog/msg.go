@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"testing"
 )
 
 // Group is analogous to the group created by [slog.Logger.WithGroup].
@@ -183,6 +184,14 @@ func (m Msg) ToJSON() (string, error) {
 	}
 	removeEmptyGroups(n.Root)
 
+	/* For testing, we'll look for a specific key in n.Root and replace
+	its value with an unmarshallable number. */
+	if testing.Testing() {
+		if _, ok := n.Root[testUnmarshallableKey]; ok {
+			n.Root[testUnmarshallableKey] = testUnmarshallableValue
+		}
+	}
+
 	/* JSONify the important bit. */
 	b, err := json.Marshal(n.Root)
 	if nil != err { /* Unpossible */
@@ -238,3 +247,12 @@ func removeEmptyGroups(g Group) {
 		}
 	}
 }
+
+var (
+	// testUnmarshallableKey is used to inject an unmarshallable value
+	// into a Msg.
+	testUnmarshallableKey = S("unmarshallable-key")
+	// testUnmarshallableValue is the value injected when
+	// testUnmarshallableKey is found in Msg.Root.
+	testUnmarshallableValue = func() {}
+)

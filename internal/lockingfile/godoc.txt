@@ -1,0 +1,25 @@
+package lockingfile // import "github.com/magisterquis/curlrevshell/internal/lockingfile"
+
+Package lockingfile - os.File which locks during writes
+
+TYPES
+
+type File struct {
+	*os.File
+}
+    File wraps an os.File with a Write that flock(2)s the file during writes.
+
+func OpenFile(name string, flag int, perm os.FileMode) (*File, error)
+    OpenFile wraps os.OpenFile to return a File.
+
+    As a special case, if the named file is unable to be opened with
+    os.OpenFile, name is /dev/fd/N, where N is a number, or /dev/stdin,
+    /dev/stdout, or /dev/stderr, and name refers to a socket, possibly via
+    symlinks, an os.File wrapping that file descriptor number will be used.
+
+func (f *File) Write(b []byte) (int, error)
+    Write wraps os.File.Write but holds a lock with syscall.Flock. If the file
+    does not support flock-style locks (i.e. returns syscall.EOPNOTSUPP or
+    syscall.ENOTSUP on Darwin) the write will be attempted without the lock
+    held.
+

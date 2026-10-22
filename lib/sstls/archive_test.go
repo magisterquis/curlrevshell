@@ -5,11 +5,12 @@ package sstls
  * Read and Save certs with an archive file
  * By J. Stuart McMurray
  * Created 20240327
- * Last Modified 20260111
+ * Last Modified 20260823
  */
 
 import (
 	"crypto/x509"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -168,6 +169,57 @@ func TestSaveCertificate_TruncateFile(t *testing.T) {
 			"File did not shrink after SaveCertificate\n"+
 				"got: %d\n"+
 				"want: <%d",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we get the right errors parsing invalid certificates?
+func TestParseCachedCertificate_Errors(t *testing.T) {
+	for n, want := range map[string]error{
+		"empty_cert": ErrCacheFileEmpty,
+		"empty_key":  ErrPrivateKeyPEMEmpty,
+		"empty_file": ErrCacheFileEmpty,
+	} {
+		t.Run(n, func(t *testing.T) {
+			if _, got := ParseCachedCertificate(
+				[]byte(mustTDFile(t)),
+			); !errors.Is(got, want) {
+				t.Errorf(
+					"Incorrect parse error\n"+
+						" got: %v\n"+
+						"want: %v",
+					got,
+					want,
+				)
+			}
+		})
+	}
+}
+
+// Do we get the right sort of error if we can't parse the cert's PEM?
+func TestParseCachedCertificate_ParseError(t *testing.T) {
+	_, err := ParseCachedCertificate([]byte(mustTDFile(t)))
+	/* tls library gives us a string :( */
+	if got, want := err.Error(), "parsing certificate: tls: failed to "+
+		"find any PEM data in certificate input"; got != want {
+		t.Errorf(
+			"Incorrect parse error\n got: %v\nwant: %v",
+			got,
+			want,
+		)
+	}
+
+}
+
+// Do we get the right sort of error if we have a nil slice?
+func TestParseCcahedCertificate_NilSlice(t *testing.T) {
+	_, err := ParseCachedCertificate(nil)
+	/* tls library gives us a string :( */
+	if got, want := err, ErrCacheFileEmpty; !errors.Is(got, want) {
+		t.Errorf(
+			"Incorrect parse error\n got: %v\nwant: %v",
 			got,
 			want,
 		)

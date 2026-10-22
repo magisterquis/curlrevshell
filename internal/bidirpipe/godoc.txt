@@ -1,0 +1,34 @@
+package bidirpipe // import "github.com/magisterquis/curlrevshell/internal/bidirpipe"
+
+Package bidirpipe - "Better" io.Pipe/net.Pipe
+
+FUNCTIONS
+
+func New() (Pipe, Pipe)
+    New returns a pair of connected Pipes.
+
+
+TYPES
+
+type Pipe struct {
+	// Has unexported fields.
+}
+    Pipe is like a combination of io.Pipe and net.Pipe. It's bidirectional but
+    also allows closing a single direction. The underlying implementation is a
+    pair of io.PipeReader/io.PipeWriter pairs.
+
+func (p Pipe) Close() error
+    Close closes the pipe.
+
+func (p Pipe) CloseRead() error
+    CloseRead causes writes to the connected pipe to return net.ErrClosedPipe.
+
+func (p Pipe) CloseWrite() error
+    CloseWrite causes reads from the connected pipe to return EOF.
+
+func (p Pipe) Read(b []byte) (n int, err error)
+    Read implements io.Reader.
+
+func (p Pipe) Write(b []byte) (n int, err error)
+    Write implements io.Writer.
+

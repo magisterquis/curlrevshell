@@ -6,7 +6,7 @@ package sstls
  * TLS listener with a self-signed certificate
  * By J. Stuart McMurray
  * Created 20240323
- * Last Modified 20250905
+ * Last Modified 20260817
  */
 
 import (
@@ -14,7 +14,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -94,7 +93,7 @@ func PubkeyFingerprint(cert *x509.Certificate) (string, error) {
 func PubkeyFingerprintTLS(cert tls.Certificate) (string, error) {
 	/* Make sure we have a parsed cert. */
 	if nil == cert.Leaf {
-		return "", errors.New("missing leaf x509 certificate")
+		return "", ErrMissingLeafCertificate
 	}
 
 	return PubkeyFingerprint(cert.Leaf)

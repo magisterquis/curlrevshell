@@ -10,34 +10,34 @@ package pledgeunveil
  * pledge(2) and unveil(2) on OpenBSD, no-ops elsewhere
  * By J. Stuart McMurray
  * Created 20251010
- * Last Modified 20251010
+ * Last Modified 20261017
  */
 
-// Pledge is a thin wrapper around [unix.Pledge]
+// Pledge is a thin wrapper around Pledge in [golang.org/x/sys/unix]
 // on OpenBSD and a no-op elsewhere.
 func Pledge(promises, execpromises string) error {
 	return nil
 }
 
-// PledgeExecpromises is a thin wrapper around [unix.PledgeExecpromises]
-// on OpenBSD and a no-op elsewhere.
+// PledgeExecpromises is a thin wrapper around PledgeExecpromises in
+// [golang.org/x/sys/unix] on OpenBSD and a no-op elsewhere.
 func PledgeExecpromises(execpromises string) error {
 	return nil
 }
 
-// PledgePromises is a thin wrapper around [unix.PledgePromises]
-// on OpenBSD and a no-op elsewhere.
+// PledgePromises is a thin wrapper around PledgePromises in
+// [golang.org/x/sys/unix] on OpenBSD and a no-op elsewhere.
 func PledgePromises(promises string) error {
 	return nil
 }
 
-// Unveil is a thin wrapper around [unix.Unveil]
+// Unveil is a thin wrapper around Unveil in [golang.org/x/sys/unix]
 // on OpenBSD and a no-op elsewhere.
 func Unveil(path string, flags string) error {
 	return nil
 }
 
-// UnveilBlock is a thin wrapper around [unix.UnveilBlock]
+// UnveilBlock is a thin wrapper around UnveilBlock in [golang.org/x/sys/unix]
 // on OpenBSD and a no-op elsewhere.
 func UnveilBlock() error {
 	return nil

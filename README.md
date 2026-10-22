@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20261020102052-97ffcc6f9239+dirty (bettertests branch)
+Version v0.0.1-beta.8.0.20261020202629-ad77b4456c85+dirty (bettertests branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
@@ -82,6 +82,8 @@ Options:
     	Tab/Ctrl+I's insertion source file or directory
   -debug
     	Print debugging messages
+  -experimental-adapter-socket path
+    	Unix socket path for adapters
   -icanhazip
     	Query icanhazip.com for a callback address
   -ipv6-one-liners
