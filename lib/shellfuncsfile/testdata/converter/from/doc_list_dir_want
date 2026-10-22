@@ -17,8 +17,9 @@ bar() {
 }
 
 tab_list() {
-        echo 'a         - A perl script to do a thing'
-        echo 'bar       - A "questionable" bar'
-        echo 'foo       - Does a '\''nice'\'' foo'
-        echo 'tab_list  - This function list'
+        printf '%s' 'a         - A perl script to do a thing
+bar       - A "questionable" bar
+foo       - Does a '\''nice'\'' foo
+tab_list  - This function list
+'
 }

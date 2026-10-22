@@ -25,6 +25,18 @@ go install github.com/magisterquis/curlrevshell@adapters
 - Add [`go fix`](https://pkg.go.dev/cmd/fix) to [`make test`](../Makefile).
 - [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
   not-OpenBSD.
+- In tests, make sure we actually have the curl referred to by "curlrevshell".
+- Handle `-log`files which refer to paths which refer to file descriptors which
+  refer to open sockets (e.g. ksh93 pipelines on Linux).
+- [`pledgeunveil`](../lib/pledgeunveil): (Re)generate non-OpenBSD code even on
+  non-OpenBSD.
+- Various and sundry changes to accomodate building and testing on Linux.
+- Switch from `echo` and `echo -E` to `printf`, which seems more likely to be a
+  shell built-in and less likely to `-E`.
+- [`pledgeunveil`](../lib/pledgeunveil): Go docs look a bit less brackety on
+  not-OpenBSD.
+- [`-icanhazip`](./flags.md#-icanhazip) works on OpenBSD with a bit of
+  environment variable-setting.
 - Updated dependencies.
 
 
@@ -51,12 +63,12 @@ go install github.com/magisterquis/curlrevshell@adapters
   lines it'll emit.
 - Tests are a little better.
 - Relatived paths better in [this changelog](./changelog.md).
-- [`TLSFingerprintVerifier`] moved from [`crsdialer`](../lib/crsdialer) to
+- `TLSFingerprintVerifier` moved from [`crsdialer`](../lib/crsdialer) to
   [`sstls`](../lib/sstls).
 - [`crstemplate`](../lib/crstemplate): Add a map to the Params struct to allow
   for passing arbitrary key/value pairs about.
-- [`crstemplate`]: Key-p templates from being generated if they use
-  non-existent map keys.
+- [`crstemplate`](../lib/crstemplate): Key-p templates from being generated if
+  they use non-existent map keys.
 - In tests, make sure we actually have the curl referred to by "curlrevshell".
 - Handle `-log`files which refer to paths which refer to file descriptors which
   refer to open sockets (e.g. ksh93 pipelines on Linux).

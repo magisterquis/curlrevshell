@@ -1,3 +1,4 @@
 tab_list() {
-        echo 'tab_list  - This function list'
+        printf '%s' 'tab_list  - This function list
+'
 }

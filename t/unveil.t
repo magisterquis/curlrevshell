@@ -4,7 +4,7 @@
 # Make sure we unveil as expected
 # By J. Stuart McMurray
 # Created 20251010
-# Last Modified 20261017
+# Last Modified 20261019
 
 set -euo pipefail
 
@@ -36,7 +36,7 @@ get_run_errors() {
         RET=$?
         # Extract errors
         set -e
-        GOT=$(echo -E "$GOT" | grep -i error ||:)
+        GOT=$(printf '%s' "$GOT" | grep -i error ||:)
 }
 
 # Make sure we can make a certificate and logfile.
