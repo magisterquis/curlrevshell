@@ -8,7 +8,7 @@ package tmplfuncs
  * Functions available to templates
  * By J. Stuart McMurray
  * Created 20250205
- * Last Modified 20251008
+ * Last Modified 20251019
  */
 
 import (
@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"regexp"
 	"text/template"
 )
@@ -26,6 +27,7 @@ const DefaultPort = "443"
 // TemplateFuncs are functions added to templates' function map.
 var TemplateFuncs = template.FuncMap{
 	"ensureport":    EnsurePort,
+	"env":           Env,
 	"host":          Host,
 	"map":           Map,
 	"matchre":       MatchRE,
@@ -99,7 +101,7 @@ func hasNoPort(err error) bool {
 func Map(kvs ...any) (map[string]any, error) {
 	/* Make sure we don't have a half-pair. */
 	if 0 != len(kvs)&0x1 {
-		return nil, fmt.Errorf("need a value for each key")
+		return nil, errMissingValue
 	}
 	/* Assemble the map. */
 	ret := make(map[string]any)
@@ -107,11 +109,7 @@ func Map(kvs ...any) (map[string]any, error) {
 		/* Key should be a string. */
 		s, ok := kvs[i].(string)
 		if !ok {
-			return nil, fmt.Errorf(
-				"key %v is a %T, not a string",
-				kvs[i],
-				kvs[i],
-			)
+			return nil, incorrectKeyTypeError{key: kvs[i]}
 		}
 		/* Save this pair. */
 		ret[s] = kvs[i+1]
@@ -131,4 +129,10 @@ func MatchRE(re, s string) (bool, error) {
 		)
 	}
 	return cre.MatchString(s), nil
+}
+
+// Env returns the value of the environment variable v.
+// It is a thin wrapper around [os.Getenv], a wrapper around getenv(3).
+func Env(v string) string {
+	return os.Getenv(v)
 }

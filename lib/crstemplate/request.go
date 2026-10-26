@@ -5,11 +5,10 @@ package crstemplate
  * Turn a request into a Request.
  * By J. Stuart McMurray
  * Created 20250126
- * Last Modified 20250613
+ * Last Modified 20261021
  */
 
 import (
-	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net"
@@ -29,10 +28,6 @@ const C2Param = "c2"
 // testingIgnoreHostHeader is a Host: header which causes c2Addr to pretend
 // it didn't get one, if we're in testing.
 const testingIgnoreHostHeader = "ignore_this_please"
-
-// ErrRequestAlreadyAdded is returned by AddRequest if the Params to which
-// a request was to be added already had one.
-var ErrRequestAlreadyAdded = errors.New("Params already has a request")
 
 // AddRequest returns a copy of p with information from r set, for the script
 // template.
@@ -115,5 +110,5 @@ func c2Addr(r *http.Request, localAddress *net.TCPAddr) (string, error) {
 	}
 
 	/* Out of ideas at this point. */
-	return "", errors.New("out of ideas")
+	return "", ErrOutOfIdeas
 }

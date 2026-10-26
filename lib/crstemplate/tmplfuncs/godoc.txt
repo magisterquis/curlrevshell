@@ -14,6 +14,7 @@ VARIABLES
 
 var TemplateFuncs = template.FuncMap{
 	"ensureport":    EnsurePort,
+	"env":           Env,
 	"host":          Host,
 	"map":           Map,
 	"matchre":       MatchRE,
@@ -29,6 +30,10 @@ func EnsurePort(port, addr string) string
     EnsurePort takes an address and ensures it contains a port. If addr is the
     empty string, the empty string will be returned. If port is the empty string
     DefaultPort is used.
+
+func Env(v string) string
+    Env returns the value of the environment variable v. It is a thin wrapper
+    around os.Getenv, a wrapper around getenv(3).
 
 func Host(addr string) (string, error)
     Host takes an IP:port or host:port and returns just the IP or host. It is a

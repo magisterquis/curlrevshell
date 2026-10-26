@@ -6,7 +6,7 @@ package hsrv
  * HTTP server
  * By J. Stuart McMurray
  * Created 20240324
- * Last Modified 20260809
+ * Last Modified 20261021
  */
 
 import (
@@ -153,7 +153,6 @@ func New(
 
 // Do actually serves HTTPS clients.
 func (s *Server) Do(ctx context.Context) error {
-
 	/* Work out where to send debug messages. */
 	dw := io.Discard
 	if s.printDebug {

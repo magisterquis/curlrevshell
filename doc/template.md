@@ -10,7 +10,9 @@ sets the script sent with `/c` as well as the helpful one-liners.
 In practice, this takes the form of handing curlrevshell one or more
 templates-inside-templates (i.e. [subtemplates](#subtemplates)) which it
 executes with (i.e. `dot` is set to) a structure of type
-[Params](../lib/crstemplate/params.go).
+[`Params`](../lib/crstemplate/params.go), except the `welcome`
+subtemplate which receives a structure of type
+[`WelcomeParams`](../lib/crstemplate/params.go).
 
 Much easier with a few [examples](#longer-examples).
 
@@ -97,6 +99,7 @@ Subtemplate | Generates a...
 `callback`  | ...`To get a shell:` one-liner
 `files`     | ...one-liner to download static files
 `script`    | ...shell hooked up to two `curl`s (for `/c`)
+`welcome`   | ...different welcome message
 
 Any or all may be put into a `-template` file to override the defaults from the
 [built-in](../lib/crstemplate/default.tmpl) template.  An empty template file
@@ -106,7 +109,9 @@ Dot
 ---
 Subtemplates will be executed with
 [`dot`](https://pkg.go.dev/text/template#pkg-overview)
-set to an instance of [Params](../lib/crstemplate/params.go).
+set to an instance of [`Params`](../lib/crstemplate/params.go) (or, for
+the `welcome` [subtemplate](#subtemplates),
+[`Params`](../lib/crstemplate/params.go)).
 
 Functions
 ---------
@@ -114,6 +119,7 @@ A small number of extra functions are made available to templates:
 Function      | Arguments                          | Example                                                                               | Description
 --------------|------------------------------------|---------------------------------------------------------------------------------------|------------
 ensureport    | `port` (default: `443`), `address` | `ensureport 123 "needsaport.com"` -> `needsaport.com:123`                             | Ensure `address` has a port
+env           | `varname`                          | `env EDITOR` -> `/usr/local/bin/vim`                                                  | Returns the value of an environment variable
 host          | `address`                          | `address dontwantaport.com:123` -> `dontwantaport.com`                                | Returns the host (or IP address) from `address`
 map           | (`key`, `value`)...                | `map "sk" "sv" "nk" 2 "bk" true` -> `map[string]any{"sk": "sv", "nk": 2, "bk": true}` | Assembles a map from key/value pairs
 matchre       | `regex` `string`                   | `matchre "\d+$" "letters"` -> `true`                                                  | Returns true if `string` matches `regex`

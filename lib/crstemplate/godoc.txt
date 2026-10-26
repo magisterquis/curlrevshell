@@ -17,6 +17,7 @@ const (
 	SubtemplateCallback = "callback" /* "To get a shell" pastables */
 	SubtemplateFiles    = "files"    /* Static fileserver pastables */
 	SubtemplateScript   = "script"   /* Exceuted by /c */
+	SubtemplateWelcome  = "welcome"  /* Welcome message */
 
 )
     Subtemplate names in DefaultTemplate. These may be overridden with the
@@ -29,17 +30,6 @@ const C2Param = "c2"
 
 VARIABLES
 
-var (
-	// ErrNoSubtemplates indicates that a template file was specified which
-	// had no subtemplates.
-	ErrNoSubtemplates = errors.New("no subtemplates")
-
-	// ErrOutsideSubtemplate indicates the file passed to Execute had data
-	// outside subtemplates; likely an old-style template.
-	ErrOutsideSubtemplate = errors.New(
-		"non-subtemplate template data found",
-	)
-)
 var DefaultTemplate string
     DefaultTemplate is the default callback script template. It can be
     overridden at runtime with -template.
@@ -53,6 +43,18 @@ var DefaultURLPaths = URLPaths{
     DefaultURLPaths are the URL paths we use if we don't have any others.
     This should not be modified.
 
+var ErrNoSubtemplates = errors.New("no subtemplates")
+    ErrNoSubtemplates indicates that a template file was specified which had no
+    subtemplates.
+
+var ErrOutOfIdeas = errors.New("out of ideas")
+    ErrOutOfIdeas indicates no C2 address was able to be derived from an HTTP
+    request.
+
+var ErrOutsideSubtemplate = errors.New("non-subtemplate template data found")
+    ErrOutsideSubtemplate indicates the file passed to Execute had data outside
+    subtemplates; likely an old-style template.
+
 var ErrRequestAlreadyAdded = errors.New("Params already has a request")
     ErrRequestAlreadyAdded is returned by AddRequest if the Params to which a
     request was to be added already had one.
@@ -65,7 +67,7 @@ func CleanURLPaths(p *URLPaths)
     If an element of p is empty, it is taken from the corresponding field in
     DefaultURLPaths.
 
-func Execute(name SubtemplateName, file string, params Params) (string, error)
+func Execute[P Params | WelcomeParams](name SubtemplateName, file string, params P) (string, error)
     Execute executes the given subtemplate with the given parameters.
 
     If file is not the empty string, it is taken as a template file to attempt
@@ -74,7 +76,7 @@ func Execute(name SubtemplateName, file string, params Params) (string, error)
     subtemplate.
 
     If file is not the empty string and the file did not exist, DefaultTemplate
-    will be used but errors.Is(err, fs.ErrNotExist) will be true to enable a
+    will be used but errors.Is(err, os.ErrNotExist) will be true to enable a
     warning that a template file is missing but the returned string will still
     be the result of executing DefaultTemplate's subtemplate.
 
@@ -87,6 +89,18 @@ type BasicAuth struct {
 	Password string
 }
     BasicAuth contains the Basic Auth credentials sent in a request.
+
+type ExtraneousTemplateDataCheckError struct {
+	Err error
+}
+    ExtraneousTemplateDataCheckError is returned by Execute when an error is
+    encountered checking a template for extraneous (old-style) data.
+
+func (err ExtraneousTemplateDataCheckError) Error() string
+    Error implements the error interface.
+
+func (err ExtraneousTemplateDataCheckError) Unwrap() error
+    Unwrap returns err.Err.
 
 type Params struct {
 
@@ -167,4 +181,15 @@ type URLPaths struct {
 }
     URLPaths contain the parts of the URL paths indicating what an HTTPS request
     is for.
+
+type WelcomeParams struct {
+	// Version is the current main module build version plus the git
+	// branch, if not master.
+	Version string
+
+	// ListenAddress is the HTTPS listen address, corresponding to the
+	// -listen-address flag.
+	ListenAddress string
+}
+    WelcomeParams are passed to the "welcome" subtemplate (SubtemplateWelcome).
 

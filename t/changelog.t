@@ -47,7 +47,8 @@ for my $i (0..$#changelog) {
         push @sstarts, $i-1 if $changelog[$i] =~ /^-+$/;
 }
 
-plan tests => 1+@entries + 1+@sstarts;
+# We finally know how many tests we'll run.
+plan tests => 3 + 1+@entries + 1+@sstarts;
 isnt 0+@entries, 0, "Read changelog entries";
 isnt 0+@sstarts, 0, "Found section headers";
 
@@ -70,5 +71,20 @@ for my $sstart (@sstarts) {
         ok two_blanks_before($sstart),"Section has two leading spaces - ".
                 "$changelog[$sstart] (line $n)";
 }
+
+# Make sure the first entry has a message about changes, etc.
+my $m;
+for my $i (0..$#changelog) {
+        if ($changelog[$i] =~ /^-+$/) {
+                $m = $i;
+                last;
+        }
+}
+my $snre = qr/^`([^`]+)`$/;
+like $changelog[$m+1], qr/^The following/,      "Changes message exists";
+like $changelog[$m-1], $snre,         "Fist section name found";
+$changelog[$m-1] =~ $snre;
+my $title = quotemeta($1 // "");
+like $changelog[$m+4], qr/^go install.*$title$/, "Found go install line";
 
 done_testing;
