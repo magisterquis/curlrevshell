@@ -38,7 +38,7 @@ usage: ${PLEDGEUNVEIL_OTHER}
 	TD=$$(mktemp -d); TF=$$TD/curlrevshell;\
 		go build -o "$$TF" ../../ &&\
 		"$$TF" -h 2>&1 | sed -Ee\
-			's,[^"]+/cert.txtar,/home/you/.cache/sstls/cert.txar,'\
+			's,[^"]+/cert.txtar,/home/you/.cache/sstls/cert.txtar,'\
 			>$@.tmp 2>&1 &&\
 		rm "$$TF" && rmdir "$$TD"
 	mv $@.tmp $@
