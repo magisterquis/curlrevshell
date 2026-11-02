@@ -67,7 +67,7 @@ Usage: curlrevshell [options]
 
 Even worse reverse shell, powered by cURL.
 
-Version v0.0.1-beta.8.0.20261102015314-df6985b02014+dirty (bettertests branch)
+Version v0.0.1-beta.8.0.20261102032109-cffac25347a9+dirty (bettertests branch)
 
 Keyboard Shortcuts:
 Ctrl+I - Insert the file or directory specified with -ctrl-i
@@ -107,7 +107,7 @@ Options:
   -template template
     	Optional template file, used if it exists
   -tls-certificate-cache file
-    	Optional file in which to cache generated TLS certificate (default "/home/you/.cache/sstls/cert.txar")
+    	Optional file in which to cache generated TLS certificate (default "/home/you/.cache/sstls/cert.txtar")
 ```
 
 Details

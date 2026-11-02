@@ -96,7 +96,7 @@ GOT=$(diff \
         3<<_eof 4<<_eof ||:
 $(go run . -h 2>&1 \
         | grep -E -v '^Version' \
-        | sed -Ee 's,[^"]+/cert.txtar,/home/you/.cache/sstls/cert.txar,'
+        | sed -Ee 's,[^"]+/cert.txtar,/home/you/.cache/sstls/cert.txtar,'
 )
 _eof
 $(awk '
