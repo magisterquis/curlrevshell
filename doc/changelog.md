@@ -11,6 +11,7 @@ the next tagged version.  Get them with
 go install github.com/magisterquis/curlrevshell@bettertests
 ```
 - Various and sundry changes to accomodate building and testing on macOS.
+- [`tlog`](../lib/tlog): Failed tests no longer HTML-escape `<>?`.
 
 
 `dev`
@@ -53,7 +54,7 @@ go install github.com/magisterquis/curlrevshell@bettertests
   `-E`.  Also in tests.
 - [`-log`](./flags.md#-log): Logfile locking should work better with non-file
   files.
-- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
+- [`tlog`](../lib/tlog): New better-than-[`chanlog`](../lib/chanlog) test
   logging library.
 - [`-experimental-adapter-socket`](./flags.md#-experimental-adapter-socket):
   Preliminary support for comms adapters, for things like C2 over CW.

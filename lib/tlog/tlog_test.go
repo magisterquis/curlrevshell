@@ -5,12 +5,12 @@ package tlog
  * Tests for tlog.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260515
+ * Last Modified 20261102
  */
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -870,7 +870,6 @@ func TestBufferNextMessage_CorruptedJSON(t *testing.T) {
 	var (
 		tb, _       = NewBuffer()
 		corruptJSON = S("corrupt-json")
-		ok          bool
 	)
 
 	/* Queue up some corrupt JSON. */
@@ -880,8 +879,8 @@ func TestBufferNextMessage_CorruptedJSON(t *testing.T) {
 	if !m.IsZero() {
 		t.Errorf("Got non-zero message: %s", m)
 	}
-	if err, ok = errors.AsType[*json.SyntaxError](err); !ok {
-		t.Fatalf("Error is not %T", err)
+	if jse, ok := errors.AsType[*jsontext.SyntacticError](err); !ok {
+		t.Errorf("Incorrect error type\n got: %T\nwant: %T", err, jse)
 	}
 }
 

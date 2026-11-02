@@ -5,11 +5,11 @@ package tlog
  * UnJSON'd log message
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260819
+ * Last Modified 20261102
  */
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"log/slog"
 	"testing"
@@ -193,7 +193,10 @@ func (m Msg) ToJSON() (string, error) {
 	}
 
 	/* JSONify the important bit. */
-	b, err := json.Marshal(n.Root)
+	b, err := json.Marshal(
+		n.Root,
+		json.Deterministic(true),
+	)
 	if nil != err { /* Unpossible */
 		return "", fmt.Errorf("JSON-encoding: %w", err)
 	}
