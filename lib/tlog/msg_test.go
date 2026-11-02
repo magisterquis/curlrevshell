@@ -5,15 +5,17 @@ package tlog
  * Tests for msg.go
  * By J. Stuart McMurray
  * Created 20251212
- * Last Modified 20260814
+ * Last Modified 20261102
  */
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"math"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -450,29 +452,19 @@ func TestMsgClone_InvalidJSON(t *testing.T) {
 		if !got.IsZero() {
 			t.Errorf("Got non-zero Msg on error")
 		}
-		if jute, ok := errors.AsType[*json.UnsupportedValueError](
-			err,
-		); !ok {
-			t.Errorf(
-				"Incorrect error type\n got: %T\nwant: %T",
-				err,
-				jute,
-			)
-		}
+		checkMarshalNaNError(t, err)
 	})
 	t.Run("unmarshal_fail", func(t *testing.T) {
 		/* Message with a non-JSON-roundtrippable value. */
-		got, err := M.With("num", unparseable{}).Clone()
-		if !got.IsZero() {
+		m, err := M.With("num", unparseable{}).Clone()
+		if !m.IsZero() {
 			t.Errorf("Got non-zero Msg on error")
 		}
-		if jute, ok := errors.AsType[*json.UnmarshalTypeError](
-			err,
-		); !ok {
+		if got, want := err, strconv.ErrRange; !errors.Is(got, want) {
 			t.Errorf(
-				"Incorrect error type\n got: %T\nwant: %T",
-				err,
-				jute,
+				"Incorrect error\n got: %v\nwant: %v",
+				got,
+				want,
 			)
 		}
 	})
@@ -492,17 +484,7 @@ func TestMsgMustClone_Panic(t *testing.T) {
 		if !ok {
 			t.Fatalf("Did not get an error from recovered panic")
 		}
-		/* Should involve JSON marshalling. */
-		if jute, ok := errors.AsType[*json.UnsupportedValueError](
-			err,
-		); !ok {
-			t.Errorf(
-				"Incorrect error type\n got: %T\nwant: %T",
-				err,
-				jute,
-			)
-		}
-
+		checkMarshalNaNError(t, err)
 	}()
 	M.With("NaN", math.NaN()).MustClone()
 }
@@ -521,17 +503,7 @@ func TestMsgString_Panic(t *testing.T) {
 		if !ok {
 			t.Fatalf("Did not get an error from recovered panic")
 		}
-		/* Should involve JSON marshalling. */
-		if jute, ok := errors.AsType[*json.UnsupportedValueError](
-			err,
-		); !ok {
-			t.Errorf(
-				"Incorrect error type\n got: %T\nwant: %T",
-				err,
-				jute,
-			)
-		}
-
+		checkMarshalNaNError(t, err)
 	}()
 	s := M.With("NaN", math.NaN()).String()
 	t.Errorf("String returned string and did not panic: %s", s)
@@ -585,15 +557,66 @@ func TestMsgUnmarshalJSON(t *testing.T) {
 // Do we get an error if a message can't be marshalled?
 func TestMsgToJSON_Error(t *testing.T) {
 	j, err := M.With(testUnmarshallableKey, true).ToJSON()
-	if got, want := err, (&json.UnsupportedTypeError{
-		Type: reflect.TypeFor[func()](),
-	}); !strings.HasSuffix(got.Error(), want.Error()) {
-		/* Apparently json.UnsupportedTypeError doesn't play well
-		with errors.Is. */
-		t.Errorf("Incorrect error\n got: %s\nwant: %s", got, want)
-	}
 	if "" != j {
 		t.Errorf("Unexpected JSON: %q", j)
+	}
+	jse, ok := errors.AsType[*json.SemanticError](err)
+	if !ok {
+		t.Fatalf("Incorrect error type\n got: %T\nwant: %T", err, jse)
+		return
+	}
+	if got, want := jse.JSONPointer, (jsontext.Pointer("")).AppendToken(
+		testUnmarshallableKey,
+	); got != want {
+		t.Errorf(
+			"Incorrect error JSON pointer\n got: %v\nwant: %v",
+			got,
+			want,
+		)
+	}
+	if got, want := jse.GoType, reflect.TypeFor[func()](); got != want {
+		t.Errorf(
+			"Incorrect error Go type\n got: %v\nwant: %v",
+			got,
+			want,
+		)
+	}
+}
+
+// Do we unnecessarily HTML-escape characters like <>?
+func TestMsgToJSON_UnnecessaryHTMLEscape(t *testing.T) {
+	var (
+		have = "LT:< GT:> AMP:&"
+
+		got  = M.With("k", have).String()
+		want = `{"k":"` + have + `"}`
+	)
+	if got != want {
+		t.Errorf(
+			"Incorrect escaping\n"+
+				"have: %v\n"+
+				" got: %v\n"+
+				"want: %v\n",
+			have,
+			got,
+			want,
+		)
+	}
+}
+
+// checkMarshalNaNError checks that err indicates an attempt to JSON-marshal a
+// NaN.
+func checkMarshalNaNError(t *testing.T, err error) {
+	/* Should come back as a semantic error. */
+	jse, ok := errors.AsType[*json.SemanticError](err)
+	if !ok {
+		t.Errorf("Incorrect error type\n got: %T\nwant: %T", err, jse)
+		return
+	}
+	/* Unfortunately, json/v2 rolls ad-hoc error strings. */
+	got, want := jse.Err, errors.New("unsupported value: NaN")
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Incorrect error\n got: %v\nwant: %v", got, want)
 	}
 }
 

@@ -48,7 +48,7 @@ go install github.com/magisterquis/curlrevshell@dev
   `-E`.  Also in tests.
 - [`-log`](./flags.md#-log): Logfile locking should work better with non-file
   files.
-- [`tlog`](../lib/tlog.go) - New better-than-[`chanlog`](../lib/chanlog) test
+- [`tlog`](../lib/tlog): New better-than-[`chanlog`](../lib/chanlog) test
   logging library.
 - [`-experimental-adapter-socket`](./flags.md#-experimental-adapter-socket):
   Preliminary support for comms adapters, for things like C2 over CW.
@@ -80,6 +80,7 @@ go install github.com/magisterquis/curlrevshell@dev
 - [`crstemplate`](../lib/crstemplate): `Execute` now does actually return
   template output even when the template file doesn't exist.
 - Various and sundry changes to accomodate building and testing on macOS.
+- [`tlog`](../lib/tlog): Failed tests no longer HTML-escape `<>?`.
 - Updated dependencies.
 
 
