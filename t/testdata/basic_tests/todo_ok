@@ -1,0 +1,6 @@
+./.git/hooks/sendemail-validate.sample:27:	# TODO: Replace with appropriate checks (e.g. spell checking).
+./.git/hooks/sendemail-validate.sample:35:	# TODO: Replace with appropriate checks for this patch
+./.git/hooks/sendemail-validate.sample:41:	# TODO: Replace with appropriate checks for the whole series
+./t/shmore.subr:654:                _tap_msg="${_tap_msg} # TODO $TAP_TODO"'
+
+vim: noet

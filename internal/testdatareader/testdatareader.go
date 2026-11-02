@@ -8,7 +8,7 @@
 //
 // Followed by package-level access to the Reader, e.g. one of the following:
 //
-//	// testdata reads test-specific data from the testdaat directory.
+//	// testdata reads test-specific data from the testdata directory.
 //	var testdata = testdatareader.Reader{FS: testdataFS}
 //
 //	// mustTDFile gets a test-specific file from testdataFS.
@@ -20,7 +20,7 @@ package testdatareader
  * Reader of Test Data, and other assorted test things
  * By J. Stuart McMurray
  * Created 20260815
- * Last Modified 20260815
+ * Last Modified 20261102
  */
 
 import (

@@ -4,7 +4,7 @@
 # Make sure extract_templates.awk works
 # By J. Stuart McMurray
 # Created 20250219
-# Last Modified 20261019
+# Last Modified 20261102
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ set -euo pipefail
 
 tap_plan 4
 
-TMPLD=$(mktemp -td test.tmpl.d.XXXXXXXXXX)
+TMPLD=$(mktemp -d)
 trap 'rm -r "$TMPLD"; tap_done_testing' EXIT
 
 # Extract ALL the (test) templates

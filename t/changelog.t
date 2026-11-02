@@ -4,12 +4,13 @@
 # Make sure our changelog looks ok
 # By J. Stuart McMurray
 # Created 20261022
-# Last Modified 20261022
+# Last Modified 20261102
 
 use autodie;
 use warnings;
 use strict;
 
+use experimental 'signatures'; # macOS...
 use feature 'signatures';
 
 use Fcntl qw/O_RDONLY/;

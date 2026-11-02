@@ -2,7 +2,7 @@
 # Put together a README with current help text
 # By J. Stuart McMurray
 # Created 20251209
-# Last Modified 20261017
+# Last Modified 20261102
 
 .SUFFIXES: .m4 .built
 
@@ -37,7 +37,9 @@ usage: ../../go.mod ../../go.sum ../../curlrevshell.go ${CURRENT_BRANCH_FILE}
 usage: ${PLEDGEUNVEIL_OTHER}
 	TD=$$(mktemp -d); TF=$$TD/curlrevshell;\
 		go build -o "$$TF" ../../ &&\
-		"$$TF" -h >$@.tmp 2>&1 &&\
+		"$$TF" -h 2>&1 | sed -Ee\
+			's,[^"]+/cert.txtar,/home/you/.cache/sstls/cert.txar,'\
+			>$@.tmp 2>&1 &&\
 		rm "$$TF" && rmdir "$$TD"
 	mv $@.tmp $@
 
@@ -67,7 +69,6 @@ downloading_deps: ../../go.mod ../../go.sum ${CURRENT_BRANCH_FILE}
 # Call a makefile in another directory
 call_make: .USE
 	${MAKE} -C ${@D} ${@F}
-
 
 clean:
 	rm -f *.built downloading_deps usage current_branch

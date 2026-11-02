@@ -10,7 +10,7 @@ testdata directory, e.g.
 
 Followed by package-level access to the Reader, e.g. one of the following:
 
-    // testdata reads test-specific data from the testdaat directory.
+    // testdata reads test-specific data from the testdata directory.
     var testdata = testdatareader.Reader{FS: testdataFS}
 
     // mustTDFile gets a test-specific file from testdataFS.

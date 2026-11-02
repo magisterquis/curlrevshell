@@ -4,7 +4,7 @@
 # Make sure docs are consistent with this version of curlrevshell
 # By J. Stuart McMurray
 # Created 20241203
-# Last Modified 20261019
+# Last Modified 20261102
 
 set -euo pipefail
 
@@ -94,7 +94,10 @@ GOT=$(diff \
         -L "README.md" \
         /dev/fd/3 /dev/fd/4 \
         3<<_eof 4<<_eof ||:
-$(go run . -h 2>&1 | grep -E -v '^Version')
+$(go run . -h 2>&1 \
+        | grep -E -v '^Version' \
+        | sed -Ee 's,[^"]+/cert.txtar,/home/you/.cache/sstls/cert.txar,'
+)
 _eof
 $(awk '
 /^Usage$/ { # For waiting until we have the usage section

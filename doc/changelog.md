@@ -79,6 +79,7 @@ go install github.com/magisterquis/curlrevshell@dev
   welcoming in new ways.
 - [`crstemplate`](../lib/crstemplate): `Execute` now does actually return
   template output even when the template file doesn't exist.
+- Various and sundry changes to accomodate building and testing on macOS.
 - Updated dependencies.
 
 
