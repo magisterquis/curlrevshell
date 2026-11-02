@@ -4,12 +4,13 @@
 # Can we connect via an adapter?
 # By J. Stuart McMurray
 # Created 20260809
-# Last Modified 20260905
+# Last Modified 20261102
 
 use autodie;
 use strict;
 use warnings;
 
+use experimental 'signatures'; # macOS...
 use feature 'signatures';
 
 use File::Temp;

@@ -4,7 +4,7 @@
 # Make sure tmplfuncs' docs are correct
 # By J. Stuart McMurray
 # Created 20250613
-# Last Modified 20261008
+# Last Modified 20261102
 
 use autodie;
 use strict;
@@ -15,6 +15,7 @@ use List::Util qw/first/;
 use Test::More tests => 11;
 use Tie::File;
 
+use experimental 'signatures'; # macOS...
 use feature 'signatures';
 
 my $libdir = "./lib/crstemplate/tmplfuncs";

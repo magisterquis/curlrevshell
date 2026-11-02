@@ -10,6 +10,7 @@ the next tagged version.  Get them with
 ```sh
 go install github.com/magisterquis/curlrevshell@bettertests
 ```
+- Various and sundry changes to accomodate building and testing on macOS.
 
 
 `dev`

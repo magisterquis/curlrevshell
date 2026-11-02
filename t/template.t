@@ -4,7 +4,7 @@
 # Make sure template things work as expected
 # By J. Stuart McMurray
 # Created 20241211
-# Last Modified 20261021
+# Last Modified 20261102
 
 set -e
 
@@ -14,8 +14,8 @@ tap_plan 13
 
 # We'll need a temporary template and a directory for the templates from
 # doc/template.md
-TMPLF=$(mktemp -t  test.tmpl.XXXXXXXXXX)
-TMPLD=$(mktemp -td test.tmpl.d.XXXXXXXXXX)
+TMPLF=$(mktemp)
+TMPLD=$(mktemp -d)
 trap 'rm -r "$TMPLF" "$TMPLD"; tap_done_testing' EXIT
 
 # Make sure we're not using html/template anywhere.
